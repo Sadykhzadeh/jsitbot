@@ -116,7 +116,7 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
     }
 
     const execution = await options.sandbox.execute(code);
-    const message = formatExecutionMessage(execution);
+    const message = formatExecutionMessage(execution, code);
     const preview = formatInlineExecutionPreview(execution);
 
     await ctx.answerInlineQuery(

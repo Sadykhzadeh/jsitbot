@@ -59,7 +59,7 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
     }
 
     const execution = await options.sandbox.execute(code);
-    const message = formatExecutionMessage(execution);
+    const message = formatExecutionMessage(execution, code);
 
     await ctx.reply(message.text, {
       parse_mode: message.parseMode,
