@@ -67,3 +67,126 @@ describe("private messages", () => {
     expect(reply.payload.text).toContain("exceeds the 2000-character limit");
   });
 });
+
+describe("edited messages", () => {
+  test("updates the earlier answer instead of sending another", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1 + 1", 5);
+    const [first] = harness.callsTo("sendMessage");
+
+    await harness.editMessage("20 + 22", 5);
+
+    expect(harness.callsTo("sendMessage")).toHaveLength(1);
+    const [edit] = harness.callsTo("editMessageText");
+    expect(edit.payload.chat_id).toBe(USER_ID);
+    expect(edit.payload.message_id).toBe(1_000);
+    expect(edit.payload.text).toContain("42");
+    expect(edit.payload.text).toContain("20 + 22");
+    expect(edit.payload.parse_mode).toBe("MarkdownV2");
+    expect(first.payload.text).toContain("*Result*");
+  });
+
+  test("keeps updating the same answer across several edits", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("2", 5);
+    await harness.editMessage("3", 5);
+
+    const edits = harness.callsTo("editMessageText");
+    expect(edits.map((edit) => edit.payload.message_id)).toEqual([1_000, 1_000]);
+    expect(edits[1].payload.text).toContain("3");
+  });
+
+  test("keeps answers to different messages apart", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1", 5);
+    await harness.sendMessage("2", 6);
+    await harness.editMessage("20", 5);
+    await harness.editMessage("30", 6);
+
+    const edits = harness.callsTo("editMessageText");
+    expect(edits.map((edit) => edit.payload.message_id)).toEqual([1_000, 1_001]);
+  });
+
+  test("does nothing when the text did not change", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1 + 1", 5);
+    await harness.editMessage("1 + 1", 5);
+
+    expect(harness.callsTo("editMessageText")).toHaveLength(0);
+    expect(harness.callsTo("sendMessage")).toHaveLength(1);
+  });
+
+  test("answers an edit the bot has no record of as a new message", async () => {
+    const harness = createHarness();
+
+    await harness.editMessage("6 * 7", 5);
+
+    expect(harness.callsTo("editMessageText")).toHaveLength(0);
+    const [reply] = harness.callsTo("sendMessage");
+    expect(reply.payload.text).toContain("42");
+    expect(reply.payload.reply_parameters).toEqual({ message_id: 5 });
+  });
+
+  test("sends a new answer when the old one can no longer be edited", async () => {
+    const harness = createHarness({
+      failures: { editMessageText: "Bad Request: message to edit not found" },
+    });
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("2", 5);
+
+    expect(harness.callsTo("sendMessage")).toHaveLength(2);
+    expect(harness.callsTo("sendMessage")[1].payload.text).toContain("*Result*");
+  });
+
+  test("does not repeat an answer Telegram says is already up to date", async () => {
+    const harness = createHarness({
+      failures: {
+        editMessageText:
+          "Bad Request: message is not modified: specified new message content and reply markup are exactly the same",
+      },
+    });
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("1 ", 5);
+
+    expect(harness.callsTo("editMessageText")).toHaveLength(1);
+    expect(harness.callsTo("sendMessage")).toHaveLength(1);
+  });
+
+  test("ignores an edit that turns the message into a command", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("/start", 5);
+
+    expect(harness.callsTo("editMessageText")).toHaveLength(0);
+  });
+
+  test("counts an edit against the rate limit", async () => {
+    const harness = createHarness({ maxRequests: 2 });
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("2", 5);
+    await harness.editMessage("3", 5);
+
+    const edits = harness.callsTo("editMessageText");
+    expect(edits).toHaveLength(2);
+    expect(edits[1].payload.text).toContain("Rate limit exceeded");
+  });
+
+  test("shows the length limit on the earlier answer", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("2".repeat(2_001), 5);
+
+    const [edit] = harness.callsTo("editMessageText");
+    expect(edit.payload.text).toContain("exceeds the 2000-character limit");
+  });
+});
