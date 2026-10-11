@@ -17,6 +17,7 @@ import {
   type SandboxOptions,
   type SandboxService,
 } from "./types";
+import { truncateText } from "../../utils/markdownV2";
 import { stripTypes } from "./typescript";
 import { createCappedModule, isHeapExhausted } from "./wasmHeap";
 
@@ -46,17 +47,6 @@ interface Packed {
   /** Line of the user's code an error came from. */
   line?: number;
   truncated: boolean;
-}
-
-function truncateValue(value: string, maxLength: number): { value: string; truncated: boolean } {
-  if (value.length <= maxLength) {
-    return { value, truncated: false };
-  }
-
-  return {
-    value: `${value.slice(0, Math.max(0, maxLength - 3))}...`,
-    truncated: true,
-  };
 }
 
 function normalizeUnknownError(error: unknown): string {
@@ -209,7 +199,7 @@ export class QuickJsSandboxService implements SandboxService {
       // out-of-memory error, so the guest sees a bare null instead of a message.
       const outOfMemory = error === "InternalError: out of memory" || (heapExhausted() && !timedOut);
       const message = timedOut ? TIMEOUT_MESSAGE : outOfMemory ? MEMORY_LIMIT_MESSAGE : error;
-      const bounded = truncateValue(message, this.options.maxResultLength);
+      const bounded = truncateText(message, this.options.maxResultLength);
 
       const ownError = !timedOut && !outOfMemory;
 
@@ -261,7 +251,7 @@ export class QuickJsSandboxService implements SandboxService {
           return failure(packed.text, { truncated: packed.truncated, line: packed.line });
         }
 
-        const result = truncateValue(packed.text, this.options.maxResultLength);
+        const result = truncateText(packed.text, this.options.maxResultLength);
 
         return {
           ok: true,
@@ -415,7 +405,7 @@ export class QuickJsSandboxService implements SandboxService {
       context.newFunction("hostLog", (line) => {
         const text = readString(context, line);
         if (text !== undefined && logs.length < maxLogs) {
-          logs.push(truncateValue(text, maxLogLength).value);
+          logs.push(truncateText(text, maxLogLength).value);
         }
       }),
     );

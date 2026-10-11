@@ -14,8 +14,12 @@ export function truncateText(text: string, maxLength: number): { value: string; 
     return { value: text, truncated: false };
   }
 
+  const end = Math.max(0, maxLength - 3);
+  const lastUnit = end > 0 ? text.charCodeAt(end - 1) : 0;
+  const keep = lastUnit >= 0xd800 && lastUnit <= 0xdbff ? end - 1 : end;
+
   return {
-    value: `${text.slice(0, Math.max(0, maxLength - 3))}...`,
+    value: `${text.slice(0, keep)}...`,
     truncated: true,
   };
 }

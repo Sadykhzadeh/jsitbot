@@ -146,3 +146,29 @@ describe("output limits", () => {
     expect(result.truncated).toBe(false);
   });
 });
+
+describe("cutting text that holds characters outside the BMP", () => {
+  // Half of a pair does not survive the trip out of the engine: it comes back
+  // as U+FFFD.
+  const brokenPair = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]|�/;
+
+  test("never leaves half of a pair at the end of a cut result, line or error", async () => {
+    for (const prefix of ["", "a", "ab", "abc"]) {
+      const result = await sandbox.execute(`
+        const text = ${JSON.stringify(prefix)} + "😀".repeat(5000);
+        console.log(text);
+        text
+      `);
+      expect(result.ok).toBe(true);
+      expect(result.truncated).toBe(true);
+      expect(brokenPair.test(result.ok ? result.result : "")).toBe(false);
+      expect(brokenPair.test(result.logs[0])).toBe(false);
+
+      const nested = await sandbox.execute(`[${JSON.stringify(prefix)} + "😀".repeat(2000)]`);
+      expect(brokenPair.test(nested.ok ? nested.result : "")).toBe(false);
+
+      const failure = await sandbox.execute(`throw new Error(${JSON.stringify(prefix)} + "😀".repeat(5000))`);
+      expect(brokenPair.test(failure.ok ? "" : failure.error)).toBe(false);
+    }
+  });
+});
