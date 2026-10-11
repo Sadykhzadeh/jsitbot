@@ -20,6 +20,8 @@
   const MAX_SCAN = 100000;
   const LINE_WIDTH = 72;
 
+  const MAX_TIMER_DELAY = 2147483647;
+
   const uncurry = Function.prototype.call.bind.bind(Function.prototype.call);
   const toText = String;
 
@@ -31,6 +33,7 @@
   const freeze = Object.freeze;
   const functionPrototype = Function.prototype;
 
+  const arraySplice = uncurry(Array.prototype.splice);
   const objectToString = uncurry(Object.prototype.toString);
   const hasOwn = uncurry(Object.prototype.hasOwnProperty);
   const isEnumerable = uncurry(Object.prototype.propertyIsEnumerable);
@@ -527,5 +530,56 @@
   });
   Object.defineProperty(globalThis, "console", { value: console, writable: false, configurable: false, enumerable: false });
 
-  return { finish, fail };
+  // Timers run on a virtual clock. The host calls tick() once the promise queue
+  // is empty, and each call fires the earliest timer, so a sleep costs no real
+  // time and a run never holds the sandbox while it waits.
+  const timers = [];
+  let timerClock = 0;
+  let lastTimerId = 0;
+
+  function setTimeout(callback, delay, ...args) {
+    if (typeof callback !== "function") {
+      throw new TypeError("The callback must be a function");
+    }
+
+    const timer = {
+      id: ++lastTimerId,
+      at: timerClock + (delay >= 1 && delay <= MAX_TIMER_DELAY ? +delay : 1),
+      callback,
+      args,
+    };
+    let low = 0;
+    let high = timers.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (timers[middle].at <= timer.at) low = middle + 1;
+      else high = middle;
+    }
+    arraySplice(timers, low, 0, timer);
+
+    return timer.id;
+  }
+
+  function clearTimeout(id) {
+    for (let i = 0; i < timers.length; i++) {
+      if (timers[i].id === id) {
+        arraySplice(timers, i, 1);
+        return;
+      }
+    }
+  }
+
+  function tick() {
+    if (timers.length === 0) return false;
+
+    const timer = arraySplice(timers, 0, 1)[0];
+    timerClock = timer.at;
+    timer.callback(...timer.args);
+    return true;
+  }
+
+  Object.defineProperty(globalThis, "setTimeout", { value: setTimeout, writable: true, configurable: true, enumerable: false });
+  Object.defineProperty(globalThis, "clearTimeout", { value: clearTimeout, writable: true, configurable: true, enumerable: false });
+
+  return { finish, fail, tick };
 })

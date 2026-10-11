@@ -96,6 +96,7 @@ type Attempt =
 
 interface Guest {
   finish: QuickJSHandle;
+  tick: QuickJSHandle;
   fail: QuickJSHandle;
 }
 
@@ -369,7 +370,7 @@ export class QuickJsSandboxService implements SandboxService {
       return this.afterParseFailure(this.packFailure(context, guest.fail, evaluated.error));
     }
 
-    return { settled: true, packed: this.settle(context, runtime, guest.finish, evaluated.value, expired) };
+    return { settled: true, packed: this.settle(context, runtime, guest, evaluated.value, expired) };
   }
 
   private attemptScript(
@@ -390,7 +391,7 @@ export class QuickJsSandboxService implements SandboxService {
     const evaluated = context.evalCode(code, GUEST_FILE);
     const packed = evaluated.error
       ? this.packFailure(context, guest.fail, evaluated.error)
-      : this.settle(context, runtime, guest.finish, evaluated.value, expired);
+      : this.settle(context, runtime, guest, evaluated.value, expired);
 
     return { settled: true, packed };
   }
@@ -433,6 +434,7 @@ export class QuickJsSandboxService implements SandboxService {
 
     return {
       finish: handles.add(context.getProp(api, "finish")),
+      tick: handles.add(context.getProp(api, "tick")),
       fail: handles.add(context.getProp(api, "fail")),
     };
   }
@@ -456,15 +458,45 @@ export class QuickJsSandboxService implements SandboxService {
     return raw === undefined ? undefined : unpack(raw);
   }
 
+  /**
+   * Runs the promise jobs, then fires the guest's timers one at a time, earliest
+   * first, running the jobs each one leaves behind, until no timer is left. A
+   * timer whose callback throws ends the run with that error.
+   */
+  private runTimers(
+    context: QuickJSContext,
+    runtime: QuickJSRuntime,
+    guest: Guest,
+    expired: () => boolean,
+  ): Packed | undefined {
+    for (;;) {
+      drainPendingJobs(runtime, expired);
+      if (expired()) {
+        throw new Error("InternalError: interrupted");
+      }
+
+      const ticked = context.callFunction(guest.tick, context.undefined);
+      if (ticked.error) {
+        return this.packFailure(context, guest.fail, ticked.error) ?? { ok: false, text: UNREADABLE_MESSAGE, truncated: false };
+      }
+
+      const fired = context.dump(ticked.value) === true;
+      ticked.value.dispose();
+      if (!fired) {
+        return undefined;
+      }
+    }
+  }
+
   /** Lets the code's promise run to completion, then reads what the guest packed. */
   private settle(
     context: QuickJSContext,
     runtime: QuickJSRuntime,
-    finish: QuickJSHandle,
+    guest: Guest,
     pending: QuickJSHandle,
     expired: () => boolean,
   ): Packed | undefined {
-    const called = context.callFunction(finish, context.undefined, pending);
+    const called = context.callFunction(guest.finish, context.undefined, pending);
     pending.dispose();
 
     if (called.error) {
@@ -474,7 +506,10 @@ export class QuickJsSandboxService implements SandboxService {
 
     const settled = called.value;
     try {
-      drainPendingJobs(runtime, expired);
+      const timerFailure = this.runTimers(context, runtime, guest, expired);
+      if (timerFailure) {
+        return timerFailure;
+      }
 
       const state = context.getPromiseState(settled);
       if (state.type === "pending") {
