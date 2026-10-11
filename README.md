@@ -21,7 +21,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 ## Security
 
 - Fresh WebAssembly instance and QuickJS runtime per execution; nothing survives into the next run
-- Runs on a worker thread. A run that has not reported back 400 ms after its timeout is terminated and the worker replaced, so even a single native call that never returns cannot hold the bot
+- Runs in a separate process that has none of the bot's configuration. A run that has not reported back 400 ms after its timeout gets the process killed and replaced, so even a single native call that never returns cannot hold the bot or keep eating memory
 - Hard memory cap on the WebAssembly heap (QuickJS's own limit does not see large allocations in the Emscripten build)
 - Timeout enforced by the engine's interrupt handler, with a clock that starts when the guest does
 - Output is bounded inside the sandbox: at most 50 console lines of 2000 characters and a 4000-character result, whatever the code prints

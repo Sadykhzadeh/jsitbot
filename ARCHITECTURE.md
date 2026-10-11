@@ -8,7 +8,7 @@
 flowchart LR
     A["Telegram update"] --> B["Bot layer"]
     B --> C["Guards"]
-    C --> D["Sandbox worker (QuickJS)"]
+    C --> D["Sandbox process (QuickJS)"]
     D --> E["Formatter"]
     E --> F["Telegram response"]
 ```
@@ -17,7 +17,7 @@ flowchart LR
 
 - Bot layer: receives Telegram updates and routes them to the right handler
 - Guard layer: applies basic validation and rate limiting
-- Sandbox layer: runs untrusted JavaScript in isolation, on a worker thread
+- Sandbox layer: runs untrusted JavaScript in isolation, in a separate process
 - Formatting layer: converts output into Telegram-safe text
 
 ## Private Message Flow
@@ -62,21 +62,21 @@ Notes:
 
 ```mermaid
 flowchart TD
-    A["User code"] --> B["Worker thread"]
+    A["User code"] --> B["Sandbox process"]
     B --> C["Fresh WebAssembly instance, capped heap"]
     C --> D["Guest runtime: console, formatter"]
     D --> E["Read the code: expression, script, function body, or TypeScript with types removed"]
     E --> F["Execute with interrupt handler"]
     F --> G["Bounded result string"]
-    G --> H["Back to the main thread"]
+    G --> H["Back to the bot over IPC"]
 ```
 
-- The worker holds the QuickJS engine and a spare WebAssembly instance that is built while it is idle. Every run takes one instance and drops it afterwards.
+- The child process holds the QuickJS engine and a spare WebAssembly instance that is built while it is idle. Every run takes one instance and drops it afterwards. It is started with a minimal environment (no bot token) and exits when the bot goes away.
 - The instance's memory has a hard maximum. QuickJS's own memory limit counts allocations rather than bytes in the Emscripten build, so it is not what stops a memory bomb.
 - The guest runtime (`guest.js`) is evaluated first. It captures the built-ins it relies on, installs `console`, and turns results, errors and log lines into short strings, so nothing the guest controls is walked by the host.
 - The code is tried as one expression, then as a script (the last statement's value is the result), then as a function body (`return`, top-level `await`). If none parses, the types are stripped with Bun's transpiler and the same readings are tried again.
-- The main thread waits for the worker for the timeout plus a grace period. If the worker is still busy after that, it is terminated and replaced, and the run is reported as timed out.
-- If a worker cannot be started in the environment, the bot logs it and runs QuickJS on the main thread, which keeps the interrupt handler and the memory cap but not the hard kill.
+- The bot waits for the child for the timeout plus a grace period. If it is still busy after that, it is killed and replaced (a replacement is ready in about 70 ms), and the run is reported as timed out. A process is killed outright; a worker thread kept running a stuck native call, and its memory, for seconds after being terminated.
+- If a process cannot be started in the environment, the bot logs it and runs QuickJS inside itself, which keeps the interrupt handler and the memory cap but not the hard kill.
 
 ## Execution Surfaces
 
@@ -88,7 +88,7 @@ Both surfaces share the same execution model and the same output contract.
 ## Security Model
 
 - Each execution is isolated: its own WebAssembly instance, runtime and context
-- CPU time is limited by the engine's interrupt handler and, as a backstop, by terminating the worker; memory is limited by the instance's maximum size
+- CPU time is limited by the engine's interrupt handler and, as a backstop, by killing the process; memory is limited by the instance's maximum size
 - Host APIs are not exposed inside guest code
 - Output size is bounded inside the sandbox
 - Per-user rate limits apply to private messages, edits and inline queries; a run that times out is charged extra
