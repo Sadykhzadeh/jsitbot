@@ -29,6 +29,13 @@ const UNREADABLE_MESSAGE = "The sandbox returned a result it could not read.";
 // by the interrupt handler inside them.
 const JOB_BATCH_SIZE = 1_000;
 
+const WARM_UP_PROGRAMS = [
+  "0",
+  `const rows = [1, 2, 3].map((n) => ({ n, label: "row " + n })); console.log(rows); rows`,
+  `return { ok: true, items: new Map([["a", [1, 2]]]) }`,
+  `const total: number = 1; null.missing`,
+];
+
 const FLAG_RESULT_CUT = 1;
 const FLAG_LOGS_CUT = 2;
 
@@ -149,9 +156,15 @@ export class QuickJsSandboxService implements SandboxService {
     this.options = resolveSandboxOptions(options);
   }
 
-  /** Pays for the first instance and warms up the interpreter before a real run needs them. */
+  /**
+   * Pays for the first instance and warms up the paths a real run takes (the
+   * three readings of the code, objects, console output, errors) so that the
+   * first message is not slower than the thousandth.
+   */
   async warmUp(): Promise<void> {
-    await this.execute("0");
+    for (const code of WARM_UP_PROGRAMS) {
+      await this.execute(code);
+    }
     this.prepareSpare();
     await this.spareModule;
   }
