@@ -77,6 +77,15 @@ function unpack(raw: string): Packed | undefined {
   };
 }
 
+type Attempt =
+  | { settled: true; packed: Packed | undefined }
+  | { settled: false; parseError: Packed };
+
+interface Guest {
+  finish: QuickJSHandle;
+  fail: QuickJSHandle;
+}
+
 function isSyntaxError(packed: Packed): boolean {
   return !packed.ok && packed.text.startsWith("SyntaxError");
 }
@@ -250,11 +259,17 @@ export class QuickJsSandboxService implements SandboxService {
   }
 
   /**
-   * Tries the code as a single expression first, so `1 + 1` and `{ a: 1 }` give
-   * their value, and as the body of a function second, so statements, `return`
-   * and top-level `await` work. Both are wrapped in an async function: the only
-   * thing that can throw while evaluating them is a parse error, never the code
-   * itself, which is why it is safe to fall through to the next form.
+   * Finds the reading of the code that parses, in this order:
+   *
+   * 1. one expression (`1 + 1`, `{ a: 1 }`, `await load()`), whose value is the result;
+   * 2. a script (`const a = 1; a + 1`), whose result is the value of its last
+   *    statement, as in a REPL;
+   * 3. the body of a function (`return`, top-level `await` next to statements).
+   *
+   * The first and last are wrapped in an async function, so the only thing that
+   * can throw while evaluating them is a parse error, never the code itself. A
+   * script can throw anything, so it is compiled without running first: a
+   * SyntaxError from `JSON.parse` must not send the code round again.
    */
   private evaluate(
     context: QuickJSContext,
@@ -265,32 +280,76 @@ export class QuickJsSandboxService implements SandboxService {
     expired: () => boolean,
   ): Packed | undefined {
     const guest = this.installGuest(context, logs, handles);
+    const attempts: Array<() => Attempt> = [
+      () => this.attemptWrapped(context, runtime, guest, wrapAsExpression(code), expired),
+      () => this.attemptScript(context, runtime, guest, code, expired),
+      () => this.attemptWrapped(context, runtime, guest, wrapAsStatements(code), expired),
+    ];
     let parseError: Packed | undefined;
 
-    for (const source of [wrapAsExpression(code), wrapAsStatements(code)]) {
-      const evaluated = context.evalCode(source, GUEST_FILE);
-
-      if (evaluated.error) {
-        const packed = this.packFailure(context, guest.fail, evaluated.error);
-        if (!packed || !isSyntaxError(packed)) {
-          return packed;
-        }
-
-        parseError = packed;
-        continue;
+    for (const attempt of attempts) {
+      const outcome = attempt();
+      if (outcome.settled) {
+        return outcome.packed;
       }
 
-      return this.settle(context, runtime, guest.finish, evaluated.value, expired);
+      parseError = outcome.parseError;
     }
 
     return parseError;
+  }
+
+  private attemptWrapped(
+    context: QuickJSContext,
+    runtime: QuickJSRuntime,
+    guest: Guest,
+    source: string,
+    expired: () => boolean,
+  ): Attempt {
+    const evaluated = context.evalCode(source, GUEST_FILE);
+
+    if (evaluated.error) {
+      return this.afterParseFailure(this.packFailure(context, guest.fail, evaluated.error));
+    }
+
+    return { settled: true, packed: this.settle(context, runtime, guest.finish, evaluated.value, expired) };
+  }
+
+  private attemptScript(
+    context: QuickJSContext,
+    runtime: QuickJSRuntime,
+    guest: Guest,
+    code: string,
+    expired: () => boolean,
+  ): Attempt {
+    const compiled = context.evalCode(code, GUEST_FILE, { compileOnly: true });
+
+    if (compiled.error) {
+      return this.afterParseFailure(this.packFailure(context, guest.fail, compiled.error));
+    }
+    compiled.value.dispose();
+
+    // It parses, so whatever happens from here on is the code's own doing.
+    const evaluated = context.evalCode(code, GUEST_FILE);
+    const packed = evaluated.error
+      ? this.packFailure(context, guest.fail, evaluated.error)
+      : this.settle(context, runtime, guest.finish, evaluated.value, expired);
+
+    return { settled: true, packed };
+  }
+
+  /** A parse error means "try the next reading"; anything else is the answer. */
+  private afterParseFailure(packed: Packed | undefined): Attempt {
+    return packed && isSyntaxError(packed)
+      ? { settled: false, parseError: packed }
+      : { settled: true, packed };
   }
 
   private installGuest(
     context: QuickJSContext,
     logs: string[],
     handles: HandleBin,
-  ): { finish: QuickJSHandle; fail: QuickJSHandle } {
+  ): Guest {
     const { maxLogs, maxLogLength, maxResultLength } = this.options;
 
     const setup = handles.add(context.unwrapResult(context.evalCode(guestRuntimeSource, "guest.js")));
