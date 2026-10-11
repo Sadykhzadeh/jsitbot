@@ -29,7 +29,7 @@ const DEFAULT_OPTIONS: SandboxOptions = {
 type AttemptResult =
   | { kind: "ok"; value: GuestExecutionShape }
   | { kind: "syntax-error"; error: string }
-  | { kind: "runtime-error"; error: string; timedOut: boolean };
+  | { kind: "runtime-error"; error: string };
 
 function truncateValue(value: string, maxLength: number): { value: string; truncated: boolean } {
   if (value.length <= maxLength) {
@@ -54,12 +54,8 @@ function isSyntaxErrorMessage(message: string): boolean {
   return /syntaxerror|unexpected token|expecting|parse error/i.test(message);
 }
 
-function isTimeoutErrorMessage(message: string): boolean {
-  return /interrupt|interrupted|timeout/i.test(message);
-}
-
 function isMemoryErrorMessage(message: string): boolean {
-  return /out of memory|memory/i.test(message);
+  return message === "InternalError: out of memory";
 }
 
 function serializeHostLogArg(arg: unknown): string {
@@ -191,8 +187,8 @@ function disposeQuietly(dispose: () => void): void {
   try {
     dispose();
   } catch {
-    // A runtime that was cut short by an abort can fail its own teardown. Its
-    // WebAssembly instance is thrown away either way, so there is nothing to save.
+    // A runtime that was cut short can fail its own teardown. Its WebAssembly
+    // instance is thrown away either way, so there is nothing to save.
   }
 }
 
@@ -238,9 +234,9 @@ export class QuickJsSandboxService implements SandboxService {
   }
 
   async execute(code: string): Promise<SandboxExecution> {
-    const startedAt = performance.now();
+    let startedAt = performance.now();
     const logs: string[] = [];
-    let timedOut = false;
+    let interrupted = false;
     let truncated = false;
     let heapExhausted = () => false;
 
@@ -256,7 +252,17 @@ export class QuickJsSandboxService implements SandboxService {
       const context = runtime.newContext();
 
       try {
-        this.installInterruptHandler(runtime, startedAt);
+        // The clock starts when the guest does: time spent waiting for an
+        // instance or behind another run is not the guest's to pay for.
+        startedAt = performance.now();
+        runtime.setInterruptHandler(() => {
+          if (performance.now() - startedAt <= this.options.timeoutMs) {
+            return false;
+          }
+
+          interrupted = true;
+          return true;
+        });
         this.installConsoleBridge(context, logs);
 
         const expressionAttempt = await this.evaluateWrappedSource(
@@ -277,36 +283,30 @@ export class QuickJsSandboxService implements SandboxService {
           if (statementAttempt.kind === "ok") {
             execution = statementAttempt.value;
           } else {
-            timedOut =
-              statementAttempt.kind === "runtime-error"
-                ? statementAttempt.timedOut
-                : false;
             return this.failureFromAttempt(
               statementAttempt.error,
               logs,
               startedAt,
-              timedOut,
+              interrupted,
               heapExhausted(),
             );
           }
         } else {
-          timedOut = expressionAttempt.timedOut;
           return this.failureFromAttempt(
             expressionAttempt.error,
             logs,
             startedAt,
-            timedOut,
+            interrupted,
             heapExhausted(),
           );
         }
 
         if (!execution.ok) {
-          timedOut = isTimeoutErrorMessage(String(execution.error ?? ""));
           return this.failureFromAttempt(
             String(execution.error ?? "Unknown execution error"),
             logs,
             startedAt,
-            timedOut,
+            interrupted,
             heapExhausted(),
           );
         }
@@ -326,23 +326,23 @@ export class QuickJsSandboxService implements SandboxService {
           truncated,
         };
       } finally {
-        disposeQuietly(() => this.teardownConsoleBridge(context));
-        disposeQuietly(() => context.dispose());
-        disposeQuietly(() => runtime.dispose());
+        // A runtime that died of an exhausted heap trips an assertion when it is
+        // freed. The whole instance is dropped right after, so skip the teardown.
+        if (!heapExhausted()) {
+          disposeQuietly(() => this.teardownConsoleBridge(context));
+          disposeQuietly(() => context.dispose());
+          disposeQuietly(() => runtime.dispose());
+        }
       }
     } catch (error) {
-      const message = normalizeUnknownError(error);
-      timedOut = timedOut || isTimeoutErrorMessage(message);
-      return this.failureFromAttempt(message, logs, startedAt, timedOut, heapExhausted());
+      return this.failureFromAttempt(
+        normalizeUnknownError(error),
+        logs,
+        startedAt,
+        interrupted,
+        heapExhausted(),
+      );
     }
-  }
-
-  private installInterruptHandler(runtime: QuickJSRuntime, startedAt: number): void {
-    runtime.setInterruptHandler(() => {
-      const expired = performance.now() - startedAt > this.options.timeoutMs;
-
-      return expired;
-    });
   }
 
   private installConsoleBridge(context: QuickJSContext, logs: string[]): void {
@@ -388,23 +388,14 @@ export class QuickJsSandboxService implements SandboxService {
       const error = errorHandleToString(context, result.error);
       return isSyntaxErrorMessage(error)
         ? { kind: "syntax-error", error }
-        : {
-            kind: "runtime-error",
-            error,
-            timedOut: isTimeoutErrorMessage(error),
-          };
+        : { kind: "runtime-error", error };
     }
 
     try {
       const native = resolvePromiseResult(context, result.value);
       return { kind: "ok", value: native };
     } catch (error) {
-      const message = normalizeUnknownError(error);
-      return {
-        kind: "runtime-error",
-        error: message,
-        timedOut: isTimeoutErrorMessage(message),
-      };
+      return { kind: "runtime-error", error: normalizeUnknownError(error) };
     }
   }
 

@@ -12,9 +12,22 @@ const sandbox = new QuickJsSandboxService({
   maxResultLength: 4_000,
 });
 
-async function timed(code: string): Promise<{ result: SandboxExecution; wallMs: number }> {
+// Same limits apart from a short clock, so the time-limit cases stay quick.
+const quickSandbox = new QuickJsSandboxService({
+  timeoutMs: 250,
+  memoryLimitBytes: 64 * 1024 * 1024,
+  maxStackSizeBytes: 512 * 1024,
+  maxLogs: 50,
+  maxLogLength: 2_000,
+  maxResultLength: 4_000,
+});
+
+async function timed(
+  code: string,
+  service: QuickJsSandboxService = sandbox,
+): Promise<{ result: SandboxExecution; wallMs: number }> {
   const startedAt = performance.now();
-  const result = await sandbox.execute(code);
+  const result = await service.execute(code);
   return { result, wallMs: performance.now() - startedAt };
 }
 
@@ -46,6 +59,11 @@ describe("memory limits", () => {
     "map that never stops growing": `
       const kept = new Map();
       for (let i = 0; ; i++) kept.set(i, "x".repeat(1000));
+    `,
+    "a promise chain that keeps every link alive": `
+      function again() { return Promise.resolve().then(again); }
+      again();
+      await new Promise(() => {});
     `,
     "many small objects": `
       const kept = [];
@@ -89,5 +107,70 @@ describe("memory limits", () => {
     if (result.ok) {
       expect(result.result).toBe("50000");
     }
+  });
+});
+
+describe("time limits", () => {
+  const spinners: Record<string, string> = {
+    "an empty loop": `while (true) {}`,
+    "a loop that swallows errors": `
+      while (true) {
+        try { for (;;) {} } catch (error) {}
+      }
+    `,
+    "a loop inside a finally block": `
+      try { throw 1 } finally { while (true) {} }
+    `,
+    "recursion that allocates": `
+      const sink = [];
+      function spin() { sink.push([]); spin(); sink.length = 0; spin(); }
+      try { spin() } catch (error) {}
+      while (true) {}
+    `,
+    "a promise chain that never ends": `
+      function again() { Promise.resolve().then(again); }
+      again();
+      await new Promise(() => {});
+    `,
+    "a spin inside an async function": `
+      await Promise.resolve();
+      while (true) {}
+    `,
+    "a runaway regular expression": `/^(a+)+$/.test("a".repeat(40) + "b")`,
+    "a getter that never returns": `
+      const trap = { get value() { while (true) {} } };
+      return trap.value;
+    `,
+    "a proxy trap that never returns": `
+      const trap = new Proxy({}, { ownKeys() { while (true) {} } });
+      return Object.keys(trap);
+    `,
+  };
+
+  for (const [name, code] of Object.entries(spinners)) {
+    test(`stops ${name} and keeps serving`, async () => {
+      const { result, wallMs } = await timed(code, quickSandbox);
+
+      expect(result.ok).toBe(false);
+      expect(result.timedOut).toBe(true);
+      if (!result.ok) {
+        expect(result.error).toBe("Sandbox execution timed out.");
+      }
+      expect(wallMs).toBeLessThan(1_000);
+
+      await expectStillHealthy();
+    });
+  }
+
+  test("does not charge the guest for time spent waiting to start", async () => {
+    const pending = quickSandbox.execute("1 + 1");
+    const blockedUntil = performance.now() + 600;
+    while (performance.now() < blockedUntil) {
+      // Stand-in for a queue: the guest has not started, but the clock at the
+      // call site is already well past the timeout.
+    }
+    const result = await pending;
+
+    expect(result.ok).toBe(true);
   });
 });
