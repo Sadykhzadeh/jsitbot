@@ -3,8 +3,10 @@ import { describe, expect, test } from "bun:test";
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 import type { SandboxExecution } from "../src/services/sandbox/types";
 
+// A generous clock: the memory cases must end because the memory ran out, not
+// because a slow machine ran out of time first.
 const sandbox = new QuickJsSandboxService({
-  timeoutMs: 700,
+  timeoutMs: 4_000,
   memoryLimitBytes: 64 * 1024 * 1024,
   maxStackSizeBytes: 512 * 1024,
   maxLogs: 50,
@@ -79,7 +81,7 @@ describe("memory limits", () => {
       if (!result.ok) {
         expect(result.error).toBe("Sandbox exceeded its memory limit.");
       }
-      expect(wallMs).toBeLessThan(3_000);
+      expect(wallMs).toBeLessThan(3_500);
 
       await expectStillHealthy();
     });
