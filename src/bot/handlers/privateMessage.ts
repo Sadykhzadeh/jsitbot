@@ -6,6 +6,7 @@ import {
   SlidingWindowRateLimiter,
   isCodeLengthAllowed,
 } from "../../security/rateLimiter";
+import { isBotCommand } from "../commands";
 import {
   formatExecutionMessage,
   formatRejectionMessage,
@@ -37,7 +38,7 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
     }
 
     const code = ctx.message.text;
-    if (code.startsWith("/")) {
+    if (isBotCommand(code)) {
       return;
     }
 
