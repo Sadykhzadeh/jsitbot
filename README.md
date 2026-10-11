@@ -17,6 +17,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Accepts TypeScript syntax (the types are stripped)
 - Has `setTimeout` and `clearTimeout` on a virtual clock: a sleep returns at once instead of using up the time limit, and `Date.now()` does not move
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors, cycles
+- Besides `console.log` and friends it has `console.table`, `assert`, `count` and `group`
 - Reports the line an error came from
 
 ## Security
