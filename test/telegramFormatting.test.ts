@@ -126,3 +126,51 @@ describe("telegramExecutionMessage", () => {
     expect(preview.description).toContain("failed in 15ms");
   });
 });
+
+describe("error locations", () => {
+  const failure = (line?: number) => ({
+    ok: false as const,
+    logs: [],
+    error: "ReferenceError: 'total' is not defined",
+    ...(line ? { line } : {}),
+    durationMs: 4,
+    timedOut: false,
+    truncated: false,
+  });
+  const code = "const items = [1, 2];\nconst sum = items.length;\nconsole.log(total);\nsum";
+
+  test("names the line and shows what is on it", () => {
+    const message = formatExecutionMessage(failure(3), code);
+
+    expect(message.text).toContain("ReferenceError: 'total' is not defined\n    at line 3: console.log(total);");
+  });
+
+  test("cuts a long source line", () => {
+    const longLine = `const x = ${"1 + ".repeat(40)}1;`;
+    const message = formatExecutionMessage(failure(2), `first();\n${longLine}\nlast();`);
+
+    const errorSection = message.text.slice(message.text.indexOf("*Error*"));
+
+    expect(errorSection).toContain("at line 2: const x = 1 + 1 + 1");
+    expect(errorSection).toContain("...");
+    expect(errorSection).not.toContain(longLine);
+  });
+
+  test("leaves one-line code alone, since the location is obvious", () => {
+    const message = formatExecutionMessage(failure(1), "console.log(total)");
+
+    expect(message.text).not.toContain("at line");
+  });
+
+  test("ignores a line the code does not have", () => {
+    const message = formatExecutionMessage(failure(40), code);
+
+    expect(message.text).not.toContain("at line");
+  });
+
+  test("shows nothing extra when the line is unknown", () => {
+    const message = formatExecutionMessage(failure(), code);
+
+    expect(message.text).not.toContain("at line");
+  });
+});
