@@ -1,8 +1,8 @@
-import {
-  getQuickJS,
-  type QuickJSContext,
-  type QuickJSHandle,
-  type QuickJSRuntime,
+import type {
+  QuickJSContext,
+  QuickJSHandle,
+  QuickJSRuntime,
+  QuickJSWASMModule,
 } from "quickjs-emscripten";
 
 import {
@@ -15,6 +15,7 @@ import type {
   SandboxOptions,
   SandboxService,
 } from "./types";
+import { createCappedModule, isHeapExhausted } from "./wasmHeap";
 
 const DEFAULT_OPTIONS: SandboxOptions = {
   timeoutMs: 700,
@@ -186,8 +187,18 @@ function resolvePromiseResult(
   }
 }
 
+function disposeQuietly(dispose: () => void): void {
+  try {
+    dispose();
+  } catch {
+    // A runtime that was cut short by an abort can fail its own teardown. Its
+    // WebAssembly instance is thrown away either way, so there is nothing to save.
+  }
+}
+
 export class QuickJsSandboxService implements SandboxService {
   private readonly options: SandboxOptions;
+  private spareModule: Promise<QuickJSWASMModule> | undefined;
 
   constructor(options?: Partial<SandboxOptions>) {
     this.options = {
@@ -196,14 +207,48 @@ export class QuickJsSandboxService implements SandboxService {
     };
   }
 
+  /** Builds the next WebAssembly instance ahead of time so the first run does not pay for it. */
+  async warmUp(): Promise<void> {
+    this.prepareSpare();
+    await this.spareModule;
+  }
+
+  private takeModule(): Promise<QuickJSWASMModule> {
+    const module = this.spareModule ?? createCappedModule(this.options.memoryLimitBytes);
+    this.spareModule = undefined;
+
+    // After the reply is on its way rather than before the next run starts.
+    setTimeout(() => this.prepareSpare(), 0);
+
+    return module;
+  }
+
+  private prepareSpare(): void {
+    if (this.spareModule) {
+      return;
+    }
+
+    const spare = createCappedModule(this.options.memoryLimitBytes);
+    this.spareModule = spare;
+    spare.catch(() => {
+      if (this.spareModule === spare) {
+        this.spareModule = undefined;
+      }
+    });
+  }
+
   async execute(code: string): Promise<SandboxExecution> {
     const startedAt = performance.now();
     const logs: string[] = [];
     let timedOut = false;
     let truncated = false;
+    let heapExhausted = () => false;
 
     try {
-      const quickjs = await getQuickJS();
+      // A fresh instance with its own capped memory for every run, so a run that
+      // exhausts or corrupts it cannot affect the next one.
+      const quickjs = await this.takeModule();
+      heapExhausted = () => isHeapExhausted(quickjs, this.options.memoryLimitBytes);
       const runtime = quickjs.newRuntime({
         memoryLimitBytes: this.options.memoryLimitBytes,
         maxStackSizeBytes: this.options.maxStackSizeBytes,
@@ -241,6 +286,7 @@ export class QuickJsSandboxService implements SandboxService {
               logs,
               startedAt,
               timedOut,
+              heapExhausted(),
             );
           }
         } else {
@@ -250,6 +296,7 @@ export class QuickJsSandboxService implements SandboxService {
             logs,
             startedAt,
             timedOut,
+            heapExhausted(),
           );
         }
 
@@ -260,6 +307,7 @@ export class QuickJsSandboxService implements SandboxService {
             logs,
             startedAt,
             timedOut,
+            heapExhausted(),
           );
         }
 
@@ -278,14 +326,14 @@ export class QuickJsSandboxService implements SandboxService {
           truncated,
         };
       } finally {
-        this.teardownConsoleBridge(context);
-        context.dispose();
-        runtime.dispose();
+        disposeQuietly(() => this.teardownConsoleBridge(context));
+        disposeQuietly(() => context.dispose());
+        disposeQuietly(() => runtime.dispose());
       }
     } catch (error) {
       const message = normalizeUnknownError(error);
       timedOut = timedOut || isTimeoutErrorMessage(message);
-      return this.failureFromAttempt(message, logs, startedAt, timedOut);
+      return this.failureFromAttempt(message, logs, startedAt, timedOut, heapExhausted());
     }
   }
 
@@ -365,8 +413,11 @@ export class QuickJsSandboxService implements SandboxService {
     logs: string[],
     startedAt: number,
     timedOut: boolean,
+    heapExhausted: boolean,
   ): SandboxExecution {
-    const normalized = isMemoryErrorMessage(error)
+    // With the heap used up to the last page QuickJS cannot even allocate its
+    // out-of-memory error, so the guest sees a bare null instead of a message.
+    const normalized = isMemoryErrorMessage(error) || (heapExhausted && !timedOut)
       ? "Sandbox exceeded its memory limit."
       : timedOut
         ? "Sandbox execution timed out."
