@@ -327,17 +327,14 @@ export class QuickJsSandboxService implements SandboxService {
   }
 
   /**
-   * Finds the reading of the code that parses, in this order:
+   * Finds the reading of the code that parses, in this order: one expression
+   * (`1 + 1`, `{ a: 1 }`), a script whose last statement is the result
+   * (`const a = 1; a + 1`), the body of a function (`return`, top-level `await`).
    *
-   * 1. one expression (`1 + 1`, `{ a: 1 }`, `await load()`), whose value is the result;
-   * 2. a script (`const a = 1; a + 1`), whose result is the value of its last
-   *    statement, as in a REPL;
-   * 3. the body of a function (`return`, top-level `await` next to statements).
-   *
-   * The first and last are wrapped in an async function, so the only thing that
-   * can throw while evaluating them is a parse error, never the code itself. A
-   * script can throw anything, so it is compiled without running first: a
-   * SyntaxError from `JSON.parse` must not send the code round again.
+   * The first and last are wrapped in an async function, so evaluating them can
+   * only throw a parse error. A script can throw anything, so it is compiled
+   * without running first: a SyntaxError from `JSON.parse` must not send the
+   * code round again.
    */
   private readCode(
     context: QuickJSContext,
@@ -440,7 +437,6 @@ export class QuickJsSandboxService implements SandboxService {
     };
   }
 
-  /** Turns a value the code threw (before it ever started running) into a packed result. */
   private packFailure(
     context: QuickJSContext,
     fail: QuickJSHandle,

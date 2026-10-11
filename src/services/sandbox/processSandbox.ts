@@ -64,19 +64,14 @@ interface Child {
 }
 
 /**
- * Runs guest code in a separate process that can be killed.
- *
- * QuickJS stops runaway JavaScript through its interrupt handler, but a native
- * call that never returns to the interpreter (joining a 2**28-element array,
- * for instance) ignores it, and a thread cannot be taken out of such a call: a
- * terminated worker kept running it for seconds, with all its memory. A process
- * can be killed outright. A run that has not reported back shortly after its
+ * Runs guest code in a child process so a stuck run can be killed. The
+ * interrupt handler cannot stop a native call that never returns to the
+ * interpreter (joining a 2**28-element array), and a worker thread cannot be
+ * taken out of one either. A run that has not reported back shortly after its
  * timeout gets its process killed and a fresh one started.
  *
- * It also keeps the guest away from the bot's own address space and
- * configuration: the child has its own memory and none of the bot's environment.
- *
- * Runs are executed one at a time, in the order they arrive.
+ * The child also has its own memory and none of the bot's environment. Runs go
+ * one at a time, in arrival order.
  */
 export class ProcessSandboxService implements SandboxService {
   private child: Promise<Child> | undefined;
@@ -100,7 +95,6 @@ export class ProcessSandboxService implements SandboxService {
     return run;
   }
 
-  /** Kills the child and resolves once it is gone. */
   async dispose(): Promise<void> {
     const current = this.child;
     this.child = undefined;
