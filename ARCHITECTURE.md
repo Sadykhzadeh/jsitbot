@@ -78,13 +78,6 @@ flowchart TD
 - The bot waits for the child for the timeout plus a grace period. If it is still busy after that, it is killed and replaced (a replacement is ready in about 70 ms), and the run is reported as timed out. A process is killed outright; a worker thread kept running a stuck native call, and its memory, for seconds after being terminated.
 - If a process cannot be started in the environment, the bot logs it and runs QuickJS inside itself, which keeps the interrupt handler and the memory cap but not the hard kill.
 
-## Execution Surfaces
-
-- Private messages
-- Inline queries
-
-Both surfaces share the same execution model and the same output contract.
-
 ## Security Model
 
 - Each execution is isolated: its own WebAssembly instance, runtime and context
@@ -92,7 +85,3 @@ Both surfaces share the same execution model and the same output contract.
 - Host APIs are not exposed inside guest code
 - Output size is bounded inside the sandbox
 - Per-user rate limits apply to private messages, edits and inline queries; a run that times out is charged extra
-
-## Design Goal
-
-Keep the bot small, predictable, and easy to maintain.
