@@ -19,8 +19,10 @@
   const MAX_ENTRIES = 100;
   const MAX_SCAN = 100000;
   const LINE_WIDTH = 72;
-
   const MAX_TIMER_DELAY = 2147483647;
+  const MAX_TABLE_ROWS = 50;
+  const MAX_TABLE_COLUMNS = 8;
+  const TABLE_CELL_WIDTH = 24;
 
   const uncurry = Function.prototype.call.bind.bind(Function.prototype.call);
   const toText = String;
@@ -32,6 +34,8 @@
   const isArray = Array.isArray;
   const freeze = Object.freeze;
   const functionPrototype = Function.prototype;
+  const getKeys = Object.keys;
+  const reflectApply = Reflect.apply;
 
   const arraySplice = uncurry(Array.prototype.splice);
   const objectToString = uncurry(Object.prototype.toString);
@@ -67,6 +71,7 @@
 
   let logCount = 0;
   let logsCutShort = false;
+  let groupIndent = "";
 
   function spaces(depth) {
     let out = "";
@@ -497,6 +502,15 @@
     return packError(error);
   }
 
+  function indent(text) {
+    let out = groupIndent;
+    for (let i = 0; i < text.length; i++) {
+      out += text[i];
+      if (text[i] === "\n") out += groupIndent;
+    }
+    return out;
+  }
+
   function write() {
     if (logCount >= maxLogs) {
       logsCutShort = true;
@@ -517,6 +531,7 @@
       line += (i > 0 ? " " : "") + piece;
       if (line.length > maxLogLength) break;
     }
+    if (groupIndent) line = indent(line);
     if (line.length > maxLogLength) {
       logsCutShort = true;
       line = head(line, maxLogLength - 3) + "...";
@@ -526,6 +541,137 @@
     hostLog(line);
   }
 
+  function assert(condition) {
+    if (condition) return;
+    if (arguments.length < 2) {
+      write("Assertion failed");
+      return;
+    }
+
+    const details = ["Assertion failed:"];
+    for (let i = 1; i < arguments.length; i++) details[i] = arguments[i];
+    reflectApply(write, undefined, details);
+  }
+
+  const counts = Object.create(null);
+
+  function count(label) {
+    const key = label === undefined ? "default" : toText(label);
+    counts[key] = (counts[key] || 0) + 1;
+    write(key + ": " + counts[key]);
+  }
+
+  function countReset(label) {
+    counts[label === undefined ? "default" : toText(label)] = 0;
+  }
+
+  function group() {
+    if (arguments.length > 0) reflectApply(write, undefined, arguments);
+    groupIndent += "  ";
+  }
+
+  function groupEnd() {
+    groupIndent = stringSlice(groupIndent, 2);
+  }
+
+  function cell(value) {
+    const text = render(value, TABLE_CELL_WIDTH, false).text;
+    let out = "";
+    for (let i = 0; i < text.length; i++) out += text[i] === "\n" ? " " : text[i];
+    return out;
+  }
+
+  // Laid out like Node's console.table: an (index) column, one column for each
+  // key found in the rows, and a Values column for rows that are not objects.
+  function table(data) {
+    if (typeof data !== "object" || data === null) {
+      write(data);
+      return;
+    }
+
+    const columns = [];
+    const known = Object.create(null);
+    const rows = [];
+    let hasValues = false;
+    const keys = getKeys(data);
+    if (keys.length > MAX_TABLE_ROWS) logsCutShort = true;
+
+    for (let i = 0; i < keys.length && i < MAX_TABLE_ROWS; i++) {
+      const row = { index: keys[i], cells: Object.create(null), value: "" };
+      let item;
+      try {
+        item = data[keys[i]];
+      } catch (ignored) {
+        item = undefined;
+      }
+
+      if (typeof item === "object" && item !== null) {
+        const fields = getKeys(item);
+        for (let j = 0; j < fields.length; j++) {
+          if (!known[fields[j]]) {
+            if (columns.length >= MAX_TABLE_COLUMNS) {
+              logsCutShort = true;
+              continue;
+            }
+            known[fields[j]] = true;
+            columns[columns.length] = fields[j];
+          }
+          try {
+            row.cells[fields[j]] = cell(item[fields[j]]);
+          } catch (ignored) {
+            row.cells[fields[j]] = "[Unreadable]";
+          }
+        }
+      } else {
+        hasValues = true;
+        row.value = cell(item);
+      }
+      rows[rows.length] = row;
+    }
+
+    const headers = ["(index)"];
+    for (let i = 0; i < columns.length; i++) headers[headers.length] = columns[i];
+    if (hasValues) headers[headers.length] = "Values";
+
+    const body = [];
+    for (let i = 0; i < rows.length; i++) {
+      const parts = [rows[i].index];
+      for (let j = 0; j < columns.length; j++) parts[parts.length] = rows[i].cells[columns[j]] || "";
+      if (hasValues) parts[parts.length] = rows[i].value;
+      body[body.length] = parts;
+    }
+
+    const widths = [];
+    for (let i = 0; i < headers.length; i++) {
+      let width = headers[i].length;
+      for (let j = 0; j < body.length; j++) if (body[j][i].length > width) width = body[j][i].length;
+      widths[i] = width + 2;
+    }
+
+    function rule(left, middle, right) {
+      let out = left;
+      for (let i = 0; i < widths.length; i++) {
+        for (let j = 0; j < widths[i]; j++) out += "─";
+        out += i < widths.length - 1 ? middle : right;
+      }
+      return out;
+    }
+
+    function line(parts) {
+      let out = "│";
+      for (let i = 0; i < parts.length; i++) {
+        out += " " + parts[i];
+        for (let j = parts[i].length + 1; j < widths[i]; j++) out += " ";
+        out += "│";
+      }
+      return out;
+    }
+
+    let out = rule("┌", "┬", "┐") + "\n" + line(headers) + "\n" + rule("├", "┼", "┤");
+    for (let i = 0; i < body.length; i++) out += "\n" + line(body[i]);
+    write(out + "\n" + rule("└", "┴", "┘"));
+  }
+
   const console = freeze({
     log: write,
     info: write,
@@ -533,6 +679,13 @@
     error: write,
     debug: write,
     dir: write,
+    assert,
+    count,
+    countReset,
+    group,
+    groupCollapsed: group,
+    groupEnd,
+    table,
   });
   Object.defineProperty(globalThis, "console", { value: console, writable: false, configurable: false, enumerable: false });
 
