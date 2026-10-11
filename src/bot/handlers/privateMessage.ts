@@ -1,4 +1,5 @@
-import type { Bot } from "grammy";
+import { GrammyError, type Api, type Bot } from "grammy";
+import type { ParseMode } from "grammy/types";
 
 import type { SandboxService } from "../../services/sandbox/types";
 import {
@@ -11,6 +12,7 @@ import {
   formatExecutionMessage,
   formatRejectionMessage,
 } from "../formatters/telegramExecutionMessage";
+import { ReplyTracker, type TrackedReply } from "../replyTracker";
 
 interface PrivateMessageHandlerOptions {
   botUserId: number;
@@ -18,9 +20,89 @@ interface PrivateMessageHandlerOptions {
   rateLimiter: SlidingWindowRateLimiter;
   rateLimitPolicy: RateLimitPolicy;
   maxCodeLength: number;
+  replies?: ReplyTracker;
+}
+
+interface Request {
+  chatId: number;
+  userId: number;
+  messageId: number;
+  code: string;
+}
+
+interface Answer {
+  text: string;
+  parseMode: ParseMode;
+  /** Whether to send it as a reply to the user's message. */
+  quote: boolean;
+}
+
+function isNotModified(error: unknown): boolean {
+  return error instanceof GrammyError && /message is not modified/i.test(error.description);
 }
 
 export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageHandlerOptions): void {
+  const replies = options.replies ?? new ReplyTracker();
+
+  async function answerFor(request: Request): Promise<Answer> {
+    const rateLimit = options.rateLimiter.consume(
+      `private:${request.userId}`,
+      options.rateLimitPolicy,
+    );
+    if (!rateLimit.allowed) {
+      const message = formatRejectionMessage(
+        `Rate limit exceeded. Try again in ${Math.ceil(rateLimit.retryAfterMs / 1000)}s.`,
+      );
+      return { text: message.text, parseMode: message.parseMode, quote: false };
+    }
+
+    if (!isCodeLengthAllowed(request.code, options.maxCodeLength)) {
+      const message = formatRejectionMessage(
+        `Code exceeds the ${options.maxCodeLength}-character limit.`,
+      );
+      return { text: message.text, parseMode: message.parseMode, quote: false };
+    }
+
+    const execution = await options.sandbox.execute(request.code);
+    const message = formatExecutionMessage(execution, request.code);
+    return { text: message.text, parseMode: message.parseMode, quote: true };
+  }
+
+  /** Updates the earlier answer when there is one that can still be edited, sends a new one otherwise. */
+  async function deliver(
+    api: Api,
+    request: Request,
+    answer: Answer,
+    earlier: TrackedReply | undefined,
+  ): Promise<number> {
+    if (earlier) {
+      try {
+        await api.editMessageText(request.chatId, earlier.replyId, answer.text, {
+          parse_mode: answer.parseMode,
+        });
+        return earlier.replyId;
+      } catch (error) {
+        if (isNotModified(error)) {
+          return earlier.replyId;
+        }
+        // Deleted, or too old to edit: say it again as a new message.
+      }
+    }
+
+    const sent = await api.sendMessage(request.chatId, answer.text, {
+      parse_mode: answer.parseMode,
+      ...(answer.quote ? { reply_parameters: { message_id: request.messageId } } : {}),
+    });
+    return sent.message_id;
+  }
+
+  async function run(api: Api, request: Request, earlier: TrackedReply | undefined): Promise<void> {
+    const answer = await answerFor(request);
+    const replyId = await deliver(api, request, answer, earlier);
+
+    replies.remember(request.chatId, request.messageId, { replyId, code: request.code });
+  }
+
   bot.chatType("private").on("message", async (ctx, next) => {
     if (ctx.message.via_bot?.id !== options.botUserId) {
       // Not a result sent from inline mode: hand it on, or the handler below
@@ -42,32 +124,37 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       return;
     }
 
-    const rateLimit = options.rateLimiter.consume(
-      `private:${ctx.from.id}`,
-      options.rateLimitPolicy,
+    await run(
+      ctx.api,
+      { chatId: ctx.chat.id, userId: ctx.from.id, messageId: ctx.message.message_id, code },
+      undefined,
     );
-    if (!rateLimit.allowed) {
-      const message = formatRejectionMessage(
-        `Rate limit exceeded. Try again in ${Math.ceil(rateLimit.retryAfterMs / 1000)}s.`,
-      );
-      await ctx.reply(message.text, { parse_mode: message.parseMode });
+  });
+
+  // Editing a message re-runs it and updates the answer in place.
+  bot.chatType("private").on("edited_message:text", async (ctx) => {
+    if (ctx.editedMessage.via_bot?.id === options.botUserId) {
       return;
     }
 
-    if (!isCodeLengthAllowed(code, options.maxCodeLength)) {
-      const message = formatRejectionMessage(
-        `Code exceeds the ${options.maxCodeLength}-character limit.`,
-      );
-      await ctx.reply(message.text, { parse_mode: message.parseMode });
+    const code = ctx.editedMessage.text;
+    if (isBotCommand(code)) {
       return;
     }
 
-    const execution = await options.sandbox.execute(code);
-    const message = formatExecutionMessage(execution, code);
+    const request = {
+      chatId: ctx.chat.id,
+      userId: ctx.from.id,
+      messageId: ctx.editedMessage.message_id,
+      code,
+    };
+    const earlier = replies.find(request.chatId, request.messageId);
 
-    await ctx.reply(message.text, {
-      parse_mode: message.parseMode,
-      reply_parameters: { message_id: ctx.msg.message_id },
-    });
+    // Telegram also reports edits that left the text alone, such as formatting.
+    if (earlier?.code === code) {
+      return;
+    }
+
+    await run(ctx.api, request, earlier);
   });
 }
