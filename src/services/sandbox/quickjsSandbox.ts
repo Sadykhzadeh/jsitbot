@@ -17,6 +17,7 @@ import {
   type SandboxOptions,
   type SandboxService,
 } from "./types";
+import { stripTypes } from "./typescript";
 import { createCappedModule, isHeapExhausted } from "./wasmHeap";
 
 const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
@@ -271,6 +272,48 @@ export class QuickJsSandboxService implements SandboxService {
   }
 
   /**
+   * Runs the code, as plain JavaScript if it parses as that and as TypeScript
+   * with the types removed if it does not. A TypeScript run has no meaningful
+   * line numbers, since the stripped code is laid out differently, and a
+   * failure of both is reported as the JavaScript error the user would expect.
+   */
+  private evaluate(
+    context: QuickJSContext,
+    runtime: QuickJSRuntime,
+    code: string,
+    logs: string[],
+    handles: HandleBin,
+    expired: () => boolean,
+  ): Packed | undefined {
+    const guest = this.installGuest(context, logs, handles);
+    const direct = this.readCode(context, runtime, guest, code, expired);
+    if (direct.settled) {
+      return direct.packed;
+    }
+
+    const stripped = stripTypes(code);
+    if (stripped && "code" in stripped) {
+      const typed = this.readCode(context, runtime, guest, stripped.code, expired);
+      if (typed.settled) {
+        return typed.packed && { ...typed.packed, line: undefined };
+      }
+    }
+
+    // Both failed. The JavaScript parser stops at the first type annotation, so
+    // when the TypeScript parser got further, its error is the one that matters.
+    if (stripped && "error" in stripped && stripped.error.line > (direct.parseError.line ?? 0)) {
+      return {
+        ok: false,
+        text: `SyntaxError: ${stripped.error.message}`,
+        line: stripped.error.line,
+        truncated: false,
+      };
+    }
+
+    return direct.parseError;
+  }
+
+  /**
    * Finds the reading of the code that parses, in this order:
    *
    * 1. one expression (`1 + 1`, `{ a: 1 }`, `await load()`), whose value is the result;
@@ -283,32 +326,24 @@ export class QuickJsSandboxService implements SandboxService {
    * script can throw anything, so it is compiled without running first: a
    * SyntaxError from `JSON.parse` must not send the code round again.
    */
-  private evaluate(
+  private readCode(
     context: QuickJSContext,
     runtime: QuickJSRuntime,
+    guest: Guest,
     code: string,
-    logs: string[],
-    handles: HandleBin,
     expired: () => boolean,
-  ): Packed | undefined {
-    const guest = this.installGuest(context, logs, handles);
+  ): Attempt {
     const attempts: Array<() => Attempt> = [
       () => this.attemptWrapped(context, runtime, guest, wrapAsExpression(code), expired),
       () => this.attemptScript(context, runtime, guest, code, expired),
       () => this.attemptWrapped(context, runtime, guest, wrapAsStatements(code), expired),
     ];
-    let parseError: Packed | undefined;
-
-    for (const attempt of attempts) {
-      const outcome = attempt();
-      if (outcome.settled) {
-        return outcome.packed;
-      }
-
-      parseError = outcome.parseError;
+    let outcome = attempts[0]();
+    for (let next = 1; !outcome.settled && next < attempts.length; next++) {
+      outcome = attempts[next]();
     }
 
-    return parseError;
+    return outcome;
   }
 
   private attemptWrapped(
