@@ -1,0 +1,507 @@
+// Runs inside the QuickJS context before any user code. It owns everything that
+// has to cross the sandbox boundary: console output and the final result are
+// turned into short, bounded strings here, so the host never receives (or has
+// to walk) a structure the guest controls.
+//
+// Everything the formatter relies on is captured up front, so user code that
+// replaces Array.prototype.push, Object.keys, JSON and the like cannot change
+// how its own output is produced or make the formatter throw.
+//
+// Returns { finish, fail }. Both produce a packed string:
+//   <status: o|e> \n <flags> \n <text>
+// where flags is a bit set: 1 = result was cut short, 2 = console output was.
+(function setup(hostLog, maxLogs, maxLogLength, maxResultLength) {
+  "use strict";
+
+  const MAX_DEPTH = 3;
+  const MAX_ENTRIES = 100;
+  const MAX_SCAN = 100000;
+  const LINE_WIDTH = 72;
+
+  const uncurry = Function.prototype.call.bind.bind(Function.prototype.call);
+  const toText = String;
+
+  const getPrototypeOf = Object.getPrototypeOf;
+  const getOwnPropertyNames = Object.getOwnPropertyNames;
+  const getOwnPropertySymbols = Object.getOwnPropertySymbols;
+  const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+  const isArray = Array.isArray;
+  const freeze = Object.freeze;
+  const functionPrototype = Function.prototype;
+
+  const objectToString = uncurry(Object.prototype.toString);
+  const hasOwn = uncurry(Object.prototype.hasOwnProperty);
+  const isEnumerable = uncurry(Object.prototype.propertyIsEnumerable);
+  const stringSlice = uncurry(String.prototype.slice);
+  const stringIndexOf = uncurry(String.prototype.indexOf);
+  const stringCharCodeAt = uncurry(String.prototype.charCodeAt);
+  const numberToString = uncurry(Number.prototype.toString);
+  const functionToString = uncurry(Function.prototype.toString);
+  const symbolToString = uncurry(Symbol.prototype.toString);
+  const bigintToString = uncurry(BigInt.prototype.toString);
+  const dateToISOString = uncurry(Date.prototype.toISOString);
+  const regExpToString = uncurry(RegExp.prototype.toString);
+  const mapForEach = uncurry(Map.prototype.forEach);
+  const setForEach = uncurry(Set.prototype.forEach);
+  const mapSize = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
+  const setSize = uncurry(getOwnPropertyDescriptor(Set.prototype, "size").get);
+  const TypedArray = getPrototypeOf(Uint8Array);
+  const typedArrayLength = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "length").get);
+  const arrayBufferLength = uncurry(getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get);
+  const numberValueOf = uncurry(Number.prototype.valueOf);
+  const stringValueOf = uncurry(String.prototype.valueOf);
+  const booleanValueOf = uncurry(Boolean.prototype.valueOf);
+  const bigintValueOf = uncurry(BigInt.prototype.valueOf);
+  const symbolValueOf = uncurry(Symbol.prototype.valueOf);
+
+  const TYPED_ARRAYS = [
+    "Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array",
+    "Int32Array", "Uint32Array", "Float32Array", "Float64Array",
+    "BigInt64Array", "BigUint64Array",
+  ];
+
+  let logCount = 0;
+  let logsCutShort = false;
+
+  function spaces(depth) {
+    let out = "";
+    for (let i = 0; i < depth; i++) out += "  ";
+    return out;
+  }
+
+  function cut(text, limit, state) {
+    if (text.length <= limit) return text;
+    state.cut = true;
+    return stringSlice(text, 0, limit > 3 ? limit - 3 : 0) + "...";
+  }
+
+  function isIdentifier(key) {
+    if (key.length === 0) return false;
+    for (let i = 0; i < key.length; i++) {
+      const c = key[i];
+      const letter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_" || c === "$";
+      const digit = c >= "0" && c <= "9";
+      if (!(letter || (digit && i > 0))) return false;
+    }
+    return true;
+  }
+
+  function quote(text, state) {
+    let source = text;
+    let clipped = false;
+    if (source.length > 1000) {
+      source = stringSlice(source, 0, 1000);
+      clipped = true;
+      state.cut = true;
+    }
+
+    let mark = "'";
+    if (stringIndexOf(source, "'") !== -1) {
+      if (stringIndexOf(source, '"') === -1) mark = '"';
+      else if (stringIndexOf(source, "`") === -1) mark = "`";
+    }
+
+    let out = mark;
+    for (let i = 0; i < source.length; i++) {
+      const c = source[i];
+      if (c === mark || c === "\\") out += "\\" + c;
+      else if (c === "\n") out += "\\n";
+      else if (c === "\r") out += "\\r";
+      else if (c === "\t") out += "\\t";
+      else if (c < " ") out += "\\x" + (stringCharCodeAt(c, 0) < 16 ? "0" : "") + numberToString(stringCharCodeAt(c, 0), 16);
+      else out += c;
+    }
+    return out + mark + (clipped ? "..." : "");
+  }
+
+  function formatNumber(n) {
+    return n === 0 && 1 / n < 0 ? "-0" : toText(n);
+  }
+
+  function constructorName(value) {
+    let proto = value;
+    for (let hops = 0; hops < 20; hops++) {
+      proto = getPrototypeOf(proto);
+      if (proto === null) return null;
+      const descriptor = getOwnPropertyDescriptor(proto, "constructor");
+      if (descriptor && typeof descriptor.value === "function") {
+        const nameDescriptor = getOwnPropertyDescriptor(descriptor.value, "name");
+        if (nameDescriptor && typeof nameDescriptor.value === "string" && nameDescriptor.value) {
+          return stringSlice(nameDescriptor.value, 0, 100);
+        }
+      }
+    }
+    return null;
+  }
+
+  function formatFunction(fn) {
+    const nameDescriptor = getOwnPropertyDescriptor(fn, "name");
+    const name = nameDescriptor && typeof nameDescriptor.value === "string" ? stringSlice(nameDescriptor.value, 0, 100) : "";
+    const source = stringSlice(functionToString(fn), 0, 6);
+
+    if (source === "class " || source === "class{") {
+      const parent = getPrototypeOf(fn);
+      let extended = "";
+      if (typeof parent === "function" && parent !== functionPrototype) {
+        const parentName = getOwnPropertyDescriptor(parent, "name");
+        if (parentName && typeof parentName.value === "string" && parentName.value) {
+          extended = " extends " + stringSlice(parentName.value, 0, 100);
+        }
+      }
+      return "[class " + (name || "(anonymous)") + extended + "]";
+    }
+
+    const tag = objectToString(fn);
+    const kind = tag === "[object AsyncFunction]" ? "AsyncFunction"
+      : tag === "[object GeneratorFunction]" ? "GeneratorFunction"
+      : tag === "[object AsyncGeneratorFunction]" ? "AsyncGeneratorFunction"
+      : "Function";
+    return name ? "[" + kind + ": " + name + "]" : "[" + kind + " (anonymous)]";
+  }
+
+  function errorText(error, state) {
+    let name = "Error";
+    let message = "";
+    try {
+      const n = error.name;
+      if (typeof n === "string" && n) name = stringSlice(n, 0, 100);
+      const m = error.message;
+      if (typeof m === "string") message = cut(m, maxResultLength, state);
+    } catch (ignored) {}
+    return message ? name + ": " + message : name;
+  }
+
+  // Lays out already formatted entries: on one line when they fit, otherwise
+  // one per line (or, for lists of short values, packed into rows).
+  function layout(prefix, open, parts, close, depth, packable) {
+    const count = parts.length;
+    if (count === 0) return prefix + open + close;
+
+    let total = prefix.length + open.length + close.length + 2;
+    let multiline = false;
+    let compact = packable && count > 6;
+    for (let i = 0; i < count; i++) {
+      total += parts[i].length + 2;
+      if (stringIndexOf(parts[i], "\n") !== -1) multiline = true;
+      if (parts[i].length > 12 && stringSlice(parts[i], 0, 4) !== "... ") compact = false;
+    }
+
+    if (!multiline && total <= LINE_WIDTH - depth * 2) {
+      let line = prefix + open + " ";
+      for (let i = 0; i < count; i++) line += (i > 0 ? ", " : "") + parts[i];
+      return line + " " + close;
+    }
+
+    const inner = spaces(depth + 1);
+    let out = prefix + open + "\n";
+
+    if (compact && !multiline) {
+      let row = inner;
+      for (let i = 0; i < count; i++) {
+        const piece = parts[i] + (i < count - 1 ? "," : "");
+        if (row.length > inner.length && row.length + piece.length + 1 > LINE_WIDTH) {
+          out += row + "\n";
+          row = inner;
+        }
+        row += (row.length > inner.length ? " " : "") + piece;
+      }
+      return out + row + "\n" + spaces(depth) + close;
+    }
+
+    for (let i = 0; i < count; i++) {
+      out += inner + parts[i] + (i < count - 1 ? "," : "") + "\n";
+    }
+    return out + spaces(depth) + close;
+  }
+
+  function more(count, singular, plural) {
+    return "... " + count + " more " + (count === 1 ? singular : plural);
+  }
+
+  function formatArray(array, depth, state) {
+    const parts = [];
+    const length = array.length;
+    let index = 0;
+    let scanned = 0;
+
+    while (index < length && parts.length < MAX_ENTRIES && state.left > 0) {
+      if (hasOwn(array, index)) {
+        const part = format(array[index], depth + 1, state);
+        parts[parts.length] = part;
+        state.left -= part.length;
+        index++;
+        continue;
+      }
+
+      let end = index;
+      while (end < length && !hasOwn(array, end) && scanned < MAX_SCAN) {
+        end++;
+        scanned++;
+      }
+      if (end === index) break;
+      parts[parts.length] = "<" + (end - index) + " empty item" + (end - index === 1 ? "" : "s") + ">";
+      index = end;
+    }
+
+    if (index < length) {
+      state.cut = true;
+      parts[parts.length] = more(length - index, "item", "items");
+    }
+    return layout("", "[", parts, "]", depth, true);
+  }
+
+  function formatTypedArray(array, name, depth, state) {
+    const length = typedArrayLength(array);
+    const parts = [];
+    for (let i = 0; i < length && i < MAX_ENTRIES && state.left > 0; i++) {
+      const part = format(array[i], depth + 1, state);
+      parts[parts.length] = part;
+      state.left -= part.length;
+    }
+    if (length > parts.length) {
+      state.cut = true;
+      parts[parts.length] = more(length - parts.length, "item", "items");
+    }
+    return layout(name + "(" + length + ") ", "[", parts, "]", depth, true);
+  }
+
+  function formatMap(map, depth, state) {
+    const size = mapSize(map);
+    const parts = [];
+    mapForEach(map, function (value, key) {
+      if (parts.length >= MAX_ENTRIES || state.left <= 0) return;
+      const part = format(key, depth + 1, state) + " => " + format(value, depth + 1, state);
+      parts[parts.length] = part;
+      state.left -= part.length;
+    });
+    if (size > parts.length) {
+      state.cut = true;
+      parts[parts.length] = more(size - parts.length, "item", "items");
+    }
+    return layout("Map(" + size + ") ", "{", parts, "}", depth);
+  }
+
+  function formatSet(set, depth, state) {
+    const size = setSize(set);
+    const parts = [];
+    setForEach(set, function (value) {
+      if (parts.length >= MAX_ENTRIES || state.left <= 0) return;
+      const part = format(value, depth + 1, state);
+      parts[parts.length] = part;
+      state.left -= part.length;
+    });
+    if (size > parts.length) {
+      state.cut = true;
+      parts[parts.length] = more(size - parts.length, "item", "items");
+    }
+    return layout("Set(" + size + ") ", "{", parts, "}", depth, true);
+  }
+
+  function formatProperties(object, prefix, depth, state) {
+    const names = getOwnPropertyNames(object);
+    const symbols = getOwnPropertySymbols(object);
+    const parts = [];
+    let seen = 0;
+
+    for (let pass = 0; pass < 2; pass++) {
+      const keys = pass === 0 ? names : symbols;
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (!isEnumerable(object, key)) continue;
+        if (parts.length >= MAX_ENTRIES || state.left <= 0) {
+          seen++;
+          continue;
+        }
+
+        const descriptor = getOwnPropertyDescriptor(object, key);
+        const label = pass === 1 ? "[" + symbolToString(key) + "]"
+          : isIdentifier(key) ? key
+          : quote(key, state);
+        let value;
+        if (descriptor.get || descriptor.set) {
+          value = descriptor.get ? (descriptor.set ? "[Getter/Setter]" : "[Getter]") : "[Setter]";
+        } else {
+          value = format(descriptor.value, depth + 1, state);
+        }
+        const part = label + ": " + value;
+        parts[parts.length] = part;
+        state.left -= part.length;
+      }
+    }
+
+    if (seen > 0) {
+      state.cut = true;
+      parts[parts.length] = more(seen, "property", "properties");
+    }
+    return layout(prefix, "{", parts, "}", depth);
+  }
+
+  function formatObject(value, depth, state) {
+    const tag = objectToString(value);
+
+    if (tag === "[object Date]") {
+      try { return dateToISOString(value); } catch (ignored) { return "Invalid Date"; }
+    }
+    if (tag === "[object RegExp]") return regExpToString(value);
+    if (tag === "[object Error]") return depth === 0 ? errorText(value, state) : "[" + errorText(value, state) + "]";
+    if (tag === "[object Number]") return "[Number: " + formatNumber(numberValueOf(value)) + "]";
+    if (tag === "[object String]") return "[String: " + quote(stringValueOf(value), state) + "]";
+    if (tag === "[object Boolean]") return "[Boolean: " + booleanValueOf(value) + "]";
+    if (tag === "[object BigInt]") return "[BigInt: " + bigintToString(bigintValueOf(value)) + "n]";
+    if (tag === "[object Symbol]") return "[Symbol: " + symbolToString(symbolValueOf(value)) + "]";
+    if (tag === "[object Promise]") return "Promise {}";
+    if (tag === "[object WeakMap]") return "WeakMap { <items unknown> }";
+    if (tag === "[object WeakSet]") return "WeakSet { <items unknown> }";
+    if (tag === "[object ArrayBuffer]") return "ArrayBuffer { byteLength: " + arrayBufferLength(value) + " }";
+
+    const name = constructorName(value);
+    const label = name === null ? "[Object: null prototype]" : name;
+
+    if (depth > MAX_DEPTH) {
+      return "[" + (isArray(value) ? "Array" : label) + "]";
+    }
+
+    if (isArray(value)) return formatArray(value, depth, state);
+    if (tag === "[object Map]") return formatMap(value, depth, state);
+    if (tag === "[object Set]") return formatSet(value, depth, state);
+    for (let i = 0; i < TYPED_ARRAYS.length; i++) {
+      if (tag === "[object " + TYPED_ARRAYS[i] + "]") return formatTypedArray(value, TYPED_ARRAYS[i], depth, state);
+    }
+
+    let prefix = "";
+    if (name === null) prefix = label + " ";
+    else if (name !== "Object") prefix = name + " ";
+    else if (tag !== "[object Object]") prefix = "Object [" + stringSlice(tag, 8, tag.length - 1) + "] ";
+    return formatProperties(value, prefix, depth, state);
+  }
+
+  // The one entry point for turning any value into text. state.left is the
+  // remaining character budget; state.cut records that something was dropped.
+  function format(value, depth, state) {
+    switch (typeof value) {
+      case "string": return quote(value, state);
+      case "number": return formatNumber(value);
+      case "bigint": return bigintToString(value) + "n";
+      case "boolean": return value ? "true" : "false";
+      case "undefined": return "undefined";
+      case "symbol": return symbolToString(value);
+      case "function": return formatFunction(value);
+    }
+    if (value === null) return "null";
+
+    for (let i = 0; i < state.stack.length; i++) {
+      if (state.stack[i] === value) return "[Circular]";
+    }
+    state.stack[state.stack.length] = value;
+    try {
+      return formatObject(value, depth, state);
+    } catch (ignored) {
+      return "[Unformattable object]";
+    } finally {
+      state.stack.length = state.stack.length - 1;
+    }
+  }
+
+  function render(value, limit, raw) {
+    const state = { left: limit, cut: false, stack: [] };
+    let text;
+    try {
+      text = raw && typeof value === "string" ? value : format(value, 0, state);
+    } catch (ignored) {
+      text = "[Unformattable value]";
+    }
+    return { text: cut(text, limit, state), cut: state.cut };
+  }
+
+  function isErrorLike(value) {
+    try {
+      return typeof value === "object" && value !== null
+        && (objectToString(value) === "[object Error]" || typeof value.message === "string");
+    } catch (ignored) {
+      return false;
+    }
+  }
+
+  function flags(resultCut) {
+    return (resultCut ? 1 : 0) + (logsCutShort ? 2 : 0);
+  }
+
+  function packOk(value) {
+    const rendered = render(value, maxResultLength, true);
+    return "o\n" + flags(rendered.cut) + "\n" + rendered.text;
+  }
+
+  function packError(error) {
+    let text;
+    let cutShort = false;
+
+    if (isErrorLike(error)) {
+      const state = { left: maxResultLength, cut: false, stack: [] };
+      text = cut(errorText(error, state), maxResultLength, state);
+      cutShort = state.cut;
+    } else {
+      const rendered = render(error, maxResultLength, false);
+      text = "Uncaught " + rendered.text;
+      cutShort = rendered.cut;
+    }
+    return "e\n" + flags(cutShort) + "\n" + text;
+  }
+
+  // Settles with a packed string whether the code returned or threw.
+  async function finish(pending) {
+    let value;
+    let failed = false;
+    try {
+      value = await pending;
+    } catch (error) {
+      value = error;
+      failed = true;
+    }
+    return failed ? packError(value) : packOk(value);
+  }
+
+  function fail(error) {
+    return packError(error);
+  }
+
+  function write() {
+    if (logCount >= maxLogs) {
+      logsCutShort = true;
+      return;
+    }
+    logCount++;
+
+    const state = { left: maxLogLength, cut: false, stack: [] };
+    let line = "";
+    for (let i = 0; i < arguments.length; i++) {
+      const argument = arguments[i];
+      let piece;
+      try {
+        piece = typeof argument === "string" ? argument : format(argument, 0, state);
+      } catch (ignored) {
+        piece = "[Unformattable value]";
+      }
+      line += (i > 0 ? " " : "") + piece;
+      if (line.length > maxLogLength) break;
+    }
+    if (line.length > maxLogLength) {
+      logsCutShort = true;
+      line = stringSlice(line, 0, maxLogLength - 3) + "...";
+    } else if (state.cut) {
+      logsCutShort = true;
+    }
+    hostLog(line);
+  }
+
+  const console = freeze({
+    log: write,
+    info: write,
+    warn: write,
+    error: write,
+    debug: write,
+    dir: write,
+  });
+  Object.defineProperty(globalThis, "console", { value: console, writable: false, configurable: false, enumerable: false });
+
+  return { finish, fail };
+})

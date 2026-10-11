@@ -31,7 +31,7 @@ describe("QuickJsSandboxService", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.logs).toEqual(["first", "{\"second\":true}"]);
+      expect(result.logs).toEqual(["first", "{ second: true }"]);
       expect(result.result).toBe("42");
     }
   });
