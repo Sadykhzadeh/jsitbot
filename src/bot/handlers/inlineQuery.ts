@@ -8,6 +8,7 @@ import type { SandboxService } from "../../services/sandbox/types";
 import {
   type RateLimitPolicy,
   SlidingWindowRateLimiter,
+  TIMEOUT_PENALTY_REQUESTS,
   isCodeLengthAllowed,
   isInlineQueryLongEnough,
 } from "../../security/rateLimiter";
@@ -116,6 +117,13 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
     }
 
     const execution = await options.sandbox.execute(code);
+    if (execution.timedOut) {
+      options.rateLimiter.charge(
+        `inline:${ctx.from.id}`,
+        options.rateLimitPolicy,
+        TIMEOUT_PENALTY_REQUESTS,
+      );
+    }
     const message = formatExecutionMessage(execution, code);
     const preview = formatInlineExecutionPreview(execution);
 

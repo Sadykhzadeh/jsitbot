@@ -5,6 +5,7 @@ import type { SandboxService } from "../../services/sandbox/types";
 import {
   type RateLimitPolicy,
   SlidingWindowRateLimiter,
+  TIMEOUT_PENALTY_REQUESTS,
   isCodeLengthAllowed,
 } from "../../security/rateLimiter";
 import { isBotCommand } from "../commands";
@@ -64,6 +65,13 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
     }
 
     const execution = await options.sandbox.execute(request.code);
+    if (execution.timedOut) {
+      options.rateLimiter.charge(
+        `private:${request.userId}`,
+        options.rateLimitPolicy,
+        TIMEOUT_PENALTY_REQUESTS,
+      );
+    }
     const message = formatExecutionMessage(execution, request.code);
     return { text: message.text, parseMode: message.parseMode, quote: true };
   }
