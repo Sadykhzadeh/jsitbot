@@ -20,8 +20,11 @@ interface PrivateMessageHandlerOptions {
 }
 
 export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageHandlerOptions): void {
-  bot.chatType("private").on("message", async (ctx) => {
+  bot.chatType("private").on("message", async (ctx, next) => {
     if (ctx.message.via_bot?.id !== options.botUserId) {
+      // Not a result sent from inline mode: hand it on, or the handler below
+      // never sees an ordinary message.
+      await next();
       return;
     }
 
