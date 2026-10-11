@@ -3,6 +3,7 @@ import type { ParseMode } from "grammy/types";
 import type { SandboxExecution } from "../../services/sandbox/types";
 import {
   escapeMarkdownV2,
+  escapeMarkdownV2Code,
   toMarkdownV2CodeBlock,
   truncateText,
 } from "../../utils/markdownV2";
@@ -164,11 +165,30 @@ export function formatRejectionMessage(message: string): { text: string; parseMo
   };
 }
 
+function inlineCode(text: string): string {
+  return `\`${escapeMarkdownV2Code(text)}\``;
+}
+
 export function formatHelpMessage(botUsername: string): { text: string; parseMode: ParseMode } {
   const body = [
     "*JS Sandbox Bot*",
-    "Send JavaScript in private chat to run it inside an isolated QuickJS runtime\\.",
-    `Inline mode: \`@${escapeMarkdownV2(botUsername)} 1 \\+ 1\``,
+    escapeMarkdownV2(
+      "Send JavaScript and get the result back. It runs in an isolated QuickJS sandbox with short time and memory limits, and has no network or file access.",
+    ),
+    "",
+    "*Examples*",
+    inlineCode("1 + 1"),
+    inlineCode("[1, 2, 3].map(n => n * 2)"),
+    inlineCode('const user = { name: "Ada" }; user'),
+    inlineCode('console.log("hi"); await Promise.resolve(42)'),
+    inlineCode("const n: number = 5; n * 2"),
+    "",
+    "*Good to know*",
+    escapeMarkdownV2("• The value of the last statement is the result. Use return to stop early."),
+    escapeMarkdownV2("• Top-level await works."),
+    escapeMarkdownV2("• TypeScript annotations are fine, the types are stripped."),
+    escapeMarkdownV2("• Edit your message and the answer updates."),
+    `• Inline, in any chat: ${inlineCode(`@${botUsername} 1 + 1`)}`,
   ].join("\n");
 
   return {
