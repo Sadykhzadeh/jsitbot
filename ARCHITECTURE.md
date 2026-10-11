@@ -8,7 +8,7 @@
 flowchart LR
     A["Telegram update"] --> B["Bot layer"]
     B --> C["Guards"]
-    C --> D["QuickJS sandbox"]
+    C --> D["Sandbox worker (QuickJS)"]
     D --> E["Formatter"]
     E --> F["Telegram response"]
 ```
@@ -17,7 +17,7 @@ flowchart LR
 
 - Bot layer: receives Telegram updates and routes them to the right handler
 - Guard layer: applies basic validation and rate limiting
-- Sandbox layer: runs untrusted JavaScript in isolation
+- Sandbox layer: runs untrusted JavaScript in isolation, on a worker thread
 - Formatting layer: converts output into Telegram-safe text
 
 ## Private Message Flow
@@ -25,17 +25,20 @@ flowchart LR
 ```mermaid
 flowchart TD
     A["Private message"] --> B["Private handler"]
-    B --> C{"Valid request?"}
-    C -- "No" --> D["Reject / ignore"]
-    C -- "Yes" --> E["Execute in sandbox"]
+    B --> C{"Command?"}
+    C -- "Yes" --> D["Left to the command handlers"]
+    C -- "No" --> G{"Valid request?"}
+    G -- "No" --> H["Reject"]
+    G -- "Yes" --> E["Execute in sandbox"]
     E --> F["Format result"]
-    F --> G["Reply in private chat"]
+    F --> I["Reply, and remember which reply answers which message"]
 ```
 
 Notes:
 
-- normal private text is treated as code
+- normal private text is treated as code; only `/word`, `/word@bot` followed by a space or the end of the message is a command, so a snippet that starts with a regular expression or a comment still runs
 - bot-generated inline results received in private chat are handled separately
+- an edited message is run again and the earlier answer is edited in place; the table that maps messages to answers is in memory and bounded, so after a restart an edit is answered as a new message
 
 ## Inline Query Flow
 
@@ -53,18 +56,27 @@ Notes:
 
 - inline mode uses the same sandbox as private messages
 - preview is short, final inserted message contains the formatted output
+- results are not cached: code can read the clock or call `Math.random()`, and a run costs about a millisecond
 
 ## Sandbox Flow
 
 ```mermaid
 flowchart TD
-    A["User code"] --> B["Validation"]
-    B --> C["Fresh QuickJS runtime"]
-    C --> D["Execute with limits"]
-    D --> E["Capture logs"]
-    E --> F["Collect result or error"]
-    F --> G["Dispose runtime"]
+    A["User code"] --> B["Worker thread"]
+    B --> C["Fresh WebAssembly instance, capped heap"]
+    C --> D["Guest runtime: console, formatter"]
+    D --> E["Read the code: expression, script, function body, or TypeScript with types removed"]
+    E --> F["Execute with interrupt handler"]
+    F --> G["Bounded result string"]
+    G --> H["Back to the main thread"]
 ```
+
+- The worker holds the QuickJS engine and a spare WebAssembly instance that is built while it is idle. Every run takes one instance and drops it afterwards.
+- The instance's memory has a hard maximum. QuickJS's own memory limit counts allocations rather than bytes in the Emscripten build, so it is not what stops a memory bomb.
+- The guest runtime (`guest.js`) is evaluated first. It captures the built-ins it relies on, installs `console`, and turns results, errors and log lines into short strings, so nothing the guest controls is walked by the host.
+- The code is tried as one expression, then as a script (the last statement's value is the result), then as a function body (`return`, top-level `await`). If none parses, the types are stripped with Bun's transpiler and the same readings are tried again.
+- The main thread waits for the worker for the timeout plus a grace period. If the worker is still busy after that, it is terminated and replaced, and the run is reported as timed out.
+- If a worker cannot be started in the environment, the bot logs it and runs QuickJS on the main thread, which keeps the interrupt handler and the memory cap but not the hard kill.
 
 ## Execution Surfaces
 
@@ -75,10 +87,11 @@ Both surfaces share the same execution model and the same output contract.
 
 ## Security Model
 
-- Each execution is isolated
-- CPU and memory usage are limited
+- Each execution is isolated: its own WebAssembly instance, runtime and context
+- CPU time is limited by the engine's interrupt handler and, as a backstop, by terminating the worker; memory is limited by the instance's maximum size
 - Host APIs are not exposed inside guest code
-- `console.log` output is captured and returned
+- Output size is bounded inside the sandbox
+- Per-user rate limits apply to private messages, edits and inline queries; a run that times out is charged extra
 
 ## Design Goal
 
