@@ -25,15 +25,12 @@ function maximumPages(guestHeapBytes: number): number {
  * Creates a QuickJS WebAssembly instance whose linear memory cannot grow past
  * `guestHeapBytes` on top of the fixed base.
  *
- * QuickJS has its own memory limit, but the Emscripten build cannot see how big
- * an allocation is, so it counts every malloc as a few bytes. A single
- * "x".repeat(1e6) or new Uint8Array(1e9) walks straight past it and keeps
- * allocating until the host process runs out of memory. A hard cap on the
- * WebAssembly memory is the limit that actually holds: once it is reached,
- * malloc fails and QuickJS raises an ordinary "out of memory" error.
+ * QuickJS's own memory limit does not hold here: the Emscripten build cannot
+ * see how big an allocation is and counts each malloc as a few bytes, so
+ * "x".repeat(1e6) walks past it. The WebAssembly memory maximum does hold;
+ * when it is reached malloc fails and QuickJS raises "out of memory".
  *
- * Every call returns an independent instance with its own memory, so nothing a
- * guest leaves behind survives into the next run.
+ * Every call returns an independent instance.
  */
 export async function createCappedModule(guestHeapBytes: number): Promise<QuickJSWASMModule> {
   const wasmMemory = new WebAssembly.Memory({

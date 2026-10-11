@@ -27,7 +27,6 @@ export class SlidingWindowRateLimiter {
   private readonly buckets = new Map<string, Entry>();
   private calls = 0;
 
-  /** Number of keys currently remembered. */
   get size(): number {
     return this.buckets.size;
   }
