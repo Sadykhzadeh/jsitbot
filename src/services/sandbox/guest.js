@@ -8,11 +8,13 @@
 // how its own output is produced or make the formatter throw.
 //
 // Returns { finish, fail }. Both produce a packed string:
-//   <status: o|e> \n <flags> \n <text>
-// where flags is a bit set: 1 = result was cut short, 2 = console output was.
+//   <status: o|e> \n <line> \n <flags> \n <text>
+// where line is the line of the user's code an error came from (0 if unknown)
+// and flags is a bit set: 1 = result was cut short, 2 = console output was.
 (function setup(hostLog, maxLogs, maxLogLength, maxResultLength) {
   "use strict";
 
+  const FILE = "input.js";
   const MAX_DEPTH = 3;
   const MAX_ENTRIES = 100;
   const MAX_SCAN = 100000;
@@ -413,6 +415,26 @@
     return { text: cut(text, limit, state), cut: state.cut };
   }
 
+  // The line of the user's code that an error came from, read off its stack.
+  function lineOf(error) {
+    try {
+      const stack = error.stack;
+      if (typeof stack !== "string") return 0;
+      const at = stringIndexOf(stack, FILE + ":");
+      if (at === -1) return 0;
+
+      let line = 0;
+      for (let i = at + FILE.length + 1; i < stack.length && i < at + FILE.length + 8; i++) {
+        const c = stack[i];
+        if (c < "0" || c > "9") break;
+        line = line * 10 + (stringCharCodeAt(c, 0) - 48);
+      }
+      return line;
+    } catch (ignored) {
+      return 0;
+    }
+  }
+
   function isErrorLike(value) {
     try {
       return typeof value === "object" && value !== null
@@ -428,23 +450,25 @@
 
   function packOk(value) {
     const rendered = render(value, maxResultLength, true);
-    return "o\n" + flags(rendered.cut) + "\n" + rendered.text;
+    return "o\n0\n" + flags(rendered.cut) + "\n" + rendered.text;
   }
 
   function packError(error) {
     let text;
+    let line = 0;
     let cutShort = false;
 
     if (isErrorLike(error)) {
       const state = { left: maxResultLength, cut: false, stack: [] };
       text = cut(errorText(error, state), maxResultLength, state);
       cutShort = state.cut;
+      line = lineOf(error);
     } else {
       const rendered = render(error, maxResultLength, false);
       text = "Uncaught " + rendered.text;
       cutShort = rendered.cut;
     }
-    return "e\n" + flags(cutShort) + "\n" + text;
+    return "e\n" + line + "\n" + flags(cutShort) + "\n" + text;
   }
 
   // Settles with a packed string whether the code returned or threw.

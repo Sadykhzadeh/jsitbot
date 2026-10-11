@@ -11,6 +11,8 @@ export interface SandboxExecutionFailure {
   ok: false;
   logs: string[];
   error: string;
+  /** Line of the submitted code the error came from, when it is known. */
+  line?: number;
   durationMs: number;
   timedOut: boolean;
   truncated: boolean;

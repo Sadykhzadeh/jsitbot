@@ -35,6 +35,8 @@ const FLAG_LOGS_CUT = 2;
 interface Packed {
   ok: boolean;
   text: string;
+  /** Line of the user's code an error came from. */
+  line?: number;
   truncated: boolean;
 }
 
@@ -60,19 +62,22 @@ function normalizeUnknownError(error: unknown): string {
 function unpack(raw: string): Packed | undefined {
   const firstBreak = raw.indexOf("\n");
   const secondBreak = raw.indexOf("\n", firstBreak + 1);
-  if (firstBreak < 1 || secondBreak < 0) {
+  const thirdBreak = raw.indexOf("\n", secondBreak + 1);
+  if (firstBreak < 1 || secondBreak < 0 || thirdBreak < 0) {
     return undefined;
   }
 
   const status = raw.slice(0, firstBreak);
-  const flags = Number(raw.slice(firstBreak + 1, secondBreak));
-  if ((status !== "o" && status !== "e") || !Number.isInteger(flags)) {
+  const line = Number(raw.slice(firstBreak + 1, secondBreak));
+  const flags = Number(raw.slice(secondBreak + 1, thirdBreak));
+  if ((status !== "o" && status !== "e") || !Number.isInteger(line) || !Number.isInteger(flags)) {
     return undefined;
   }
 
   return {
     ok: status === "o",
-    text: raw.slice(secondBreak + 1),
+    text: raw.slice(thirdBreak + 1),
+    line: line > 0 ? line : undefined,
     truncated: (flags & (FLAG_RESULT_CUT | FLAG_LOGS_CUT)) !== 0,
   };
 }
@@ -180,20 +185,27 @@ export class QuickJsSandboxService implements SandboxService {
     let interrupted = false;
     let heapExhausted = () => false;
 
-    const failure = (error: string, timedOut = interrupted, cut = false): SandboxExecution => {
+    const failure = (
+      error: string,
+      details: { timedOut?: boolean; truncated?: boolean; line?: number } = {},
+    ): SandboxExecution => {
+      const timedOut = details.timedOut ?? interrupted;
       // With the heap used up to the last page QuickJS cannot even allocate its
       // out-of-memory error, so the guest sees a bare null instead of a message.
       const outOfMemory = error === "InternalError: out of memory" || (heapExhausted() && !timedOut);
       const message = timedOut ? TIMEOUT_MESSAGE : outOfMemory ? MEMORY_LIMIT_MESSAGE : error;
       const bounded = truncateValue(message, this.options.maxResultLength);
 
+      const ownError = !timedOut && !outOfMemory;
+
       return {
         ok: false,
         logs,
         error: bounded.value,
+        ...(ownError && details.line ? { line: details.line } : {}),
         durationMs: Math.round(performance.now() - startedAt),
         timedOut,
-        truncated: bounded.truncated || cut,
+        truncated: bounded.truncated || Boolean(details.truncated),
       };
     };
 
@@ -225,13 +237,13 @@ export class QuickJsSandboxService implements SandboxService {
         const packed = this.evaluate(context, runtime, code, logs, handles, () => interrupted);
 
         if (interrupted) {
-          return failure(TIMEOUT_MESSAGE, true);
+          return failure(TIMEOUT_MESSAGE, { timedOut: true });
         }
         if (!packed) {
           return failure(UNREADABLE_MESSAGE);
         }
         if (!packed.ok) {
-          return failure(packed.text, interrupted, packed.truncated);
+          return failure(packed.text, { truncated: packed.truncated, line: packed.line });
         }
 
         const result = truncateValue(packed.text, this.options.maxResultLength);

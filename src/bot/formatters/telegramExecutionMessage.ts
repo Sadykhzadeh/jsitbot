@@ -11,6 +11,27 @@ const TELEGRAM_MESSAGE_LIMIT = 4000;
 const SECTION_OVERHEAD = 64;
 const INLINE_TITLE_LIMIT = 64;
 const INLINE_DESCRIPTION_LIMIT = 128;
+const ERROR_SOURCE_EXCERPT_LIMIT = 60;
+
+/**
+ * Adds where an error happened. Only worth the extra line when the code has
+ * several of them: for a one-liner the location is obvious.
+ */
+function describeError(execution: SandboxExecution, code: string): string {
+  if (execution.ok) {
+    return execution.result;
+  }
+
+  const sourceLines = code.split("\n");
+  if (!execution.line || sourceLines.length < 2 || execution.line > sourceLines.length) {
+    return execution.error;
+  }
+
+  const source = sourceLines[execution.line - 1].trim();
+  const excerpt = truncateText(source, ERROR_SOURCE_EXCERPT_LIMIT).value;
+
+  return `${execution.error}\n    at line ${execution.line}${excerpt ? `: ${excerpt}` : ""}`;
+}
 
 function buildSection(title: string, content: string): string {
   return `*${title}*\n${toMarkdownV2CodeBlock(content)}`;
@@ -91,7 +112,7 @@ export function formatExecutionMessage(
 } {
   const trimmedCode = code.trim().length > 0 ? code : " ";
   const outcomeTitle = execution.ok ? "Result" : "Error";
-  const outcomeValue = execution.ok ? execution.result : execution.error;
+  const outcomeValue = describeError(execution, code);
   const sections: ExecutionSection[] = [
     {
       key: "code",
