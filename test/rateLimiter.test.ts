@@ -64,3 +64,34 @@ describe("SlidingWindowRateLimiter memory", () => {
     expect(limiter.consume("recent", policy, 6_000).allowed).toBe(false);
   });
 });
+
+describe("SlidingWindowRateLimiter charges", () => {
+  test("count against the window without being checked", () => {
+    const limiter = new SlidingWindowRateLimiter();
+    const policy = { windowMs: 1_000, maxRequests: 3 };
+
+    expect(limiter.consume("user", policy, 0).allowed).toBe(true);
+    limiter.charge("user", policy, 2, 100);
+
+    expect(limiter.consume("user", policy, 200).allowed).toBe(false);
+  });
+
+  test("expire with the window like any other request", () => {
+    const limiter = new SlidingWindowRateLimiter();
+    const policy = { windowMs: 1_000, maxRequests: 3 };
+
+    limiter.charge("user", policy, 3, 0);
+
+    expect(limiter.consume("user", policy, 999).allowed).toBe(false);
+    expect(limiter.consume("user", policy, 1_001).allowed).toBe(true);
+  });
+
+  test("can push a key over its limit, which blocks the next request", () => {
+    const limiter = new SlidingWindowRateLimiter();
+    const policy = { windowMs: 1_000, maxRequests: 2 };
+
+    limiter.charge("user", policy, 5, 0);
+
+    expect(limiter.consume("user", policy, 10).allowed).toBe(false);
+  });
+});

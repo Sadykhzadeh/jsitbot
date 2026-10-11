@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 import { BOT_ID, USER_ID, createHarness } from "./helpers/botHarness";
 
 describe("private messages", () => {
@@ -188,5 +189,34 @@ describe("edited messages", () => {
 
     const [edit] = harness.callsTo("editMessageText");
     expect(edit.payload.text).toContain("exceeds the 2000-character limit");
+  });
+});
+
+describe("runs that time out", () => {
+  test("cost more of the rate limit than ordinary ones", async () => {
+    const harness = createHarness({
+      maxRequests: 4,
+      sandbox: new QuickJsSandboxService({ timeoutMs: 100 }),
+    });
+
+    await harness.sendMessage("while (true) {}", 1);
+    await harness.sendMessage("1", 2);
+    await harness.sendMessage("2", 3);
+
+    const replies = harness.callsTo("sendMessage").map((call) => call.payload.text as string);
+    expect(replies[0]).toContain("timed out");
+    expect(replies[1]).toContain("*Result*");
+    expect(replies[2]).toContain("Rate limit exceeded");
+  });
+
+  test("leave ordinary runs at one request each", async () => {
+    const harness = createHarness({ maxRequests: 4 });
+
+    for (let message = 1; message <= 4; message++) {
+      await harness.sendMessage(String(message), message);
+    }
+
+    const replies = harness.callsTo("sendMessage").map((call) => call.payload.text as string);
+    expect(replies.every((text) => text.includes("*Result*"))).toBe(true);
   });
 });
