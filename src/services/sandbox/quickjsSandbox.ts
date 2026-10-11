@@ -9,22 +9,14 @@ import {
   buildExpressionWrapper,
   buildStatementWrapper,
 } from "./executionWrapper";
-import type {
-  GuestExecutionShape,
-  SandboxExecution,
-  SandboxOptions,
-  SandboxService,
+import {
+  resolveSandboxOptions,
+  type GuestExecutionShape,
+  type SandboxExecution,
+  type SandboxOptions,
+  type SandboxService,
 } from "./types";
 import { createCappedModule, isHeapExhausted } from "./wasmHeap";
-
-const DEFAULT_OPTIONS: SandboxOptions = {
-  timeoutMs: 700,
-  memoryLimitBytes: 64 * 1024 * 1024,
-  maxStackSizeBytes: 512 * 1024,
-  maxLogs: 50,
-  maxLogLength: 2_000,
-  maxResultLength: 4_000,
-};
 
 type AttemptResult =
   | { kind: "ok"; value: GuestExecutionShape }
@@ -197,14 +189,12 @@ export class QuickJsSandboxService implements SandboxService {
   private spareModule: Promise<QuickJSWASMModule> | undefined;
 
   constructor(options?: Partial<SandboxOptions>) {
-    this.options = {
-      ...DEFAULT_OPTIONS,
-      ...options,
-    };
+    this.options = resolveSandboxOptions(options);
   }
 
-  /** Builds the next WebAssembly instance ahead of time so the first run does not pay for it. */
+  /** Pays for the first instance and warms up the interpreter before a real run needs them. */
   async warmUp(): Promise<void> {
+    await this.execute("0");
     this.prepareSpare();
     await this.spareModule;
   }

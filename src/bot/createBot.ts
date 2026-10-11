@@ -5,14 +5,14 @@ import { registerInlineQueryHandler } from "./handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "./handlers/privateMessage";
 import { registerStartHelpHandlers } from "./handlers/startHelp";
 import { SlidingWindowRateLimiter } from "../security/rateLimiter";
-import { QuickJsSandboxService } from "../services/sandbox/quickjsSandbox";
+import { createSandbox } from "../services/sandbox/createSandbox";
 
 export async function createBot(config: AppEnv): Promise<Bot> {
   const bot = new Bot(config.botToken);
   const me = await bot.api.getMe();
   const botUsername = me.username ?? "jsitbot";
 
-  const sandbox = new QuickJsSandboxService({
+  const sandbox = await createSandbox({
     timeoutMs: config.sandbox.timeoutMs,
     memoryLimitBytes: config.sandbox.memoryLimitBytes,
     maxStackSizeBytes: config.sandbox.maxStackSizeBytes,
