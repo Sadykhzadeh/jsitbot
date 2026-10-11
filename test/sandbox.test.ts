@@ -125,4 +125,36 @@ describe("QuickJsSandboxService", () => {
 
     expect(result.ok).toBe(false);
   });
+
+  test("reports a user error that mentions memory as the user's own error", async () => {
+    const result = await sandbox.execute(`throw new Error("memory leak detected in cache")`);
+
+    expect(result.ok).toBe(false);
+    expect(result.timedOut).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Error: memory leak detected in cache");
+    }
+  });
+
+  test("reports user errors that mention timeouts or interrupts as the user's own errors", async () => {
+    for (const message of ["request timeout", "interrupted by user", "Timeout while waiting"]) {
+      const result = await sandbox.execute(`throw new Error(${JSON.stringify(message)})`);
+
+      expect(result.ok).toBe(false);
+      expect(result.timedOut).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBe(`Error: ${message}`);
+      }
+    }
+  });
+
+  test("flags a real timeout and replaces the engine's wording", async () => {
+    const result = await sandbox.execute("while (true) {}");
+
+    expect(result.ok).toBe(false);
+    expect(result.timedOut).toBe(true);
+    if (!result.ok) {
+      expect(result.error).toBe("Sandbox execution timed out.");
+    }
+  });
 });
