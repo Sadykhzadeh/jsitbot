@@ -47,9 +47,3 @@ export const DEFAULT_SANDBOX_OPTIONS: SandboxOptions = {
 export function resolveSandboxOptions(options?: Partial<SandboxOptions>): SandboxOptions {
   return { ...DEFAULT_SANDBOX_OPTIONS, ...options };
 }
-
-export interface GuestExecutionShape {
-  ok: boolean;
-  value?: unknown;
-  error?: unknown;
-}

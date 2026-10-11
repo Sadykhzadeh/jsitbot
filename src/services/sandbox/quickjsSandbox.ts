@@ -6,22 +6,37 @@ import type {
 } from "quickjs-emscripten";
 
 import {
-  buildExpressionWrapper,
-  buildStatementWrapper,
+  GUEST_FILE,
+  guestRuntimeSource,
+  wrapAsExpression,
+  wrapAsStatements,
 } from "./executionWrapper";
 import {
   resolveSandboxOptions,
-  type GuestExecutionShape,
   type SandboxExecution,
   type SandboxOptions,
   type SandboxService,
 } from "./types";
 import { createCappedModule, isHeapExhausted } from "./wasmHeap";
 
-type AttemptResult =
-  | { kind: "ok"; value: GuestExecutionShape }
-  | { kind: "syntax-error"; error: string }
-  | { kind: "runtime-error"; error: string };
+const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
+const TIMEOUT_MESSAGE = "Sandbox execution timed out.";
+const NEVER_SETTLES_MESSAGE = "The code is waiting on a promise that can never settle.";
+const UNREADABLE_MESSAGE = "The sandbox returned a result it could not read.";
+
+// Jobs are run in batches so the deadline is checked between them as well as
+// by the interrupt handler inside them.
+const JOB_BATCH_SIZE = 1_000;
+
+const FLAG_RESULT_CUT = 1;
+const FLAG_LOGS_CUT = 2;
+
+/** What the guest runtime hands back: a status, some flags and the text to show. */
+interface Packed {
+  ok: boolean;
+  text: string;
+  truncated: boolean;
+}
 
 function truncateValue(value: string, maxLength: number): { value: string; truncated: boolean } {
   if (value.length <= maxLength) {
@@ -42,137 +57,32 @@ function normalizeUnknownError(error: unknown): string {
   return String(error);
 }
 
-function isSyntaxErrorMessage(message: string): boolean {
-  return /syntaxerror|unexpected token|expecting|parse error/i.test(message);
+function unpack(raw: string): Packed | undefined {
+  const firstBreak = raw.indexOf("\n");
+  const secondBreak = raw.indexOf("\n", firstBreak + 1);
+  if (firstBreak < 1 || secondBreak < 0) {
+    return undefined;
+  }
+
+  const status = raw.slice(0, firstBreak);
+  const flags = Number(raw.slice(firstBreak + 1, secondBreak));
+  if ((status !== "o" && status !== "e") || !Number.isInteger(flags)) {
+    return undefined;
+  }
+
+  return {
+    ok: status === "o",
+    text: raw.slice(secondBreak + 1),
+    truncated: (flags & (FLAG_RESULT_CUT | FLAG_LOGS_CUT)) !== 0,
+  };
 }
 
-function isMemoryErrorMessage(message: string): boolean {
-  return message === "InternalError: out of memory";
+function isSyntaxError(packed: Packed): boolean {
+  return !packed.ok && packed.text.startsWith("SyntaxError");
 }
 
-function serializeHostLogArg(arg: unknown): string {
-  if (typeof arg === "string") {
-    return arg;
-  }
-
-  if (arg === undefined) {
-    return "undefined";
-  }
-
-  if (arg === null) {
-    return "null";
-  }
-
-  if (typeof arg === "bigint") {
-    return `${arg}n`;
-  }
-
-  if (typeof arg === "function") {
-    return "[Function]";
-  }
-
-  if (typeof arg === "symbol") {
-    return String(arg);
-  }
-
-  try {
-    return JSON.stringify(arg);
-  } catch {
-    return String(arg);
-  }
-}
-
-function serializeGuestHandleForLog(context: QuickJSContext, handle: QuickJSHandle): string {
-  return serializeHostLogArg(dumpHandle<unknown>(context, handle));
-}
-
-function dumpHandle<T>(context: QuickJSContext, handle: QuickJSHandle): T {
-  return context.dump(handle) as T;
-}
-
-function consumeHandle<T>(context: QuickJSContext, handle: QuickJSHandle): T {
-  try {
-    return dumpHandle<T>(context, handle);
-  } finally {
-    handle.dispose();
-  }
-}
-
-function errorHandleToString(context: QuickJSContext, handle: QuickJSHandle): string {
-  try {
-    if (context.typeof(handle) === "object") {
-      const messageHandle = context.getProp(handle, "message");
-      const nameHandle = context.getProp(handle, "name");
-
-      try {
-        const message = dumpHandle<unknown>(context, messageHandle);
-        const name = dumpHandle<unknown>(context, nameHandle);
-
-        if (typeof message === "string" && typeof name === "string" && name.length > 0) {
-          return `${name}: ${message}`;
-        }
-
-        if (typeof message === "string" && message.length > 0) {
-          return message;
-        }
-      } finally {
-        messageHandle.dispose();
-        nameHandle.dispose();
-      }
-    }
-
-    const dumped = dumpHandle<unknown>(context, handle);
-
-    if (typeof dumped === "string") {
-      return dumped;
-    }
-
-    if (dumped && typeof dumped === "object") {
-      const maybeMessage = "message" in dumped ? dumped.message : undefined;
-      if (typeof maybeMessage === "string" && maybeMessage.length > 0) {
-        return maybeMessage;
-      }
-    }
-
-    return String(dumped);
-  } finally {
-    handle.dispose();
-  }
-}
-
-function drainPendingJobs(runtime: QuickJSRuntime): void {
-  while (runtime.hasPendingJob()) {
-    const jobsResult = runtime.executePendingJobs();
-    if (jobsResult.error) {
-      const message = errorHandleToString(jobsResult.error.context, jobsResult.error);
-      throw new Error(message);
-    }
-  }
-}
-
-function resolvePromiseResult(
-  context: QuickJSContext,
-  promiseHandle: QuickJSHandle,
-): GuestExecutionShape {
-  try {
-    drainPendingJobs(context.runtime);
-
-    const promiseState = context.getPromiseState(promiseHandle);
-    if (promiseState.type === "fulfilled") {
-      return consumeHandle<GuestExecutionShape>(context, promiseState.value);
-    }
-
-    if (promiseState.type === "rejected") {
-      return {
-        ok: false,
-        error: errorHandleToString(context, promiseState.error),
-      };
-    }
-
-    throw new Error("Sandbox promise did not settle");
-  } finally {
-    promiseHandle.dispose();
-  }
+function readString(context: QuickJSContext, handle: QuickJSHandle): string | undefined {
+  return context.typeof(handle) === "string" ? context.getString(handle) : undefined;
 }
 
 function disposeQuietly(dispose: () => void): void {
@@ -181,6 +91,38 @@ function disposeQuietly(dispose: () => void): void {
   } catch {
     // A runtime that was cut short can fail its own teardown. Its WebAssembly
     // instance is thrown away either way, so there is nothing to save.
+  }
+}
+
+/** Handles must be released before their context; this keeps track of them. */
+class HandleBin {
+  private readonly handles: QuickJSHandle[] = [];
+
+  add<T extends QuickJSHandle>(handle: T): T {
+    this.handles.push(handle);
+    return handle;
+  }
+
+  disposeAll(): void {
+    for (const handle of this.handles.reverse()) {
+      disposeQuietly(() => handle.dispose());
+    }
+    this.handles.length = 0;
+  }
+}
+
+function drainPendingJobs(runtime: QuickJSRuntime, expired: () => boolean): void {
+  while (runtime.hasPendingJob()) {
+    if (expired()) {
+      throw new Error("InternalError: interrupted");
+    }
+
+    const result = runtime.executePendingJobs(JOB_BATCH_SIZE);
+    if (result.error) {
+      const dumped = result.error.context.dump(result.error) as { name?: unknown; message?: unknown } | null;
+      result.error.dispose();
+      throw new Error(`${dumped?.name ?? "Error"}: ${dumped?.message ?? "unknown error"}`);
+    }
   }
 }
 
@@ -227,8 +169,24 @@ export class QuickJsSandboxService implements SandboxService {
     let startedAt = performance.now();
     const logs: string[] = [];
     let interrupted = false;
-    let truncated = false;
     let heapExhausted = () => false;
+
+    const failure = (error: string, timedOut = interrupted, cut = false): SandboxExecution => {
+      // With the heap used up to the last page QuickJS cannot even allocate its
+      // out-of-memory error, so the guest sees a bare null instead of a message.
+      const outOfMemory = error === "InternalError: out of memory" || (heapExhausted() && !timedOut);
+      const message = timedOut ? TIMEOUT_MESSAGE : outOfMemory ? MEMORY_LIMIT_MESSAGE : error;
+      const bounded = truncateValue(message, this.options.maxResultLength);
+
+      return {
+        ok: false,
+        logs,
+        error: bounded.value,
+        durationMs: Math.round(performance.now() - startedAt),
+        timedOut,
+        truncated: bounded.truncated || cut,
+      };
+    };
 
     try {
       // A fresh instance with its own capped memory for every run, so a run that
@@ -240,6 +198,7 @@ export class QuickJsSandboxService implements SandboxService {
         maxStackSizeBytes: this.options.maxStackSizeBytes,
       });
       const context = runtime.newContext();
+      const handles = new HandleBin();
 
       try {
         // The clock starts when the guest does: time spent waiting for an
@@ -253,165 +212,170 @@ export class QuickJsSandboxService implements SandboxService {
           interrupted = true;
           return true;
         });
-        this.installConsoleBridge(context, logs);
 
-        const expressionAttempt = await this.evaluateWrappedSource(
-          context,
-          buildExpressionWrapper(code),
-        );
+        const packed = this.evaluate(context, runtime, code, logs, handles, () => interrupted);
 
-        let execution: GuestExecutionShape;
-
-        if (expressionAttempt.kind === "ok") {
-          execution = expressionAttempt.value;
-        } else if (expressionAttempt.kind === "syntax-error") {
-          const statementAttempt = await this.evaluateWrappedSource(
-            context,
-            buildStatementWrapper(code),
-          );
-
-          if (statementAttempt.kind === "ok") {
-            execution = statementAttempt.value;
-          } else {
-            return this.failureFromAttempt(
-              statementAttempt.error,
-              logs,
-              startedAt,
-              interrupted,
-              heapExhausted(),
-            );
-          }
-        } else {
-          return this.failureFromAttempt(
-            expressionAttempt.error,
-            logs,
-            startedAt,
-            interrupted,
-            heapExhausted(),
-          );
+        if (interrupted) {
+          return failure(TIMEOUT_MESSAGE, true);
+        }
+        if (!packed) {
+          return failure(UNREADABLE_MESSAGE);
+        }
+        if (!packed.ok) {
+          return failure(packed.text, interrupted, packed.truncated);
         }
 
-        if (!execution.ok) {
-          return this.failureFromAttempt(
-            String(execution.error ?? "Unknown execution error"),
-            logs,
-            startedAt,
-            interrupted,
-            heapExhausted(),
-          );
-        }
-
-        const normalizedResult = truncateValue(
-          String(execution.value ?? "undefined"),
-          this.options.maxResultLength,
-        );
-        truncated = truncated || normalizedResult.truncated;
+        const result = truncateValue(packed.text, this.options.maxResultLength);
 
         return {
           ok: true,
           logs,
-          result: normalizedResult.value,
+          result: result.value,
           durationMs: Math.round(performance.now() - startedAt),
           timedOut: false,
-          truncated,
+          truncated: packed.truncated || result.truncated,
         };
       } finally {
         // A runtime that died of an exhausted heap trips an assertion when it is
         // freed. The whole instance is dropped right after, so skip the teardown.
         if (!heapExhausted()) {
-          disposeQuietly(() => this.teardownConsoleBridge(context));
+          handles.disposeAll();
           disposeQuietly(() => context.dispose());
           disposeQuietly(() => runtime.dispose());
         }
       }
     } catch (error) {
-      return this.failureFromAttempt(
-        normalizeUnknownError(error),
-        logs,
-        startedAt,
-        interrupted,
-        heapExhausted(),
-      );
+      return failure(normalizeUnknownError(error));
     }
   }
 
-  private installConsoleBridge(context: QuickJSContext, logs: string[]): void {
-    const logSink = context.newFunction("__hostLog", (...args) => {
-      if (logs.length >= this.options.maxLogs) {
-        return;
+  /**
+   * Tries the code as a single expression first, so `1 + 1` and `{ a: 1 }` give
+   * their value, and as the body of a function second, so statements, `return`
+   * and top-level `await` work. Both are wrapped in an async function: the only
+   * thing that can throw while evaluating them is a parse error, never the code
+   * itself, which is why it is safe to fall through to the next form.
+   */
+  private evaluate(
+    context: QuickJSContext,
+    runtime: QuickJSRuntime,
+    code: string,
+    logs: string[],
+    handles: HandleBin,
+    expired: () => boolean,
+  ): Packed | undefined {
+    const guest = this.installGuest(context, logs, handles);
+    let parseError: Packed | undefined;
+
+    for (const source of [wrapAsExpression(code), wrapAsStatements(code)]) {
+      const evaluated = context.evalCode(source, GUEST_FILE);
+
+      if (evaluated.error) {
+        const packed = this.packFailure(context, guest.fail, evaluated.error);
+        if (!packed || !isSyntaxError(packed)) {
+          return packed;
+        }
+
+        parseError = packed;
+        continue;
       }
 
-      const serialized = args
-        .map((arg) => serializeGuestHandleForLog(context, arg))
-        .join(" ");
-      const normalized = truncateValue(serialized, this.options.maxLogLength);
-      logs.push(normalized.value);
-    });
-
-    context.setProp(context.global, "__hostLog", logSink);
-    logSink.dispose();
-  }
-
-  private teardownConsoleBridge(context: QuickJSContext): void {
-    const cleanupResult = context.evalCode(`
-      try {
-        delete globalThis.console;
-        delete globalThis.__hostLog;
-      } catch {}
-    `);
-
-    if (cleanupResult.error) {
-      cleanupResult.error.dispose();
-      return;
+      return this.settle(context, runtime, guest.finish, evaluated.value, expired);
     }
 
-    cleanupResult.value.dispose();
+    return parseError;
   }
 
-  private async evaluateWrappedSource(
+  private installGuest(
     context: QuickJSContext,
-    source: string,
-  ): Promise<AttemptResult> {
-    const result = context.evalCode(source);
-
-    if (result.error) {
-      const error = errorHandleToString(context, result.error);
-      return isSyntaxErrorMessage(error)
-        ? { kind: "syntax-error", error }
-        : { kind: "runtime-error", error };
-    }
-
-    try {
-      const native = resolvePromiseResult(context, result.value);
-      return { kind: "ok", value: native };
-    } catch (error) {
-      return { kind: "runtime-error", error: normalizeUnknownError(error) };
-    }
-  }
-
-  private failureFromAttempt(
-    error: string,
     logs: string[],
-    startedAt: number,
-    timedOut: boolean,
-    heapExhausted: boolean,
-  ): SandboxExecution {
-    // With the heap used up to the last page QuickJS cannot even allocate its
-    // out-of-memory error, so the guest sees a bare null instead of a message.
-    const normalized = isMemoryErrorMessage(error) || (heapExhausted && !timedOut)
-      ? "Sandbox exceeded its memory limit."
-      : timedOut
-        ? "Sandbox execution timed out."
-        : error;
-    const truncatedError = truncateValue(normalized, this.options.maxResultLength);
+    handles: HandleBin,
+  ): { finish: QuickJSHandle; fail: QuickJSHandle } {
+    const { maxLogs, maxLogLength, maxResultLength } = this.options;
+
+    const setup = handles.add(context.unwrapResult(context.evalCode(guestRuntimeSource, "guest.js")));
+    const hostLog = handles.add(
+      context.newFunction("hostLog", (line) => {
+        const text = readString(context, line);
+        if (text !== undefined && logs.length < maxLogs) {
+          logs.push(truncateValue(text, maxLogLength).value);
+        }
+      }),
+    );
+    const api = handles.add(
+      context.unwrapResult(
+        context.callFunction(
+          setup,
+          context.undefined,
+          hostLog,
+          handles.add(context.newNumber(maxLogs)),
+          handles.add(context.newNumber(maxLogLength)),
+          handles.add(context.newNumber(maxResultLength)),
+        ),
+      ),
+    );
 
     return {
-      ok: false,
-      logs,
-      error: truncatedError.value,
-      durationMs: Math.round(performance.now() - startedAt),
-      timedOut,
-      truncated: truncatedError.truncated,
+      finish: handles.add(context.getProp(api, "finish")),
+      fail: handles.add(context.getProp(api, "fail")),
     };
+  }
+
+  /** Turns a value the code threw (before it ever started running) into a packed result. */
+  private packFailure(
+    context: QuickJSContext,
+    fail: QuickJSHandle,
+    error: QuickJSHandle,
+  ): Packed | undefined {
+    const called = context.callFunction(fail, context.undefined, error);
+    error.dispose();
+
+    if (called.error) {
+      called.error.dispose();
+      return undefined;
+    }
+
+    const raw = readString(context, called.value);
+    called.value.dispose();
+
+    return raw === undefined ? undefined : unpack(raw);
+  }
+
+  /** Lets the code's promise run to completion, then reads what the guest packed. */
+  private settle(
+    context: QuickJSContext,
+    runtime: QuickJSRuntime,
+    finish: QuickJSHandle,
+    pending: QuickJSHandle,
+    expired: () => boolean,
+  ): Packed | undefined {
+    const called = context.callFunction(finish, context.undefined, pending);
+    pending.dispose();
+
+    if (called.error) {
+      called.error.dispose();
+      return undefined;
+    }
+
+    const settled = called.value;
+    try {
+      drainPendingJobs(runtime, expired);
+
+      const state = context.getPromiseState(settled);
+      if (state.type === "pending") {
+        return { ok: false, text: NEVER_SETTLES_MESSAGE, truncated: false };
+      }
+      if (state.type === "rejected") {
+        state.error.dispose();
+        return undefined;
+      }
+
+      const raw = readString(context, state.value);
+      state.value.dispose();
+
+      return raw === undefined ? undefined : unpack(raw);
+    } finally {
+      settled.dispose();
+    }
   }
 }
