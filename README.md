@@ -15,6 +15,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Re-runs a message when you edit it, and updates the answer in place
 - Returns the value of the last statement, like a REPL, and understands `return` and top-level `await`
 - Accepts TypeScript syntax (the types are stripped)
+- Has `setTimeout` and `clearTimeout` on a virtual clock: a sleep returns at once instead of using up the time limit, and `Date.now()` does not move
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors, cycles
 - Reports the line an error came from
 

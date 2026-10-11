@@ -115,7 +115,7 @@ describe("what the guest can reach", () => {
     const types = await value(`
       return [
         typeof process, typeof Bun, typeof require, typeof module, typeof fetch,
-        typeof setTimeout, typeof setInterval, typeof WebAssembly, typeof hostLog,
+        typeof tick, typeof setInterval, typeof WebAssembly, typeof hostLog,
         typeof __hostLog, typeof guest, typeof finish, typeof std, typeof os,
       ].join(" ");
     `);
@@ -138,6 +138,6 @@ describe("what the guest can reach", () => {
   test("only lists the language's own globals", async () => {
     const names = await value(`return Object.getOwnPropertyNames(globalThis).sort().join(",")`);
 
-    expect(names).not.toMatch(/process|Bun|require|fetch|hostLog|setTimeout|Worker|postMessage|onmessage/);
+    expect(names).not.toMatch(/process|Bun|require|fetch|hostLog|Worker|postMessage|onmessage/);
   });
 });
