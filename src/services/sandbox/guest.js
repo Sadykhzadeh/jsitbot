@@ -74,10 +74,16 @@
     return out;
   }
 
+  // The first `end` characters, without half of a surrogate pair at the end.
+  function head(text, end) {
+    const last = end > 0 ? stringCharCodeAt(text, end - 1) : 0;
+    return stringSlice(text, 0, last >= 0xd800 && last <= 0xdbff ? end - 1 : end);
+  }
+
   function cut(text, limit, state) {
     if (text.length <= limit) return text;
     state.cut = true;
-    return stringSlice(text, 0, limit > 3 ? limit - 3 : 0) + "...";
+    return head(text, limit > 3 ? limit - 3 : 0) + "...";
   }
 
   function isIdentifier(key) {
@@ -95,7 +101,7 @@
     let source = text;
     let clipped = false;
     if (source.length > 1000) {
-      source = stringSlice(source, 0, 1000);
+      source = head(source, 1000);
       clipped = true;
       state.cut = true;
     }
@@ -513,7 +519,7 @@
     }
     if (line.length > maxLogLength) {
       logsCutShort = true;
-      line = stringSlice(line, 0, maxLogLength - 3) + "...";
+      line = head(line, maxLogLength - 3) + "...";
     } else if (state.cut) {
       logsCutShort = true;
     }

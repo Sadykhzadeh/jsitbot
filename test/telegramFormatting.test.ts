@@ -174,3 +174,26 @@ describe("error locations", () => {
     expect(message.text).not.toContain("at line");
   });
 });
+
+describe("cutting text that holds characters outside the BMP", () => {
+  const loneSurrogate = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+  test("never leaves half of a pair in the message or the inline preview", () => {
+    for (const prefix of ["", "a"]) {
+      const execution = {
+        ok: true as const,
+        logs: [prefix + "😀".repeat(1500)],
+        result: prefix + "😀".repeat(1500),
+        durationMs: 1,
+        timedOut: false as const,
+        truncated: false,
+      };
+      const message = formatExecutionMessage(execution, prefix + "😀".repeat(3000));
+      const preview = formatInlineExecutionPreview(execution);
+
+      expect(loneSurrogate.test(message.text)).toBe(false);
+      expect(loneSurrogate.test(preview.title)).toBe(false);
+      expect(loneSurrogate.test(preview.description)).toBe(false);
+    }
+  });
+});
