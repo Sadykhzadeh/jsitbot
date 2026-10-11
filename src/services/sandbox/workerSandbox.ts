@@ -14,6 +14,9 @@ const HARD_KILL_GRACE_MS = 400;
 
 const START_TIMEOUT_MS = 10_000;
 
+// How long to wait for a terminated worker to finish going away.
+const EXIT_WAIT_MS = 3_000;
+
 function failure(error: string, startedAt: number, timedOut: boolean): SandboxExecution {
   return {
     ok: false,
@@ -40,6 +43,7 @@ export class WorkerSandboxService implements SandboxService {
   private worker: Promise<Worker> | undefined;
   private queue: Promise<unknown> = Promise.resolve();
   private nextId = 0;
+  private readonly exiting = new Set<Promise<void>>();
 
   private readonly options: SandboxOptions;
 
@@ -58,10 +62,35 @@ export class WorkerSandboxService implements SandboxService {
     return run;
   }
 
-  dispose(): void {
+  /** Stops the worker and resolves once every worker this service started has exited. */
+  async dispose(): Promise<void> {
     const current = this.worker;
     this.worker = undefined;
-    current?.then((worker) => worker.terminate(), () => undefined);
+
+    const worker = await current?.catch(() => undefined);
+    if (worker) {
+      this.terminate(worker);
+    }
+
+    await Promise.all(this.exiting);
+  }
+
+  /**
+   * Terminating is asynchronous. A process that exits while a worker thread is
+   * still being torn down can hang on some platforms, so the exit is tracked.
+   */
+  private terminate(worker: Worker): void {
+    const exited = new Promise<void>((resolve) => {
+      const giveUp = setTimeout(resolve, EXIT_WAIT_MS);
+      worker.addEventListener("close", () => {
+        clearTimeout(giveUp);
+        resolve();
+      }, { once: true });
+    });
+
+    this.exiting.add(exited);
+    exited.then(() => this.exiting.delete(exited));
+    worker.terminate();
   }
 
   private ensureWorker(): Promise<Worker> {
@@ -83,7 +112,7 @@ export class WorkerSandboxService implements SandboxService {
       const worker = new Worker(new URL("./worker.ts", import.meta.url).href);
       const abandon = (reason: string) => {
         clearTimeout(timer);
-        worker.terminate();
+        this.terminate(worker);
         reject(new Error(reason));
       };
       const timer = setTimeout(() => abandon("Sandbox worker did not start in time"), START_TIMEOUT_MS);
@@ -136,7 +165,7 @@ export class WorkerSandboxService implements SandboxService {
           this.worker = undefined;
         }
 
-        worker.terminate();
+        this.terminate(worker);
         // Start the replacement now so the next run does not wait for it.
         this.ensureWorker().catch(() => undefined);
       };

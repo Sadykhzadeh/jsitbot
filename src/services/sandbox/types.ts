@@ -25,7 +25,7 @@ export interface SandboxService {
   /** Gets everything the first run would otherwise pay for out of the way. */
   warmUp?(): Promise<void>;
   /** Releases threads or instances held by the service. */
-  dispose?(): void;
+  dispose?(): void | Promise<void>;
 }
 
 export interface SandboxOptions {

@@ -16,7 +16,7 @@ export async function createSandbox(options: Partial<SandboxOptions>): Promise<S
     return worker;
   } catch (error) {
     console.error("Sandbox worker is unavailable, running guest code on the main thread:", error);
-    worker.dispose();
+    await worker.dispose();
 
     const local = new QuickJsSandboxService(options);
     await local.warmUp();

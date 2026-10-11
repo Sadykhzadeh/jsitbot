@@ -137,7 +137,7 @@ describe("createSandbox", () => {
       const result = await created.execute("1 + 1");
       expect(result.ok).toBe(true);
     } finally {
-      created.dispose?.();
+      await created.dispose?.();
     }
   });
 });
