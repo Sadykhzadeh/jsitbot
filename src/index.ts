@@ -2,6 +2,7 @@ import { GrammyError, HttpError } from "grammy";
 
 import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
+import { logBotError } from "./runtime/logError";
 
 function fail(message: string): never {
   console.error(message);
@@ -31,6 +32,10 @@ try {
   }
   throw error;
 }
+
+// Replaces the handler createBot installs, which printed the whole error: for a
+// failed Telegram call that includes the message that was being sent.
+bot.catch(logBotError);
 
 await bot.start({
   // Say which updates are wanted rather than inherit whatever list Telegram
