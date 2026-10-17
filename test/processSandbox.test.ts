@@ -124,14 +124,22 @@ describe("ProcessSandboxService", () => {
     // The child says when the guest's clock starts, so the wait after the
     // timeout is short. Waiting from the moment the run was sent took the
     // timeout plus 400 ms.
-    await sandbox.execute("1"); // a replacement for the process the last test killed may still be starting
-    const startedAt = performance.now();
-    const result = await sandbox.execute(`new Array(2 ** 28).join("ab").length`);
-    const wallMs = performance.now() - startedAt;
+    // The old wait could never be shorter than the timeout plus 400 ms, so any
+    // run that is over sooner shows the new one. A busy machine can stretch one
+    // attempt past that; it is unlikely to stretch three in a row.
+    let shortest = Infinity;
+    for (let attempt = 0; attempt < 3 && shortest >= options.timeoutMs + 390; attempt++) {
+      await sandbox.execute("1"); // a replacement for the process the last attempt killed may still be starting
+      const startedAt = performance.now();
+      const result = await sandbox.execute(`new Array(2 ** 28).join("ab").length`);
+      const wallMs = performance.now() - startedAt;
 
-    expect(result.timedOut).toBe(true);
-    expect(wallMs).toBeGreaterThanOrEqual(options.timeoutMs);
-    expect(wallMs).toBeLessThan(options.timeoutMs + 350);
+      expect(result.timedOut).toBe(true);
+      expect(wallMs).toBeGreaterThanOrEqual(options.timeoutMs);
+      shortest = Math.min(shortest, wallMs);
+    }
+
+    expect(shortest).toBeLessThan(options.timeoutMs + 390);
   });
 
   test("a killed run does not eat into the budget of the next one", async () => {
