@@ -24,6 +24,6 @@ process.on("message", async (message: ChildRequest) => {
     throw new Error("Sandbox process received code before it was initialised");
   }
 
-  const execution = await sandbox.execute(message.code);
+  const execution = await sandbox.execute(message.code, () => reply({ type: "started", id: message.id }));
   reply({ type: "result", id: message.id, execution });
 });

@@ -24,7 +24,7 @@ Run your own instance (see the README) and attack that. Do not run exploits, flo
 - **Guest escape.** Code in a message or inline query that reaches anything outside the QuickJS context: the host process, its modules, files, environment, network, or the bot's token or configuration. This includes the step that strips TypeScript types before the code runs.
 - **Host API exposure.** A way for guest code to get hold of a host object or function, through `console`, the output formatter, the timers or the error and result paths.
 - **Crossing the boundary with data.** Output that is not bounded as documented (more than 50 console lines of 2000 characters, or a result over 4000 characters), or that breaks out of the code block the bot puts it in and injects Telegram formatting.
-- **Denial of service that survives the watchdog.** A run that keeps the sandbox process busy past its timeout plus the 400 ms grace period, that stops the replacement process from starting, that crashes the bot process, or that leaves memory or processes behind after it was killed.
+- **Denial of service that survives the watchdog.** A run that keeps the sandbox process busy past its timeout plus the 150 ms grace period, that stops the replacement process from starting, that crashes the bot process, or that leaves memory or processes behind after it was killed.
 - **Memory cap bypass.** Guest memory use beyond the 64 MB limit, or a run that exhausts the memory of the machine.
 - **State carried between runs.** Anything one run can leave behind that a later run, by the same user or another, can see or be affected by.
 - **Rate limit bypass** by a single account.

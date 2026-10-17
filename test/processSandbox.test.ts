@@ -113,6 +113,19 @@ describe("ProcessSandboxService", () => {
     }
   });
 
+  test("gives up on a stuck native call soon after the guest's clock ran out", async () => {
+    // The child says when the guest's clock starts, so the wait after the
+    // timeout is short. Waiting from the moment the run was sent took the
+    // timeout plus 400 ms.
+    const startedAt = performance.now();
+    const result = await sandbox.execute(`new Array(2 ** 28).join("ab").length`);
+    const wallMs = performance.now() - startedAt;
+
+    expect(result.timedOut).toBe(true);
+    expect(wallMs).toBeGreaterThanOrEqual(options.timeoutMs);
+    expect(wallMs).toBeLessThan(options.timeoutMs + 300);
+  });
+
   test("a killed run does not eat into the budget of the next one", async () => {
     const killed = sandbox.execute(`new Array(2 ** 28).join("ab").length`);
     const next = sandbox.execute(`

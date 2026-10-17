@@ -11,8 +11,12 @@ import {
 // How long past its own timeout a run may take to report back before the
 // process is considered stuck. The guest's interrupt handler normally ends a
 // run at the timeout; this covers work it cannot interrupt, such as a single
-// native call that loops for seconds.
+// native call that loops for seconds. The child says when the guest's clock
+// starts, and from then the grace only has to cover the reply and a slow
+// event loop. Until it says so, the longer one applies: the child may still be
+// waiting for a runtime of its own.
 const HARD_KILL_GRACE_MS = 400;
+const STARTED_GRACE_MS = 150;
 
 const START_TIMEOUT_MS = 10_000;
 
@@ -61,10 +65,15 @@ function failure(error: string, startedAt: number, timedOut: boolean): SandboxEx
   };
 }
 
+interface Run {
+  answer(execution: SandboxExecution): void;
+  started(): void;
+}
+
 interface Child {
   process: Bun.Subprocess;
   /** Runs that have been sent to this child and not answered yet. */
-  pending: Map<number, (execution: SandboxExecution) => void>;
+  pending: Map<number, Run>;
   /** Set when the service ends the process itself, as opposed to it dying. */
   killed: boolean;
 }
@@ -134,7 +143,7 @@ export class ProcessSandboxService implements SandboxService {
 
   private startChild(onGone: () => void): Promise<Child> {
     return new Promise((resolve, reject) => {
-      const pending = new Map<number, (execution: SandboxExecution) => void>();
+      const pending = new Map<number, Run>();
       let ready = false;
 
       const timer = setTimeout(() => {
@@ -153,8 +162,10 @@ export class ProcessSandboxService implements SandboxService {
             ready = true;
             clearTimeout(timer);
             resolve(child);
+          } else if (message.type === "started") {
+            pending.get(message.id)?.started();
           } else {
-            pending.get(message.id)?.(message.execution);
+            pending.get(message.id)?.answer(message.execution);
           }
         },
         onExit: (_process, exitCode, signalCode) => {
@@ -169,8 +180,8 @@ export class ProcessSandboxService implements SandboxService {
           if (!child.killed && pending.size > 0) {
             console.error("Sandbox process died while running guest code:", signalCode ?? exitCode);
           }
-          for (const answer of [...pending.values()]) {
-            answer(failure("The sandbox crashed while running this code.", performance.now(), false));
+          for (const run of [...pending.values()]) {
+            run.answer(failure("The sandbox crashed while running this code.", performance.now(), false));
           }
         },
       });
@@ -204,12 +215,19 @@ export class ProcessSandboxService implements SandboxService {
         resolve(execution);
       };
 
-      const timer = setTimeout(() => {
+      const giveUp = () => {
         this.replaceChild(child);
         settle(failure("Sandbox execution timed out.", runStartedAt, true));
-      }, this.options.timeoutMs + HARD_KILL_GRACE_MS);
+      };
+      let timer = setTimeout(giveUp, this.options.timeoutMs + HARD_KILL_GRACE_MS);
 
-      child.pending.set(id, settle);
+      child.pending.set(id, {
+        answer: settle,
+        started: () => {
+          clearTimeout(timer);
+          timer = setTimeout(giveUp, this.options.timeoutMs + STARTED_GRACE_MS);
+        },
+      });
 
       const request: ChildRequest = { type: "run", id, code };
       try {
