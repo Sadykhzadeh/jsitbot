@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 
 import type { AppEnv } from "../config/env";
+import { handleConcurrently } from "./concurrency";
 import { registerInlineQueryHandler } from "./handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "./handlers/privateMessage";
 import { registerStartHelpHandlers } from "./handlers/startHelp";
@@ -22,6 +23,8 @@ export async function createBot(config: AppEnv): Promise<Bot> {
   });
   const rateLimiter = new SlidingWindowRateLimiter();
   const timeBudget = new SandboxTimeBudget();
+
+  bot.use(handleConcurrently(bot, config.limits.concurrency));
 
   registerStartHelpHandlers(bot, botUsername);
   registerPrivateMessageHandler(bot, {
