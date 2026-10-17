@@ -22,7 +22,7 @@ Run your own instance (see the README) and attack that. Do not run exploits, flo
 ## In scope
 
 - **Guest escape.** Code in a message or inline query that reaches anything outside the QuickJS context: the host process, its modules, files, environment, network, or the bot's token or configuration. This includes the step that strips TypeScript types before the code runs.
-- **Host API exposure.** A way for guest code to get hold of a host object or function, through `console`, the output formatter, the timers or the error and result paths.
+- **Host API exposure.** A way for guest code to get hold of a host object or function, through `console`, the output formatter, the timers, the parts of the environment that are loaded on first use (`src/services/sandbox/extras/`: `URL`, `crypto` and the like) or the error and result paths.
 - **Crossing the boundary with data.** Output that is not bounded as documented (more than 50 console lines of 2000 characters, or a result over 4000 characters), or that breaks out of the code block the bot puts it in and injects Telegram formatting.
 - **Denial of service that survives the watchdog.** A run that keeps the sandbox process busy past its timeout plus the 150 ms grace period, that stops the replacement process from starting, that crashes the bot process, or that leaves memory or processes behind after it was killed.
 - **Memory cap bypass.** Guest memory use beyond the 64 MB limit, or a run that exhausts the memory of the machine.
@@ -31,6 +31,7 @@ Run your own instance (see the README) and attack that. Do not run exploits, flo
 
 ## Out of scope
 
+- `crypto.getRandomValues` and `crypto.randomUUID` not being secure. They come from a small generator inside the sandbox on purpose and say so in the README.
 - Using the whole budget. A run that takes 700 ms, allocates 64 MB, prints 50 lines or ends with a timeout or memory error is the sandbox working.
 - Guest code changing its own world: replacing built-ins, polluting prototypes, making its own output look odd or unreadable. Each run has a fresh instance, so it affects nobody else. Reading the guest runtime source (`guest.js`) is not a leak either, since the repository is public.
 - Flooding from many accounts, or anything else that is a matter of request volume. Per-user limits are the protection here, and Telegram applies its own.

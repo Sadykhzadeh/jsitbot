@@ -29,6 +29,7 @@ Anything under `src/services/sandbox/` decides what a stranger's program can rea
 
 - Nothing from the host goes into the guest. If the guest needs a new capability, say why in the pull request and what it can be used to reach.
 - What leaves the guest is a bounded string, never an object the guest controls. The formatter in `guest.js` captures the built-ins it needs before user code runs; keep it that way.
+- A new global goes in `src/services/sandbox/extras/` and is loaded when a program first reads it, unless every program needs it; it must be plain JavaScript that only works on what the guest has. Test it in `test/sandboxGlobals.test.ts`, or compare it with the platform's own as `test/sandboxUrl.test.ts` does.
 - Add a test next to the existing ones: `test/sandboxIsolation.test.ts` for tampering with built-ins, `test/sandboxLimits.test.ts` for time and memory, `test/sandboxOutput.test.ts` for output bounds, `test/processSandbox.test.ts` for the child process and its watchdog.
 - Run `bun run bench` before and after a change that touches the run path and mention the numbers if they moved.
 
