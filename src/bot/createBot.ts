@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 
 import type { AppEnv } from "../config/env";
+import { publishCommandMenus } from "./commandMenu";
 import { handleConcurrently } from "./concurrency";
 import { registerInlineQueryHandler } from "./handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "./handlers/privateMessage";
@@ -24,6 +25,9 @@ export async function createBot(config: AppEnv): Promise<Bot> {
   });
   const rateLimiter = new SlidingWindowRateLimiter();
   const timeBudget = new SandboxTimeBudget();
+
+  // The menu is a convenience: starting must not wait for it or fail without it.
+  publishCommandMenus(bot.api).catch((error) => console.error("Could not publish the command menu:", error));
 
   bot.use(handleConcurrently(bot, config.limits.concurrency));
 
