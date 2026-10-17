@@ -198,6 +198,23 @@ describe("the child process", () => {
     await service.dispose();
   });
 
+  test("is replaced as soon as it dies, not when the next run asks", async () => {
+    const service = new ProcessSandboxService(options);
+    await service.warmUp();
+    const { process: child } = await childOf(service);
+
+    // Only a process that has been running a while is replaced right away.
+    await new Promise((resolve) => setTimeout(resolve, 2_100));
+    child.kill("SIGKILL");
+    await child.exited;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+    const { process: replacement } = await childOf(service);
+    expect(replacement.pid).not.toBe(child.pid);
+    expect(replacement.exitCode).toBeNull();
+    await service.dispose();
+  });
+
   test("is started again if it died while idle", async () => {
     const service = new ProcessSandboxService(options);
     await service.warmUp();

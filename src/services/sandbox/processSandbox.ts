@@ -20,6 +20,10 @@ const STARTED_GRACE_MS = 150;
 
 const START_TIMEOUT_MS = 10_000;
 
+// A process that dies sooner than this after it was started is not replaced
+// until the next run asks for one.
+const EAGER_RESTART_AFTER_MS = 2_000;
+
 const CHILD_ENTRY = fileURLToPath(new URL("./sandboxChild.ts", import.meta.url));
 
 // The only parts of the environment the child gets. In particular it does not
@@ -144,6 +148,7 @@ export class ProcessSandboxService implements SandboxService {
   private startChild(onGone: () => void): Promise<Child> {
     return new Promise((resolve, reject) => {
       const pending = new Map<number, Run>();
+      const spawnedAt = performance.now();
       let ready = false;
 
       const timer = setTimeout(() => {
@@ -182,6 +187,13 @@ export class ProcessSandboxService implements SandboxService {
           }
           for (const run of [...pending.values()]) {
             run.answer(failure("The sandbox crashed while running this code.", performance.now(), false));
+          }
+
+          // A process that was running fine and died, say because the machine
+          // ran short of memory, is replaced now rather than by the next
+          // message. One that died young is not: that would spin.
+          if (ready && !child.killed && performance.now() - spawnedAt > EAGER_RESTART_AFTER_MS) {
+            this.ensureChild().catch(() => undefined);
           }
         },
       });
