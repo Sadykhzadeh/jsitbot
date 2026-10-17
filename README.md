@@ -97,6 +97,7 @@ The tests need no token and no network.
 | `bun run test` | Runs the test suite (`bun test`) |
 | `bun run typecheck` | Type-checks `src`, `test` and `scripts` with `tsc --noEmit` |
 | `bun run bench` | Starts the sandbox the way the bot does and prints startup time, first-run latency and warm p50/p95 for a few typical programs |
+| `bun run soak` | Starts the real bot against a local stand-in for the Telegram API and prints start-up time, the memory of the bot and its sandbox process, and how a burst of messages is answered. `--limit=30` makes the stand-in refuse sends above 30 a second, as Telegram does |
 
 ## Configuration
 
@@ -124,7 +125,7 @@ src/security/          rate limiter and input guards
 src/services/sandbox/  the QuickJS sandbox, its child process and the guest runtime
 src/config/            limits and environment
 test/                  tests, run with bun test
-scripts/               benchmark
+scripts/               benchmark, soak test, fake Telegram API
 ```
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes how a message becomes an answer and how the sandbox is put together.
