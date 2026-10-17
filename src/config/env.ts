@@ -37,6 +37,9 @@ const DEFAULT_SHUTDOWN = {
   graceMs: 8_000,
 };
 
+// A line about what the bot did is printed this often while it is busy.
+const DEFAULT_STATS_EVERY_SECONDS = 60;
+
 // What BotFather hands out: the bot's numeric id, a colon, then a secret made of
 // letters, digits, "_" and "-".
 const BOT_TOKEN_PATTERN = /^\d+:[A-Za-z0-9_-]+$/;
@@ -83,6 +86,7 @@ export function loadEnv(source: Record<string, string | undefined>) {
     },
     telegramApi: DEFAULT_TELEGRAM_API,
     shutdown: DEFAULT_SHUTDOWN,
+    statsEverySeconds: DEFAULT_STATS_EVERY_SECONDS,
   } as const;
 }
 
