@@ -1,7 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createSandbox } from "../src/services/sandbox/createSandbox";
-import { ProcessSandboxService, childEnvironment } from "../src/services/sandbox/processSandbox";
+import { ProcessSandboxService, childCommand, childEnvironment } from "../src/services/sandbox/processSandbox";
 
 const options = {
   timeoutMs: 300,
@@ -212,6 +215,27 @@ describe("the child process", () => {
       else process.env.BOT_TOKEN = original.token;
       if (original.other === undefined) delete process.env.SOME_SECRET;
       else process.env.SOME_SECRET = original.other;
+    }
+  });
+
+  test("a .env file in the working directory does not reach the child", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "jsitbot-env-"));
+
+    try {
+      writeFileSync(join(directory, ".env"), "BOT_TOKEN=from-dotenv\n");
+      writeFileSync(join(directory, "probe.ts"), "console.log(JSON.stringify(Bun.env.BOT_TOKEN ?? null));\n");
+
+      const probe = Bun.spawn(childCommand(join(directory, "probe.ts")), {
+        cwd: directory,
+        env: childEnvironment(),
+        stdout: "pipe",
+        stderr: "ignore",
+      });
+
+      expect((await new Response(probe.stdout).text()).trim()).toBe("null");
+      await probe.exited;
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 

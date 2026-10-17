@@ -31,6 +31,12 @@ const CHILD_ENV_KEYS = [
   "LANG",
 ];
 
+// Bun reads a .env file from the working directory on its own, which would hand
+// the bot token to the child through its environment after all.
+export function childCommand(entry = CHILD_ENTRY): string[] {
+  return [process.execPath, "run", "--no-env-file", entry];
+}
+
 export function childEnvironment(): Record<string, string> {
   const environment: Record<string, string> = {};
 
@@ -137,7 +143,7 @@ export class ProcessSandboxService implements SandboxService {
         reject(new Error("Sandbox process did not start in time"));
       }, START_TIMEOUT_MS);
 
-      const subprocess = Bun.spawn([process.execPath, "run", CHILD_ENTRY], {
+      const subprocess = Bun.spawn(childCommand(), {
         stdin: "ignore",
         stdout: "inherit",
         stderr: "inherit",
