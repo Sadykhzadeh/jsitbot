@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 import type { SandboxExecution } from "../src/services/sandbox/types";
@@ -109,6 +109,32 @@ describe("memory limits", () => {
     if (result.ok) {
       expect(result.result).toBe("50000");
     }
+  });
+});
+
+describe("giving memory back", () => {
+  // A dropped instance is only freed when the collector runs, and the collector
+  // counts each one as 16 MB however much of it was used. Without a nudge, a
+  // run of runs that each fill the cap piles up several hundred megabytes.
+  async function collections(code: string): Promise<number> {
+    const collect = spyOn(Bun, "gc");
+    try {
+      await sandbox.execute(code);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return collect.mock.calls.length;
+    } finally {
+      collect.mockRestore();
+    }
+  }
+
+  test("collects garbage after a run that filled much of the memory", async () => {
+    expect(await collections(`"x".repeat(40e6).length`)).toBeGreaterThan(0);
+    expect(await collections(`const kept = []; while (true) kept.push("x".repeat(1024 * 1024))`)).toBeGreaterThan(0);
+  });
+
+  test("leaves an ordinary run alone", async () => {
+    expect(await collections(`[1, 2, 3].map((n) => n * 2)`)).toBe(0);
+    expect(await collections(`const text = "x".repeat(1000); text.length`)).toBe(0);
   });
 });
 
