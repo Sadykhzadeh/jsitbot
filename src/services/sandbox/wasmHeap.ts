@@ -74,3 +74,8 @@ export function isHeapExhausted(module: QuickJSWASMModule, guestHeapBytes: numbe
 
   return module.getWasmMemory().buffer.byteLength >= capBytes - WASM_PAGE_BYTES;
 }
+
+/** True when the run needed more memory than the instance started with. */
+export function isHeapGrown(module: QuickJSWASMModule): boolean {
+  return module.getWasmMemory().buffer.byteLength > BASE_HEAP_BYTES;
+}

@@ -19,7 +19,7 @@ import {
 } from "./types";
 import { truncateText } from "../../utils/markdownV2";
 import { stripTypes } from "./typescript";
-import { createCappedModule, isHeapExhausted } from "./wasmHeap";
+import { createCappedModule, isHeapExhausted, isHeapGrown } from "./wasmHeap";
 
 const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
 const TIMEOUT_MESSAGE = "Sandbox execution timed out.";
@@ -36,6 +36,10 @@ const WARM_UP_PROGRAMS = [
   `return { ok: true, items: new Map([["a", [1, 2]]]) }`,
   `const total: number = 1; null.missing`,
 ];
+
+// A run that left this much more of the process resident than it found is
+// followed by a garbage collection.
+const HEAVY_RUN_BYTES = 8 * 1024 * 1024;
 
 const FLAG_RESULT_CUT = 1;
 const FLAG_LOGS_CUT = 2;
@@ -191,6 +195,7 @@ export class QuickJsSandboxService implements SandboxService {
     let logs: string[] = [];
     let interrupted = false;
     let heapExhausted = () => false;
+    let heavy = () => false;
 
     const failure = (
       error: string,
@@ -224,6 +229,8 @@ export class QuickJsSandboxService implements SandboxService {
       const { module, runtime, context, guest, logs: sink } = await this.takePrepared();
       logs = sink;
       heapExhausted = () => isHeapExhausted(module, this.options.memoryLimitBytes);
+      const residentBefore = process.memoryUsage.rss();
+      heavy = () => isHeapGrown(module) || process.memoryUsage.rss() - residentBefore > HEAVY_RUN_BYTES;
 
       // The clock starts when the guest does: time spent waiting for an
       // instance or behind another run is not the guest's to pay for.
@@ -261,6 +268,15 @@ export class QuickJsSandboxService implements SandboxService {
       };
     } catch (error) {
       return failure(normalizeUnknownError(error));
+    } finally {
+      if (heavy()) {
+        // A dropped instance is only freed when the collector gets to it, and
+        // it counts as 16 MB however much of it was used, so the collector waits
+        // for a dozen of them. Instances that each held tens of megabytes would
+        // pile up to hundreds, and several such runs in a row could take the
+        // machine's memory. Do it once the reply is on its way.
+        setTimeout(() => Bun.gc(true), 0);
+      }
     }
   }
 
