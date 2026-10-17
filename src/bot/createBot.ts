@@ -4,7 +4,7 @@ import type { AppEnv } from "../config/env";
 import { registerInlineQueryHandler } from "./handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "./handlers/privateMessage";
 import { registerStartHelpHandlers } from "./handlers/startHelp";
-import { SlidingWindowRateLimiter } from "../security/rateLimiter";
+import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../security/rateLimiter";
 import { createSandbox } from "../services/sandbox/createSandbox";
 
 export async function createBot(config: AppEnv): Promise<Bot> {
@@ -21,6 +21,7 @@ export async function createBot(config: AppEnv): Promise<Bot> {
     maxResultLength: 4_000,
   });
   const rateLimiter = new SlidingWindowRateLimiter();
+  const timeBudget = new SandboxTimeBudget();
 
   registerStartHelpHandlers(bot, botUsername);
   registerPrivateMessageHandler(bot, {
@@ -28,12 +29,16 @@ export async function createBot(config: AppEnv): Promise<Bot> {
     sandbox,
     rateLimiter,
     rateLimitPolicy: config.limits.privateRateLimit,
+    timeBudget,
+    timeBudgetPolicy: config.limits.sandboxTimeBudget,
     maxCodeLength: config.limits.maxCodeLength,
   });
   registerInlineQueryHandler(bot, {
     sandbox,
     rateLimiter,
     rateLimitPolicy: config.limits.inlineRateLimit,
+    timeBudget,
+    timeBudgetPolicy: config.limits.sandboxTimeBudget,
     maxCodeLength: config.limits.maxCodeLength,
     minCodeLength: config.limits.inlineMinLength,
     botUsername,

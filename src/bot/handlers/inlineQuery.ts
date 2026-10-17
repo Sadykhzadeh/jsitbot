@@ -7,7 +7,9 @@ import {
 import type { SandboxService } from "../../services/sandbox/types";
 import {
   type RateLimitPolicy,
+  SandboxTimeBudget,
   SlidingWindowRateLimiter,
+  type TimeBudgetPolicy,
   TIMEOUT_PENALTY_REQUESTS,
   isCodeLengthAllowed,
   isInlineQueryLongEnough,
@@ -23,6 +25,8 @@ interface InlineQueryHandlerOptions {
   sandbox: SandboxService;
   rateLimiter: SlidingWindowRateLimiter;
   rateLimitPolicy: RateLimitPolicy;
+  timeBudget: SandboxTimeBudget;
+  timeBudgetPolicy: TimeBudgetPolicy;
   maxCodeLength: number;
   minCodeLength: number;
   botUsername: string;
@@ -116,7 +120,31 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
       return;
     }
 
+    const budgetKey = `user:${ctx.from.id}`;
+    const budget = options.timeBudget.check(budgetKey, options.timeBudgetPolicy);
+    if (!budget.allowed) {
+      const rejection = formatRejectionMessage(
+        `Your code has used up its run time for now. Try again in ${Math.ceil(budget.retryAfterMs / 1000)}s.`,
+      );
+      await ctx.answerInlineQuery(
+        [
+          buildArticle(
+            "run-time",
+            "Run time used up",
+            "Your code kept the sandbox busy for too long. Try again shortly.",
+            rejection.text,
+          ),
+        ],
+        {
+          cache_time: 0,
+          is_personal: true,
+        },
+      );
+      return;
+    }
+
     const execution = await options.sandbox.execute(code);
+    options.timeBudget.record(budgetKey, execution.durationMs, options.timeBudgetPolicy);
     if (execution.timedOut) {
       options.rateLimiter.charge(
         `inline:${ctx.from.id}`,

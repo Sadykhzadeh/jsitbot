@@ -88,3 +88,4 @@ flowchart TD
 - Host APIs are not exposed inside guest code
 - Output size is bounded inside the sandbox
 - Per-user rate limits apply to private messages, edits and inline queries; a run that times out is charged extra
+- Each user also has a budget of sandbox time per window, counted in the milliseconds their runs took and shared by private messages and inline queries. The request limits count runs, and a run can cost a millisecond or the whole timeout; the budget is what stops one account from holding the sandbox for a large share of the time
