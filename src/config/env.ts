@@ -22,6 +22,13 @@ const DEFAULT_SANDBOX_TIME_BUDGET = {
   windowMs: 10_000,
   maxMs: 1_000,
 };
+// Calls to Telegram. It allows a bot about 30 messages a second over all chats
+// and answers 429 with a time to wait above that, so sends stay under it.
+const DEFAULT_TELEGRAM_API = {
+  sendsPerSecond: 25,
+  attempts: 3,
+  maxWaitMs: 5_000,
+};
 
 // What BotFather hands out: the bot's numeric id, a colon, then a secret made of
 // letters, digits, "_" and "-".
@@ -67,6 +74,7 @@ export function loadEnv(source: Record<string, string | undefined>) {
       sandboxTimeBudget: DEFAULT_SANDBOX_TIME_BUDGET,
       concurrency: DEFAULT_CONCURRENCY,
     },
+    telegramApi: DEFAULT_TELEGRAM_API,
   } as const;
 }
 
