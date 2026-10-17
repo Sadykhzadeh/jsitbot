@@ -41,6 +41,14 @@ Notes:
 - bot-generated inline results received in private chat are handled separately
 - an edited message is run again and the earlier answer is edited in place; the table that maps messages to answers is in memory and bounded, so after a restart an edit is answered as a new message
 
+## Group Flow
+
+A group has many people in it and most of what they write is not code for the bot, so it only reacts to a message that is addressed to it: `/run code`, `@bot code`, or either of them as a reply, in which case the code is the first code block of the message that is replied to, or its whole text (`src/bot/handlers/runCommand.ts`). The same handler answers in private chats, where `/run` is otherwise ignored like any other command.
+
+- the limits are the ones of private messages and the counters are shared (`src/bot/runner.ts`), so a user gets no more by mixing the two
+- a user who is over the request limit or the sandbox time budget gets no answer in a group, since an answer there is one more message for everybody; a message over the length limit does get one
+- an edit of the `/run` message is not run again
+
 ## Inline Query Flow
 
 ```mermaid
