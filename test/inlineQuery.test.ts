@@ -113,3 +113,21 @@ describe("inline results to share", () => {
     expect(full.description).not.toContain("\n");
   });
 });
+
+describe("caching of inline answers", () => {
+  test("lets Telegram keep the help for everybody, but never a run or a refusal", async () => {
+    const harness = createHarness({ maxRequests: 1 });
+
+    await harness.inlineQuery("1");
+    await harness.inlineQuery("6 * 7");
+    await harness.inlineQuery("6 * 8");
+
+    const [help, run, refusal] = harness.callsTo("answerInlineQuery").map((call) => call.payload);
+    expect(help.cache_time).toBeGreaterThan(0);
+    expect(help.is_personal).toBeFalsy();
+    expect(run.cache_time).toBe(0);
+    expect(run.is_personal).toBe(true);
+    expect(refusal.results[0].id).toBe("rate-limited");
+    expect(refusal.cache_time).toBe(0);
+  });
+});

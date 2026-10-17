@@ -33,6 +33,8 @@ interface InlineQueryHandlerOptions {
   botUsername: string;
 }
 
+const HELP_CACHE_SECONDS = 600;
+
 function buildArticle(
   id: string,
   title: string,
@@ -64,8 +66,8 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
           ),
         ],
         {
-          cache_time: 0,
-          is_personal: true,
+          // The same for everybody and for every short query, unlike a run.
+          cache_time: HELP_CACHE_SECONDS,
           button: {
             text: "Open private chat",
             start_parameter: "inline-help",
