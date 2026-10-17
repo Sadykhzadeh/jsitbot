@@ -11,7 +11,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 ## What It Does
 
-- Executes JavaScript from private messages and inline queries
+- Executes JavaScript from private messages and inline queries, answering up to 8 users at a time
 - Re-runs a message when you edit it, and updates the answer in place
 - Returns the value of the last statement, like a REPL, and understands `return` and top-level `await`
 - Accepts TypeScript syntax (the types are stripped)
@@ -108,7 +108,7 @@ Everything else is a constant in the source, so a change to a limit is a code ch
 
 | What | Where |
 | --- | --- |
-| Time per run, guest memory, stack size, code length, minimum inline query length, rate limits | `src/config/env.ts` |
+| Time per run, guest memory, stack size, code length, minimum inline query length, rate limits, sandbox time per user, how many updates run at once | `src/config/env.ts` |
 | Console lines, console line length, result length | `src/bot/createBot.ts` |
 | Defaults used by the sandbox on its own (the benchmark, the tests) | `src/services/sandbox/types.ts` |
 

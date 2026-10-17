@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 
+import { handleConcurrently, type ConcurrencyPolicy } from "../../src/bot/concurrency";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../../src/security/rateLimiter";
 import { registerInlineQueryHandler } from "../../src/bot/handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "../../src/bot/handlers/privateMessage";
@@ -18,8 +19,12 @@ export interface ApiCall {
 export interface HarnessOptions {
   sandbox?: SandboxService;
   maxRequests?: number;
+  /** Handle updates concurrently, the way the real bot does. Off by default, so a test can await one update. */
+  concurrency?: ConcurrencyPolicy;
   /** Sandbox time one user may use per ten seconds; unlimited by default. */
   maxSandboxMs?: number;
+  /** How long each call to the API takes, as Telegram's network round trip would. */
+  apiLatencyMs?: number;
   /** Methods that should fail, with the error text Telegram would give. */
   failures?: Record<string, string>;
 }
@@ -45,6 +50,9 @@ export function createHarness(options: HarnessOptions = {}) {
   bot.api.config.use(async (_previous, method, payload) => {
     const body = payload as Record<string, any>;
     calls.push({ method, payload: body });
+    if (options.apiLatencyMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.apiLatencyMs));
+    }
 
     const failure = options.failures?.[method];
     if (failure) {
@@ -70,6 +78,10 @@ export function createHarness(options: HarnessOptions = {}) {
 
     return { ok: true, result: true } as any;
   });
+
+  if (options.concurrency) {
+    bot.use(handleConcurrently(bot, options.concurrency));
+  }
 
   const sandbox = options.sandbox ?? new QuickJsSandboxService();
   const rateLimiter = new SlidingWindowRateLimiter();
@@ -98,8 +110,10 @@ export function createHarness(options: HarnessOptions = {}) {
   });
 
   let nextUpdateId = 1;
-  const from = { id: USER_ID, is_bot: false, first_name: "Tester" };
-  const chat = { id: USER_ID, type: "private" as const, first_name: "Tester" };
+  const sender = (userId: number) => ({
+    from: { id: userId, is_bot: false, first_name: "Tester" },
+    chat: { id: userId, type: "private" as const, first_name: "Tester" },
+  });
 
   return {
     bot,
@@ -110,26 +124,26 @@ export function createHarness(options: HarnessOptions = {}) {
       return calls.filter((call) => call.method === method);
     },
 
-    async sendMessage(text: string, messageId = 1): Promise<void> {
+    async sendMessage(text: string, messageId = 1, userId = USER_ID): Promise<void> {
       const update: Update = {
         update_id: nextUpdateId++,
-        message: { message_id: messageId, date: 0, chat, from, text },
+        message: { message_id: messageId, date: 0, ...sender(userId), text },
       };
       await bot.handleUpdate(update);
     },
 
-    async editMessage(text: string, messageId = 1): Promise<void> {
+    async editMessage(text: string, messageId = 1, userId = USER_ID): Promise<void> {
       const update: Update = {
         update_id: nextUpdateId++,
-        edited_message: { message_id: messageId, date: 0, edit_date: 1, chat, from, text },
+        edited_message: { message_id: messageId, date: 0, edit_date: 1, ...sender(userId), text },
       };
       await bot.handleUpdate(update);
     },
 
-    async inlineQuery(query: string): Promise<void> {
+    async inlineQuery(query: string, userId = USER_ID): Promise<void> {
       const update: Update = {
         update_id: nextUpdateId++,
-        inline_query: { id: `q${nextUpdateId}`, from, query, offset: "" },
+        inline_query: { id: `q${nextUpdateId}`, from: sender(userId).from, query, offset: "" },
       };
       await bot.handleUpdate(update);
     },

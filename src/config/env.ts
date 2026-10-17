@@ -3,6 +3,11 @@ const DEFAULT_MEMORY_LIMIT_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAX_STACK_SIZE_BYTES = 512 * 1024;
 const DEFAULT_MAX_CODE_LENGTH = 2000;
 const DEFAULT_INLINE_MIN_LENGTH = 3;
+// Updates handled at once, and how many one user may have going or waiting.
+const DEFAULT_CONCURRENCY = {
+  limit: 8,
+  perUser: 3,
+};
 const DEFAULT_PRIVATE_RATE_LIMIT = {
   windowMs: 10_000,
   maxRequests: 5,
@@ -41,6 +46,7 @@ export const env = {
     privateRateLimit: DEFAULT_PRIVATE_RATE_LIMIT,
     inlineRateLimit: DEFAULT_INLINE_RATE_LIMIT,
     sandboxTimeBudget: DEFAULT_SANDBOX_TIME_BUDGET,
+    concurrency: DEFAULT_CONCURRENCY,
   },
 } as const;
 
