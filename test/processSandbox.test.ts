@@ -70,13 +70,20 @@ describe("ProcessSandboxService", () => {
     expect(loop.ok).toBe(false);
     expect(loop.timedOut).toBe(true);
 
-    const bomb = await sandbox.execute(`
-      const kept = [];
-      while (true) kept.push("x".repeat(1024 * 1024));
-    `);
-    expect(bomb.ok).toBe(false);
-    if (!bomb.ok) {
-      expect(bomb.error).toBe("Sandbox exceeded its memory limit.");
+    // Filling the memory takes about 250 ms, so a clock as short as the one the
+    // other tests use would sometimes win the race on a busy machine.
+    const roomy = new ProcessSandboxService({ ...options, timeoutMs: 3_000 });
+    try {
+      const bomb = await roomy.execute(`
+        const kept = [];
+        while (true) kept.push("x".repeat(1024 * 1024));
+      `);
+      expect(bomb.ok).toBe(false);
+      if (!bomb.ok) {
+        expect(bomb.error).toBe("Sandbox exceeded its memory limit.");
+      }
+    } finally {
+      await roomy.dispose();
     }
   });
 
