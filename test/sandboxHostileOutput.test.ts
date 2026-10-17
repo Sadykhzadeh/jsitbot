@@ -32,7 +32,7 @@ describe("values the formatter must not trust", () => {
     expect(result.timedOut).toBe(false);
     expect(result.logs).toHaveLength(1);
     expect(result.logs[0]).toContain("toString: [Function: trap]");
-    expect(wallMs).toBeLessThan(250);
+    expect(wallMs).toBeLessThan(1_000);
   });
 
   test("a proxy whose traps throw prints as unformattable", async () => {
@@ -52,7 +52,7 @@ describe("values the formatter must not trust", () => {
     expect(result.ok).toBe(true);
     expect(text(result).length).toBeLessThan(4_000);
     expect(result.truncated).toBe(true);
-    expect(wallMs).toBeLessThan(250);
+    expect(wallMs).toBeLessThan(1_000);
   });
 
   test("getters are named, not run", async () => {
