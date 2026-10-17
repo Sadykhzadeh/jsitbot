@@ -5,6 +5,8 @@
 // and CPU, and how fast a runaway run is stopped.
 //
 // Usage: bun run bench [--runs=150]
+import { readFileSync } from "node:fs";
+
 import { createSandbox } from "../src/services/sandbox/createSandbox";
 import { ProcessSandboxService } from "../src/services/sandbox/processSandbox";
 import type { SandboxService } from "../src/services/sandbox/types";
@@ -58,8 +60,23 @@ async function childProcess(sandbox: SandboxService): Promise<Bun.Subprocess | u
   return child?.process;
 }
 
+/** A line of /proc/<pid>/status in kilobytes, such as VmRSS or VmHWM, as MB. */
+function procStatusMb(pid: number, field: string): number | undefined {
+  try {
+    const status = readFileSync(`/proc/${pid}/status`, "utf8");
+    const kilobytes = status.match(new RegExp(String.raw`^${field}:\s+(\d+) kB`, "m"))?.[1];
+    return kilobytes ? Math.round(Number(kilobytes) / 1024) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Resident set of another process right now, in MB. */
 function residentMb(pid: number): number | undefined {
+  if (process.platform === "linux") {
+    // BusyBox's ps, which the Alpine images have, does not know -o rss.
+    return procStatusMb(pid, "VmRSS");
+  }
   if (process.platform === "win32") {
     const out = Bun.spawnSync(["tasklist", "/FI", `PID eq ${pid}`, "/NH", "/FO", "CSV"]).stdout.toString();
     const kilobytes = out.match(/"([\d,.]+) K"\s*$/m)?.[1];
@@ -67,6 +84,21 @@ function residentMb(pid: number): number | undefined {
   }
   const out = Bun.spawnSync(["ps", "-o", "rss=", "-p", String(pid)]).stdout.toString().trim();
   return out ? Math.round(Number(out) / 1024) : undefined;
+}
+
+/**
+ * Highest resident size a process has reached, in MB. On Linux it is read from
+ * /proc, so the process must still be alive; elsewhere from the usage report
+ * of an exited process, which counts kilobytes on Windows and bytes on the rest.
+ */
+function peakMb(process_: Bun.Subprocess): number {
+  const fromProc = process.platform === "linux" ? procStatusMb(process_.pid, "VmHWM") : undefined;
+  if (fromProc !== undefined) {
+    return fromProc;
+  }
+  const maxRss = process_.resourceUsage()?.maxRSS ?? 0;
+
+  return process.platform === "win32" ? maxRss / 1024 : maxRss / 1024 / 1024;
 }
 
 const cpuMs = (process: Bun.Subprocess) => Number(process.resourceUsage()?.cpuTime.total ?? 0n) / 1000;
@@ -115,8 +147,10 @@ if (child) {
       checkpoints.push(`${run}: ${residentMb(child.pid)} MB`);
     }
   }
+  // /proc is gone once the process is, so on Linux the peak is read first.
+  const peakWhileAlive = process.platform === "linux" ? peakMb(child) : undefined;
   await soak.dispose?.();
-  const peak = (child.resourceUsage()?.maxRSS ?? 0) / 1024;
+  const peak = peakWhileAlive ?? peakMb(child);
   console.log(`  rss at start ${rssBefore} MB, then ${checkpoints.join(", ")}, peak ${peak.toFixed(0)} MB`);
 
   // The CPU time of a process can only be read once it has exited, and starting
