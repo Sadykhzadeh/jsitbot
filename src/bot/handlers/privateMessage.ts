@@ -10,6 +10,7 @@ import {
   TIMEOUT_PENALTY_REQUESTS,
   isCodeLengthAllowed,
 } from "../../security/rateLimiter";
+import { stripCodeFence } from "../codeInput";
 import { isBotCommand } from "../commands";
 import {
   formatExecutionMessage,
@@ -141,10 +142,12 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       return;
     }
 
-    const code = ctx.message.text;
-    if (isBotCommand(code)) {
+    const text = ctx.message.text;
+    if (isBotCommand(text)) {
       return;
     }
+
+    const code = stripCodeFence(text);
 
     await run(
       ctx.api,
@@ -159,10 +162,12 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       return;
     }
 
-    const code = ctx.editedMessage.text;
-    if (isBotCommand(code)) {
+    const text = ctx.editedMessage.text;
+    if (isBotCommand(text)) {
       return;
     }
+
+    const code = stripCodeFence(text);
 
     const request = {
       chatId: ctx.chat.id,

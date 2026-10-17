@@ -220,3 +220,25 @@ describe("runs that time out", () => {
     expect(replies.every((text) => text.includes("*Result*"))).toBe(true);
   });
 });
+
+describe("code in a fence", () => {
+  test("is run without the fence and the language name", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("```js\nconst n = 20;\nn + 22\n```", 3);
+
+    const [reply] = harness.callsTo("sendMessage");
+    expect(reply.payload.text).toContain("*Result*\n```\n42\n```");
+    expect(reply.payload.text).not.toContain("not a function");
+  });
+
+  test("is stripped in an edit as well", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1", 3);
+    await harness.editMessage("```\n6 * 7\n```", 3);
+
+    const [edit] = harness.callsTo("editMessageText");
+    expect(edit.payload.text).toContain("*Result*\n```\n42\n```");
+  });
+});
