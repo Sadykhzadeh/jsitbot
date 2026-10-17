@@ -18,7 +18,8 @@ jobs:
   check:
     # The only label this forge's runner answers to.
     runs-on: docker
-    timeout-minutes: 15
+    # The job takes about half a minute; a hang should not hold the runner longer.
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v7
@@ -27,8 +28,15 @@ jobs:
         with:
           bun-version: 1.4.3
 
-      - run: bun install --frozen-lockfile
+      - name: Install
+        run: bun install --frozen-lockfile
 
-      - run: bun run typecheck
+      # Under a second, so a type error is reported before the tests start.
+      - name: Type check
+        run: bun run typecheck
 
-      - run: bun test
+      # Three workers: the two slowest files, which wait on real time, then run
+      # side by side instead of one after the other. More workers do not make it
+      # faster and only give the tests that watch the clock a busier machine.
+      - name: Test
+        run: bun test --parallel=3
