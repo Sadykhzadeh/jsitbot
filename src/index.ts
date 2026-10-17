@@ -4,6 +4,7 @@ import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
 import { logBotError } from "./runtime/logError";
 import { listenForShutdown } from "./runtime/shutdown";
+import { logStatsPeriodically } from "./runtime/stats";
 import { createApiGuard } from "./runtime/telegramApi";
 
 function fail(message: string): never {
@@ -56,6 +57,8 @@ bot.api.config.use(apiGuard.transformer);
 // Replaces the handler createBot installs, which printed the whole error: for a
 // failed Telegram call that includes the message that was being sent.
 bot.catch(logBotError);
+
+logStatsPeriodically(bot, apiGuard.stats, env.statsEverySeconds);
 
 await bot.start({
   // Say which updates are wanted rather than inherit whatever list Telegram

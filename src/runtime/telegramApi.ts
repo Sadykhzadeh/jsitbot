@@ -42,6 +42,8 @@ const SERVER_ERROR_BACKOFF_MS = 250;
 export interface ApiStats {
   /** Calls started and not yet finished, waiting for a turn or a retry included. */
   pending: number;
+  /** The most calls that were pending at once since this was last set to `pending`. */
+  peakPending: number;
   /** Calls made again after Telegram said to wait. */
   rateLimited: number;
   /** Calls made again after a server error or a lost connection. */
@@ -61,7 +63,7 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
   const interval = 1_000 / policy.sendsPerSecond;
   // The earliest moment the next paced call may go out.
   let nextSlot = 0;
-  const stats: ApiStats = { pending: 0, rateLimited: 0, failedOver: 0, lastActivityAt: clock.now() };
+  const stats: ApiStats = { pending: 0, peakPending: 0, rateLimited: 0, failedOver: 0, lastActivityAt: clock.now() };
 
   async function takeTurn(): Promise<void> {
     const now = clock.now();
@@ -83,6 +85,7 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
     }
 
     stats.pending++;
+    stats.peakPending = Math.max(stats.peakPending, stats.pending);
     stats.lastActivityAt = clock.now();
     try {
       for (let attempt = 1; ; attempt++) {
