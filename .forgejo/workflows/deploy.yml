@@ -1,4 +1,4 @@
-# Deploy hook for the instance of this bot that the author runs. It is only
+# Deploy hook for the instance of this service that the author runs. It is only
 # useful together with a deploy receiver of your own; if you run a fork, delete
 # this file or point DEPLOY_URL at your own endpoint. Forgejo/Gitea Actions read
 # it, GitHub ignores it.
