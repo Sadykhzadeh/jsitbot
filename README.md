@@ -40,36 +40,91 @@ Telegram bot for running JavaScript in an isolated sandbox.
 | Private chat | 5 runs per 10 s |
 | Inline | 12 runs per 10 s |
 
-## Setup
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Running It Locally
+
+You need:
+
+- [Bun](https://bun.sh) 1.3 or newer (CI runs 1.4). Node is not needed.
+- A Telegram bot token, see below.
+- Network access to the Telegram API. The bot uses long polling, so no public URL or webhook is required.
 
 ```bash
 bun install
 cp .env.example .env
 ```
 
-Set:
+Put your token in `.env`:
 
 ```env
 BOT_TOKEN=your_telegram_bot_token
 ```
 
-Run:
+Start the bot:
 
 ```bash
-bun run dev
+bun run start
 ```
+
+It prints `Bot started as @your_bot_name` once it is polling. Bun loads `.env` on its own. The sandbox process is started without `.env` and without the rest of the bot's environment.
+
+### Getting a bot token
+
+1. Open [@BotFather](https://t.me/BotFather) in Telegram and send `/newbot`.
+2. Pick a display name, then a username that ends in `bot`.
+3. BotFather replies with a token that looks like `<digits>:<letters and digits>`. Put it in `.env`. Anyone who has the token controls the bot, so do not commit it.
+4. For inline mode, send `/setinline`, choose your bot and give it a placeholder such as `1 + 1`.
+
+### Running the checks
+
+```bash
+bun test
+bun run typecheck
+```
+
+The tests need no token and no network.
 
 ## Scripts
 
-```bash
-bun run dev
-bun run start
-bun run test
-bun run typecheck
-bun run bench
+| Command | What it does |
+| --- | --- |
+| `bun run dev` | Runs `src/index.ts` (the same as `start`; there is no file watcher) |
+| `bun run start` | Runs `src/index.ts` |
+| `bun run test` | Runs the test suite (`bun test`) |
+| `bun run typecheck` | Type-checks `src`, `test` and `scripts` with `tsc --noEmit` |
+| `bun run bench` | Starts the sandbox the way the bot does and prints startup time, first-run latency and warm p50/p95 for a few typical programs |
+
+## Configuration
+
+The only setting read from the environment is the token:
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `BOT_TOKEN` | yes | Telegram bot token from @BotFather |
+
+Everything else is a constant in the source, so a change to a limit is a code change and goes through review and tests:
+
+| What | Where |
+| --- | --- |
+| Time per run, guest memory, stack size, code length, minimum inline query length, rate limits | `src/config/env.ts` |
+| Console lines, console line length, result length | `src/bot/createBot.ts` |
+| Defaults used by the sandbox on its own (the benchmark, the tests) | `src/services/sandbox/types.ts` |
+
+If the sandbox process cannot be started on your machine, the bot logs it and runs QuickJS inside its own process instead. That keeps the interrupt handler and the memory cap but not the hard kill, so look for `Sandbox process is unavailable` in the log before you expose a bot to other people.
+
+## Project Layout
+
+```text
+src/bot/               grammY handlers, message formatting
+src/security/          rate limiter and input guards
+src/services/sandbox/  the QuickJS sandbox, its child process and the guest runtime
+src/config/            limits and environment
+test/                  tests, run with bun test
+scripts/               benchmark
 ```
 
-`bun run bench` starts the sandbox the way the bot does and prints startup time, first-run latency and warm p50/p95 for a few typical programs.
+[ARCHITECTURE.md](ARCHITECTURE.md) describes how a message becomes an answer and how the sandbox is put together.
 
 ## Usage
 
@@ -106,5 +161,8 @@ Inline mode:
 Note:
 
 - Enable inline mode in `@BotFather`
-- Bun loads `.env` automatically
 - Send `/help` for examples
+
+## Contributing
+
+Bug reports and pull requests are welcome. Before you open one, run `bun test` and `bun run typecheck`; CI runs the same two commands. Keep a change to one thing, and add a test with it. Changes under `src/services/sandbox/` get extra care, because that code runs strangers' programs. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
