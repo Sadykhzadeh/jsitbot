@@ -90,38 +90,26 @@ interface Guest {
   fail: QuickJSHandle;
 }
 
+/**
+ * A WebAssembly instance with a runtime and context in it that already carry
+ * the guest runtime, and that no user code has touched yet. Building one takes
+ * longer than running most programs, so one is made while the sandbox is idle.
+ */
+interface Prepared {
+  module: QuickJSWASMModule;
+  runtime: QuickJSRuntime;
+  context: QuickJSContext;
+  guest: Guest;
+  /** Where the guest's console output goes; set once per run. */
+  logs: string[];
+}
+
 function isSyntaxError(packed: Packed): boolean {
   return !packed.ok && packed.text.startsWith("SyntaxError");
 }
 
 function readString(context: QuickJSContext, handle: QuickJSHandle): string | undefined {
   return context.typeof(handle) === "string" ? context.getString(handle) : undefined;
-}
-
-function disposeQuietly(dispose: () => void): void {
-  try {
-    dispose();
-  } catch {
-    // A runtime that was cut short can fail its own teardown. Its WebAssembly
-    // instance is thrown away either way, so there is nothing to save.
-  }
-}
-
-/** Handles must be released before their context; this keeps track of them. */
-class HandleBin {
-  private readonly handles: QuickJSHandle[] = [];
-
-  add<T extends QuickJSHandle>(handle: T): T {
-    this.handles.push(handle);
-    return handle;
-  }
-
-  disposeAll(): void {
-    for (const handle of this.handles.reverse()) {
-      disposeQuietly(() => handle.dispose());
-    }
-    this.handles.length = 0;
-  }
 }
 
 function drainPendingJobs(runtime: QuickJSRuntime, expired: () => boolean): void {
@@ -141,7 +129,7 @@ function drainPendingJobs(runtime: QuickJSRuntime, expired: () => boolean): void
 
 export class QuickJsSandboxService implements SandboxService {
   private readonly options: SandboxOptions;
-  private spareModule: Promise<QuickJSWASMModule> | undefined;
+  private spare: Promise<Prepared> | undefined;
 
   constructor(options?: Partial<SandboxOptions>) {
     this.options = resolveSandboxOptions(options);
@@ -157,36 +145,50 @@ export class QuickJsSandboxService implements SandboxService {
       await this.execute(code);
     }
     this.prepareSpare();
-    await this.spareModule;
+    await this.spare;
   }
 
-  private takeModule(): Promise<QuickJSWASMModule> {
-    const module = this.spareModule ?? createCappedModule(this.options.memoryLimitBytes);
-    this.spareModule = undefined;
+  private takePrepared(): Promise<Prepared> {
+    const prepared = this.spare ?? this.prepare();
+    this.spare = undefined;
 
     // After the reply is on its way rather than before the next run starts.
     setTimeout(() => this.prepareSpare(), 0);
 
-    return module;
+    return prepared;
   }
 
   private prepareSpare(): void {
-    if (this.spareModule) {
+    if (this.spare) {
       return;
     }
 
-    const spare = createCappedModule(this.options.memoryLimitBytes);
-    this.spareModule = spare;
+    const spare = this.prepare();
+    this.spare = spare;
     spare.catch(() => {
-      if (this.spareModule === spare) {
-        this.spareModule = undefined;
+      if (this.spare === spare) {
+        this.spare = undefined;
       }
     });
   }
 
+  private async prepare(): Promise<Prepared> {
+    const module = await createCappedModule(this.options.memoryLimitBytes);
+    const runtime = module.newRuntime({
+      memoryLimitBytes: this.options.memoryLimitBytes,
+      maxStackSizeBytes: this.options.maxStackSizeBytes,
+    });
+    const context = runtime.newContext();
+    const logs: string[] = [];
+    const prepared = { module, runtime, context, logs } as Prepared;
+    prepared.guest = this.installGuest(context, prepared);
+
+    return prepared;
+  }
+
   async execute(code: string): Promise<SandboxExecution> {
     let startedAt = performance.now();
-    const logs: string[] = [];
+    let logs: string[] = [];
     let interrupted = false;
     let heapExhausted = () => false;
 
@@ -216,60 +218,47 @@ export class QuickJsSandboxService implements SandboxService {
 
     try {
       // A fresh instance with its own capped memory for every run, so a run that
-      // exhausts or corrupts it cannot affect the next one.
-      const quickjs = await this.takeModule();
-      heapExhausted = () => isHeapExhausted(quickjs, this.options.memoryLimitBytes);
-      const runtime = quickjs.newRuntime({
-        memoryLimitBytes: this.options.memoryLimitBytes,
-        maxStackSizeBytes: this.options.maxStackSizeBytes,
+      // exhausts or corrupts it cannot affect the next one. It is never torn
+      // down: the whole instance is dropped, and freeing a runtime that died of
+      // a stack overflow or an exhausted heap trips an assertion in QuickJS.
+      const { module, runtime, context, guest, logs: sink } = await this.takePrepared();
+      logs = sink;
+      heapExhausted = () => isHeapExhausted(module, this.options.memoryLimitBytes);
+
+      // The clock starts when the guest does: time spent waiting for an
+      // instance or behind another run is not the guest's to pay for.
+      startedAt = performance.now();
+      runtime.setInterruptHandler(() => {
+        if (performance.now() - startedAt <= this.options.timeoutMs) {
+          return false;
+        }
+
+        interrupted = true;
+        return true;
       });
-      const context = runtime.newContext();
-      const handles = new HandleBin();
 
-      try {
-        // The clock starts when the guest does: time spent waiting for an
-        // instance or behind another run is not the guest's to pay for.
-        startedAt = performance.now();
-        runtime.setInterruptHandler(() => {
-          if (performance.now() - startedAt <= this.options.timeoutMs) {
-            return false;
-          }
+      const packed = this.evaluate(context, runtime, guest, code, () => interrupted);
 
-          interrupted = true;
-          return true;
-        });
-
-        const packed = this.evaluate(context, runtime, code, logs, handles, () => interrupted);
-
-        if (interrupted) {
-          return failure(TIMEOUT_MESSAGE, { timedOut: true });
-        }
-        if (!packed) {
-          return failure(UNREADABLE_MESSAGE);
-        }
-        if (!packed.ok) {
-          return failure(packed.text, { truncated: packed.truncated, line: packed.line });
-        }
-
-        const result = truncateText(packed.text, this.options.maxResultLength);
-
-        return {
-          ok: true,
-          logs,
-          result: result.value,
-          durationMs: Math.round(performance.now() - startedAt),
-          timedOut: false,
-          truncated: packed.truncated || result.truncated,
-        };
-      } finally {
-        // A runtime that died of an exhausted heap trips an assertion when it is
-        // freed. The whole instance is dropped right after, so skip the teardown.
-        if (!heapExhausted()) {
-          handles.disposeAll();
-          disposeQuietly(() => context.dispose());
-          disposeQuietly(() => runtime.dispose());
-        }
+      if (interrupted) {
+        return failure(TIMEOUT_MESSAGE, { timedOut: true });
       }
+      if (!packed) {
+        return failure(UNREADABLE_MESSAGE);
+      }
+      if (!packed.ok) {
+        return failure(packed.text, { truncated: packed.truncated, line: packed.line });
+      }
+
+      const result = truncateText(packed.text, this.options.maxResultLength);
+
+      return {
+        ok: true,
+        logs,
+        result: result.value,
+        durationMs: Math.round(performance.now() - startedAt),
+        timedOut: false,
+        truncated: packed.truncated || result.truncated,
+      };
     } catch (error) {
       return failure(normalizeUnknownError(error));
     }
@@ -284,12 +273,10 @@ export class QuickJsSandboxService implements SandboxService {
   private evaluate(
     context: QuickJSContext,
     runtime: QuickJSRuntime,
+    guest: Guest,
     code: string,
-    logs: string[],
-    handles: HandleBin,
     expired: () => boolean,
   ): Packed | undefined {
-    const guest = this.installGuest(context, logs, handles);
     const direct = this.readCode(context, runtime, guest, code, expired);
     if (direct.settled) {
       return direct.packed;
@@ -393,39 +380,32 @@ export class QuickJsSandboxService implements SandboxService {
       : { settled: true, packed };
   }
 
-  private installGuest(
-    context: QuickJSContext,
-    logs: string[],
-    handles: HandleBin,
-  ): Guest {
+  /** Evaluates the guest runtime in the context and returns the entry points it hands back. */
+  private installGuest(context: QuickJSContext, prepared: Prepared): Guest {
     const { maxLogs, maxLogLength, maxResultLength } = this.options;
 
-    const setup = handles.add(context.unwrapResult(context.evalCode(guestRuntimeSource, "guest.js")));
-    const hostLog = handles.add(
-      context.newFunction("hostLog", (line) => {
-        const text = readString(context, line);
-        if (text !== undefined && logs.length < maxLogs) {
-          logs.push(truncateText(text, maxLogLength).value);
-        }
-      }),
-    );
-    const api = handles.add(
-      context.unwrapResult(
-        context.callFunction(
-          setup,
-          context.undefined,
-          hostLog,
-          handles.add(context.newNumber(maxLogs)),
-          handles.add(context.newNumber(maxLogLength)),
-          handles.add(context.newNumber(maxResultLength)),
-        ),
+    const setup = context.unwrapResult(context.evalCode(guestRuntimeSource, "guest.js"));
+    const hostLog = context.newFunction("hostLog", (line) => {
+      const text = readString(context, line);
+      if (text !== undefined && prepared.logs.length < maxLogs) {
+        prepared.logs.push(truncateText(text, maxLogLength).value);
+      }
+    });
+    const api = context.unwrapResult(
+      context.callFunction(
+        setup,
+        context.undefined,
+        hostLog,
+        context.newNumber(maxLogs),
+        context.newNumber(maxLogLength),
+        context.newNumber(maxResultLength),
       ),
     );
 
     return {
-      finish: handles.add(context.getProp(api, "finish")),
-      tick: handles.add(context.getProp(api, "tick")),
-      fail: handles.add(context.getProp(api, "fail")),
+      finish: context.getProp(api, "finish"),
+      tick: context.getProp(api, "tick"),
+      fail: context.getProp(api, "fail"),
     };
   }
 
