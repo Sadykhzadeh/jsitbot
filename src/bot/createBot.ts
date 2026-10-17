@@ -4,6 +4,7 @@ import type { AppEnv } from "../config/env";
 import { handleConcurrently } from "./concurrency";
 import { registerInlineQueryHandler } from "./handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "./handlers/privateMessage";
+import { registerRunCommandHandler } from "./handlers/runCommand";
 import { registerStartHelpHandlers } from "./handlers/startHelp";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../security/rateLimiter";
 import { createSandbox } from "../services/sandbox/createSandbox";
@@ -27,6 +28,17 @@ export async function createBot(config: AppEnv): Promise<Bot> {
   bot.use(handleConcurrently(bot, config.limits.concurrency));
 
   registerStartHelpHandlers(bot, botUsername);
+  // Before the private handler, so that "/run" and "@bot" are taken out of the
+  // messages it would otherwise run as code.
+  registerRunCommandHandler(bot, {
+    botUsername,
+    sandbox,
+    rateLimiter,
+    rateLimitPolicy: config.limits.privateRateLimit,
+    timeBudget,
+    timeBudgetPolicy: config.limits.sandboxTimeBudget,
+    maxCodeLength: config.limits.maxCodeLength,
+  });
   registerPrivateMessageHandler(bot, {
     botUserId: me.id,
     sandbox,

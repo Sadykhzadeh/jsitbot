@@ -18,6 +18,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Has `setTimeout`, `setInterval` and their `clear` twins on a virtual clock: a sleep returns at once instead of using up the time limit, and `Date.now()` does not move. `performance.now()` does move with it, so a measurement around a sleep shows the sleep. An interval that is never cleared runs until the time limit
 - Has `queueMicrotask`
 - Takes code pasted in a fenced block, with or without a language name
+- Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, or `/run` as a reply to a message that has the code. It ignores everything else that is said there
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors, cycles
 - Besides `console.log` and friends it has `console.table`, `assert`, `count` and `group`
 - Reports the line an error came from
@@ -155,6 +156,14 @@ total
 ```
 
 Edit the message and the answer is updated.
+
+Group chat:
+
+```text
+/run [1, 2, 3].map(n => n * 2)
+```
+
+Or reply to a message that has code in it with `/run`. The bot reads only what is addressed to it, so it works with Telegram's default privacy mode left on.
 
 Inline mode:
 
