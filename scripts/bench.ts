@@ -29,6 +29,7 @@ const RUNS = argument ? Number(argument.slice("--runs=".length)) : 150;
 const GAP_MS = 15;
 const SOAK_RUNS = 1000;
 const BURST = 200;
+const HEAVY_RUNS = 12;
 
 function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
@@ -103,16 +104,9 @@ for (const [name, code] of [PROGRAMS[0], PROGRAMS[1], PROGRAMS[7]]) {
 }
 
 console.log(`\nchild process over ${SOAK_RUNS} runs of the programs above, mixed:`);
-// Its own sandbox: the CPU time of a process can only be read once it has
-// exited, so this run ends by killing the child. A sandbox that did nothing is
-// measured the same way to get the cost of starting one, which is taken off.
-const idle = await createSandbox({});
-const idleChild = await childProcess(idle);
-await idle.dispose?.();
-
 const soak = await createSandbox({});
 const child = await childProcess(soak);
-if (child && idleChild) {
+if (child) {
   const rssBefore = residentMb(child.pid);
   const checkpoints: string[] = [];
   for (let run = 1; run <= SOAK_RUNS; run++) {
@@ -124,12 +118,42 @@ if (child && idleChild) {
   await soak.dispose?.();
   const peak = (child.resourceUsage()?.maxRSS ?? 0) / 1024;
   console.log(`  rss at start ${rssBefore} MB, then ${checkpoints.join(", ")}, peak ${peak.toFixed(0)} MB`);
-  console.log(
-    `  cpu per run ${((cpuMs(child) - cpuMs(idleChild)) / SOAK_RUNS).toFixed(2)} ms (child process, user + system; starting one costs ${cpuMs(idleChild).toFixed(0)} ms)`,
-  );
+
+  // The CPU time of a process can only be read once it has exited, and starting
+  // one costs far more than a run, so the cost of a run is the difference
+  // between two children that did different numbers of them.
+  const cpuAfter = async (runs: number): Promise<number> => {
+    const counted = await createSandbox({});
+    const countedChild = await childProcess(counted);
+    for (let run = 1; run <= runs; run++) {
+      await counted.execute(PROGRAMS[run % PROGRAMS.length][1]);
+    }
+    await counted.dispose?.();
+    return countedChild ? cpuMs(countedChild) : 0;
+  };
+  const few = await cpuAfter(500);
+  const many = await cpuAfter(3500);
+  console.log(`  cpu per run ${((many - few) / 3000).toFixed(2)} ms (child process, user + system)`);
 } else {
   await soak.dispose?.();
   console.log("  (no child process: the sandbox runs inside the bot)");
+}
+
+console.log(`\nruns that each fill a good part of the memory cap, ${HEAVY_RUNS} back to back:`);
+{
+  const heavy = await createSandbox({});
+  const heavyChild = await childProcess(heavy);
+  if (heavyChild) {
+    const before = residentMb(heavyChild.pid);
+    let peak = 0;
+    for (let run = 0; run < HEAVY_RUNS; run++) {
+      await heavy.execute(`"x".repeat(50e6).length`);
+      peak = Math.max(peak, residentMb(heavyChild.pid) ?? 0);
+    }
+    await sleep(300);
+    console.log(`  child rss ${before} MB -> peak ${peak} MB, ${residentMb(heavyChild.pid)} MB 300 ms later`);
+  }
+  await heavy.dispose?.();
 }
 
 console.log("\nwhere a run goes, inside the child (median of 100, a fresh instance each time):");
