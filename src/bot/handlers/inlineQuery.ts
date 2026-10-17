@@ -15,6 +15,7 @@ import {
   isInlineQueryLongEnough,
 } from "../../security/rateLimiter";
 import {
+  formatCompactExecution,
   formatExecutionMessage,
   formatInlineExecutionPreview,
   formatHelpMessage,
@@ -155,15 +156,14 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
     const message = formatExecutionMessage(execution, code);
     const preview = formatInlineExecutionPreview(execution);
 
+    const articles = [buildArticle("execution", preview.title, preview.description, message.text)];
+    const compact = formatCompactExecution(execution, code);
+    if (compact) {
+      articles.push(buildArticle("compact", compact.title, "Just the code and its result", compact.text));
+    }
+
     await ctx.answerInlineQuery(
-      [
-        buildArticle(
-          "execution",
-          preview.title,
-          preview.description,
-          message.text,
-        ),
-      ],
+      articles,
       {
         cache_time: 0,
         is_personal: true,
