@@ -1,7 +1,7 @@
 import { Bot } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 
-import { SlidingWindowRateLimiter } from "../../src/security/rateLimiter";
+import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../../src/security/rateLimiter";
 import { registerInlineQueryHandler } from "../../src/bot/handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "../../src/bot/handlers/privateMessage";
 import { QuickJsSandboxService } from "../../src/services/sandbox/quickjsSandbox";
@@ -18,6 +18,8 @@ export interface ApiCall {
 export interface HarnessOptions {
   sandbox?: SandboxService;
   maxRequests?: number;
+  /** Sandbox time one user may use per ten seconds; unlimited by default. */
+  maxSandboxMs?: number;
   /** Methods that should fail, with the error text Telegram would give. */
   failures?: Record<string, string>;
 }
@@ -72,18 +74,24 @@ export function createHarness(options: HarnessOptions = {}) {
   const sandbox = options.sandbox ?? new QuickJsSandboxService();
   const rateLimiter = new SlidingWindowRateLimiter();
   const rateLimitPolicy = { windowMs: 10_000, maxRequests: options.maxRequests ?? 1_000 };
+  const timeBudget = new SandboxTimeBudget();
+  const timeBudgetPolicy = { windowMs: 10_000, maxMs: options.maxSandboxMs ?? 10_000_000 };
 
   registerPrivateMessageHandler(bot, {
     botUserId: BOT_ID,
     sandbox,
     rateLimiter,
     rateLimitPolicy,
+    timeBudget,
+    timeBudgetPolicy,
     maxCodeLength: 2_000,
   });
   registerInlineQueryHandler(bot, {
     sandbox,
     rateLimiter,
     rateLimitPolicy,
+    timeBudget,
+    timeBudgetPolicy,
     maxCodeLength: 2_000,
     minCodeLength: 3,
     botUsername: "jsitbot",

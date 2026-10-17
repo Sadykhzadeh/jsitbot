@@ -45,3 +45,23 @@ describe("inline queries", () => {
     ]);
   });
 });
+
+describe("sandbox time budget", () => {
+  test("is shared between inline queries and private messages", async () => {
+    const harness = createHarness({
+      maxSandboxMs: 150,
+      sandbox: new QuickJsSandboxService({ timeoutMs: 100 }),
+    });
+
+    await harness.sendMessage("while (true) {}", 1);
+    await harness.inlineQuery("while (true) {}");
+    await harness.inlineQuery("1 + 1");
+    await harness.sendMessage("2 + 2", 2);
+
+    expect(articles(harness).map((article) => article.id)).toEqual(["execution", "run-time"]);
+    const replies = harness.callsTo("sendMessage");
+    expect(replies).toHaveLength(2);
+    expect(replies[1].payload.text).toContain("used up its run time");
+    expect(replies[1].payload.text).not.toContain("*Result*");
+  });
+});

@@ -83,3 +83,84 @@ export function isCodeLengthAllowed(code: string, maxLength: number): boolean {
 export function isInlineQueryLongEnough(code: string, minLength: number): boolean {
   return code.trim().length >= minLength;
 }
+
+export interface TimeBudgetPolicy {
+  windowMs: number;
+  /** How much sandbox time one user may use within the window. */
+  maxMs: number;
+}
+
+interface Spent {
+  at: number;
+  ms: number;
+}
+
+interface Ledger {
+  spent: Spent[];
+  windowMs: number;
+}
+
+/**
+ * Counts the time a user's runs kept the sandbox busy, across private messages
+ * and inline queries alike. The request limits count runs, but a run can take a
+ * millisecond or the whole timeout, and each of the two request limits has its
+ * own bucket, so one account could still hold the sandbox for a large share of
+ * every window. A user who has used up the budget waits until enough of it has
+ * aged out.
+ */
+export class SandboxTimeBudget {
+  private readonly ledgers = new Map<string, Ledger>();
+  private calls = 0;
+
+  get size(): number {
+    return this.ledgers.size;
+  }
+
+  check(key: string, policy: TimeBudgetPolicy, now = Date.now()): RateLimitResult {
+    this.sweepOccasionally(now);
+
+    const ledger = this.ledgers.get(key);
+    if (!ledger) {
+      return { allowed: true, retryAfterMs: 0 };
+    }
+
+    ledger.windowMs = policy.windowMs;
+    ledger.spent = ledger.spent.filter((entry) => entry.at > now - policy.windowMs);
+    let total = ledger.spent.reduce((sum, entry) => sum + entry.ms, 0);
+    if (total < policy.maxMs) {
+      return { allowed: true, retryAfterMs: 0 };
+    }
+
+    // Oldest first: the budget is back once enough of the old entries have left.
+    for (const entry of ledger.spent) {
+      total -= entry.ms;
+      if (total < policy.maxMs) {
+        return { allowed: false, retryAfterMs: Math.max(0, entry.at + policy.windowMs - now) };
+      }
+    }
+
+    return { allowed: false, retryAfterMs: policy.windowMs };
+  }
+
+  /** Adds the time a run took. A run too quick to measure still counts as a millisecond. */
+  record(key: string, ms: number, policy: TimeBudgetPolicy, now = Date.now()): void {
+    const ledger = this.ledgers.get(key) ?? { spent: [], windowMs: policy.windowMs };
+    ledger.windowMs = policy.windowMs;
+    ledger.spent.push({ at: now, ms: Math.max(1, ms) });
+    this.ledgers.set(key, ledger);
+  }
+
+  private sweepOccasionally(now: number): void {
+    this.calls++;
+    if (this.calls % SWEEP_EVERY !== 0) {
+      return;
+    }
+
+    for (const [key, ledger] of this.ledgers) {
+      const newest = ledger.spent[ledger.spent.length - 1];
+      if (newest === undefined || newest.at <= now - ledger.windowMs) {
+        this.ledgers.delete(key);
+      }
+    }
+  }
+}

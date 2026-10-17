@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  SandboxTimeBudget,
   SlidingWindowRateLimiter,
   isCodeLengthAllowed,
   isInlineQueryLongEnough,
@@ -93,5 +94,64 @@ describe("SlidingWindowRateLimiter charges", () => {
     limiter.charge("user", policy, 5, 0);
 
     expect(limiter.consume("user", policy, 10).allowed).toBe(false);
+  });
+});
+
+describe("SandboxTimeBudget", () => {
+  const policy = { windowMs: 10_000, maxMs: 1_000 };
+
+  test("lets a user run until the time they used adds up to the budget", () => {
+    const budget = new SandboxTimeBudget();
+
+    expect(budget.check("a", policy, 0).allowed).toBe(true);
+    budget.record("a", 700, policy, 0);
+    expect(budget.check("a", policy, 1_000).allowed).toBe(true);
+    budget.record("a", 700, policy, 1_000);
+    expect(budget.check("a", policy, 2_000).allowed).toBe(false);
+  });
+
+  test("says when enough of the old time has aged out", () => {
+    const budget = new SandboxTimeBudget();
+    budget.record("a", 700, policy, 1_000);
+    budget.record("a", 700, policy, 3_000);
+
+    // The first 700 ms leave the window at 11 000, which brings the total under 1 000.
+    expect(budget.check("a", policy, 5_000)).toEqual({ allowed: false, retryAfterMs: 6_000 });
+    expect(budget.check("a", policy, 11_001).allowed).toBe(true);
+  });
+
+  test("keeps users apart, and many quick runs do not add up to much", () => {
+    const budget = new SandboxTimeBudget();
+    for (let run = 0; run < 100; run++) {
+      budget.record("quick", 2, policy, run * 10);
+    }
+    budget.record("slow", 900, policy, 0);
+
+    expect(budget.check("quick", policy, 1_000).allowed).toBe(true);
+    budget.record("slow", 900, policy, 0);
+    expect(budget.check("slow", policy, 1_000).allowed).toBe(false);
+    expect(budget.check("other", policy, 1_000).allowed).toBe(true);
+  });
+
+  test("a run too quick to measure still counts", () => {
+    const budget = new SandboxTimeBudget();
+    for (let run = 0; run < 1_000; run++) {
+      budget.record("a", 0, policy, 0);
+    }
+
+    expect(budget.check("a", policy, 1).allowed).toBe(false);
+  });
+
+  test("forgets users who stopped coming", () => {
+    const budget = new SandboxTimeBudget();
+    for (let user = 0; user < 100; user++) {
+      budget.record(`user${user}`, 5, policy, 0);
+    }
+
+    for (let call = 0; call < 600; call++) {
+      budget.check("active", policy, 60_000);
+    }
+
+    expect(budget.size).toBe(0);
   });
 });

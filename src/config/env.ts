@@ -11,6 +11,12 @@ const DEFAULT_INLINE_RATE_LIMIT = {
   windowMs: 10_000,
   maxRequests: 12,
 };
+// Sandbox time one user may use per window, private messages and inline queries
+// together. Two runs that hit the 700 ms timeout use it up.
+const DEFAULT_SANDBOX_TIME_BUDGET = {
+  windowMs: 10_000,
+  maxMs: 1_000,
+};
 
 function getRequiredEnv(name: string): string {
   const value = Bun.env[name]?.trim();
@@ -34,6 +40,7 @@ export const env = {
     inlineMinLength: DEFAULT_INLINE_MIN_LENGTH,
     privateRateLimit: DEFAULT_PRIVATE_RATE_LIMIT,
     inlineRateLimit: DEFAULT_INLINE_RATE_LIMIT,
+    sandboxTimeBudget: DEFAULT_SANDBOX_TIME_BUDGET,
   },
 } as const;
 

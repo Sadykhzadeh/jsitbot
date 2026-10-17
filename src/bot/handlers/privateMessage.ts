@@ -4,7 +4,9 @@ import type { ParseMode } from "grammy/types";
 import type { SandboxService } from "../../services/sandbox/types";
 import {
   type RateLimitPolicy,
+  SandboxTimeBudget,
   SlidingWindowRateLimiter,
+  type TimeBudgetPolicy,
   TIMEOUT_PENALTY_REQUESTS,
   isCodeLengthAllowed,
 } from "../../security/rateLimiter";
@@ -20,6 +22,8 @@ interface PrivateMessageHandlerOptions {
   sandbox: SandboxService;
   rateLimiter: SlidingWindowRateLimiter;
   rateLimitPolicy: RateLimitPolicy;
+  timeBudget: SandboxTimeBudget;
+  timeBudgetPolicy: TimeBudgetPolicy;
   maxCodeLength: number;
   replies?: ReplyTracker;
 }
@@ -64,7 +68,17 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       return { text: message.text, parseMode: message.parseMode, quote: false };
     }
 
+    const budgetKey = `user:${request.userId}`;
+    const budget = options.timeBudget.check(budgetKey, options.timeBudgetPolicy);
+    if (!budget.allowed) {
+      const message = formatRejectionMessage(
+        `Your code has used up its run time for now. Try again in ${Math.ceil(budget.retryAfterMs / 1000)}s.`,
+      );
+      return { text: message.text, parseMode: message.parseMode, quote: false };
+    }
+
     const execution = await options.sandbox.execute(request.code);
+    options.timeBudget.record(budgetKey, execution.durationMs, options.timeBudgetPolicy);
     if (execution.timedOut) {
       options.rateLimiter.charge(
         `private:${request.userId}`,

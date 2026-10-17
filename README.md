@@ -28,7 +28,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Timeout enforced by the engine's interrupt handler, with a clock that starts when the guest does
 - Output is bounded inside the sandbox: at most 50 console lines of 2000 characters and a 4000-character result, whatever the code prints
 - No Bun/Node host APIs exposed to guest code; the formatter captures the built-ins it needs before user code runs
-- Per-user rate limits; a run that times out is charged as three requests
+- Per-user rate limits; a run that times out is charged as three requests. On top of that, each user has a budget of sandbox time, shared by private messages and inline queries, so one account cannot keep the sandbox busy for long
 
 | Limit | Value |
 | --- | --- |
@@ -39,6 +39,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 | Result | 4000 characters |
 | Private chat | 5 runs per 10 s |
 | Inline | 12 runs per 10 s |
+| Sandbox time per user | 1 s per 10 s, private and inline together |
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
