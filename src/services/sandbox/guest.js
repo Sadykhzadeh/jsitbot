@@ -11,7 +11,7 @@
 //   <status: o|e> \n <line> \n <flags> \n <text>
 // where line is the line of the user's code an error came from (0 if unknown)
 // and flags is a bit set: 1 = result was cut short, 2 = console output was.
-(function setup(hostLog, maxLogs, maxLogLength, maxResultLength) {
+(function setup(hostLog, loadExtra, maxLogs, maxLogLength, maxResultLength) {
   "use strict";
 
   const FILE = "input.js";
@@ -845,6 +845,39 @@
     },
     timeOrigin: clockStart,
   };
+
+  // Globals whose code is only evaluated, from source the host hands over by
+  // name, when the program first reads one of them. Assigning to the global
+  // replaces it as it would any other.
+  const indirectEval = eval;
+  const defineProperty = Object.defineProperty;
+
+  function lazyGlobals(module, names) {
+    let exported;
+
+    function load() {
+      if (exported === undefined) exported = indirectEval(loadExtra(module))();
+      return exported;
+    }
+
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      const settle = function (value) {
+        defineProperty(globalThis, name, { value, writable: true, configurable: true, enumerable: false });
+        return value;
+      };
+      defineProperty(globalThis, name, {
+        get() {
+          return settle(load()[name]);
+        },
+        set: settle,
+        configurable: true,
+        enumerable: false,
+      });
+    }
+  }
+
+  lazyGlobals("clone", ["structuredClone"]);
 
   for (const [name, value] of [
     ["setTimeout", setTimeout],

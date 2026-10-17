@@ -7,6 +7,7 @@ import type {
 
 import {
   GUEST_FILE,
+  guestExtras,
   guestRuntimeSource,
   wrapAsExpression,
   wrapAsStatements,
@@ -409,11 +410,18 @@ export class QuickJsSandboxService implements SandboxService {
         prepared.logs.push(truncateText(text, maxLogLength).value);
       }
     });
+    // Hands the guest the source of a part it asked for by name. Nothing else
+    // crosses: the names are fixed in the guest runtime and the sources are ours.
+    const loadExtra = context.newFunction("loadExtra", (name) => {
+      const source = guestExtras[readString(context, name) ?? ""];
+      return context.newString(source ?? "");
+    });
     const api = context.unwrapResult(
       context.callFunction(
         setup,
         context.undefined,
         hostLog,
+        loadExtra,
         context.newNumber(maxLogs),
         context.newNumber(maxLogLength),
         context.newNumber(maxResultLength),

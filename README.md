@@ -16,7 +16,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Returns the value of the last statement, like a REPL, and understands `return` and top-level `await`
 - Accepts TypeScript syntax (the types are stripped)
 - Has `setTimeout`, `setInterval` and their `clear` twins on a virtual clock: a sleep returns at once instead of using up the time limit, and `Date.now()` does not move. `performance.now()` does move with it, so a measurement around a sleep shows the sleep. An interval that is never cleared runs until the time limit
-- Has `queueMicrotask`
+- Has `queueMicrotask` and `structuredClone`
 - Takes code pasted in a fenced block, with or without a language name
 - Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, or `/run` as a reply to a message that has the code. It ignores everything else that is said there
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors, cycles
