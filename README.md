@@ -166,3 +166,7 @@ Note:
 ## Contributing
 
 Bug reports and pull requests are welcome. Before you open one, run `bun test` and `bun run typecheck`; CI runs the same two commands. Keep a change to one thing, and add a test with it. Changes under `src/services/sandbox/` get extra care, because that code runs strangers' programs. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
+
+## License
+
+[MIT](LICENSE)
