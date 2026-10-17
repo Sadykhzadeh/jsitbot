@@ -51,6 +51,8 @@
   const dateToISOString = uncurry(Date.prototype.toISOString);
   const regExpToString = uncurry(RegExp.prototype.toString);
   const mapForEach = uncurry(Map.prototype.forEach);
+  const mapGet = uncurry(Map.prototype.get);
+  const mapSet = uncurry(Map.prototype.set);
   const setForEach = uncurry(Set.prototype.forEach);
   const mapSize = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
   const setSize = uncurry(getOwnPropertyDescriptor(Set.prototype, "size").get);
@@ -364,6 +366,34 @@
     return layout("Set(" + size + ") ", "{", parts, "}", depth, true);
   }
 
+  // Prototype -> function that lists what to show of an instance of a class the
+  // extras define (URL and the like), whose state is not in visible properties.
+  const inspectors = new Map();
+
+  function registerInspector(Class, inspect) {
+    mapSet(inspectors, Class.prototype, inspect);
+  }
+
+  function formatInspected(inspect, name, value, depth, state) {
+    const described = inspect(value);
+    const entries = described.entries;
+    const parts = [];
+
+    for (let i = 0; i < entries.length && i < MAX_ENTRIES && state.left > 0; i++) {
+      const shown = format(entries[i][1], depth + 1, state);
+      const part = described.map
+        ? format(entries[i][0], depth + 1, state) + " => " + shown
+        : entries[i][0] + ": " + shown;
+      parts[parts.length] = part;
+      state.left -= part.length;
+    }
+    if (entries.length > parts.length) {
+      state.cut = true;
+      parts[parts.length] = more(entries.length - parts.length, "item", "items");
+    }
+    return layout(name + " ", "{", parts, "}", depth);
+  }
+
   function formatProperties(object, prefix, depth, state) {
     const names = getOwnPropertyNames(object);
     const symbols = getOwnPropertySymbols(object);
@@ -427,6 +457,9 @@
     if (depth > MAX_DEPTH) {
       return "[" + (isArray(value) ? "Array" : label) + "]";
     }
+
+    const inspect = mapGet(inspectors, getPrototypeOf(value));
+    if (inspect !== undefined) return formatInspected(inspect, label, value, depth, state);
 
     if (isArray(value)) return formatArray(value, depth, state);
     if (tag === "[object Map]") return formatMap(value, depth, state);
@@ -856,7 +889,7 @@
     let exported;
 
     function load() {
-      if (exported === undefined) exported = indirectEval(loadExtra(module))();
+      if (exported === undefined) exported = indirectEval(loadExtra(module))(registerInspector);
       return exported;
     }
 
@@ -879,6 +912,7 @@
 
   lazyGlobals("clone", ["structuredClone"]);
   lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
+  lazyGlobals("url", ["URL", "URLSearchParams"]);
 
   for (const [name, value] of [
     ["setTimeout", setTimeout],
