@@ -15,6 +15,8 @@ export interface FakeTelegram {
   refused: { count: number };
   /** Hands an update to the bot's next (or current) getUpdates. */
   push(update: Update): void;
+  /** Resolves once the bot has asked for updates after `updateId`, which it does when it has taken that one. */
+  waitForOffset(updateId: number, timeoutMs?: number): Promise<void>;
   /** Resolves when `count` calls of `method` have been seen in total. */
   waitFor(method: string, count: number, timeoutMs?: number): Promise<void>;
   stop(): void;
@@ -37,6 +39,8 @@ export function startFakeTelegram(
   const queue: Update[] = [];
   const pollers: Array<() => void> = [];
   const watchers: Array<{ method: string; count: number; done: () => void }> = [];
+  const offsetWatchers: Array<{ updateId: number; done: () => void }> = [];
+  let highestOffset = 0;
   let nextMessageId = 1;
 
   function wake(): void {
@@ -59,6 +63,11 @@ export function startFakeTelegram(
   async function handle(method: string, body: Record<string, any>): Promise<unknown> {
     if (method === "getUpdates") {
       const offset: number = body.offset ?? 0;
+      highestOffset = Math.max(highestOffset, offset);
+      for (const watcher of offsetWatchers.filter((w) => offset > w.updateId)) {
+        offsetWatchers.splice(offsetWatchers.indexOf(watcher), 1);
+        watcher.done();
+      }
       while (queue.length > 0 && queue[0].update_id < offset) {
         queue.shift();
       }
@@ -158,6 +167,21 @@ export function startFakeTelegram(
         watchers.push({
           method,
           count: total,
+          done: () => {
+            clearTimeout(timer);
+            resolve();
+          },
+        });
+      });
+    },
+    waitForOffset(updateId, timeoutMs = 10_000) {
+      if (highestOffset > updateId) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`The bot never asked for updates after ${updateId}`)), timeoutMs);
+        offsetWatchers.push({
+          updateId,
           done: () => {
             clearTimeout(timer);
             resolve();

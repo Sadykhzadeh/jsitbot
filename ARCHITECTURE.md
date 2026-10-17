@@ -93,6 +93,13 @@ flowchart TD
 - The child tells the bot when the guest's clock starts, and the bot waits for the timeout plus 150 ms from then (400 ms from the moment the run was sent if the child never says). If the child is still busy after that, it is killed and replaced (a replacement is ready in about 100 ms), and the run is reported as timed out. A process is killed outright; a worker thread kept running a stuck native call, and its memory, for seconds after being terminated.
 - If a process cannot be started in the environment, the bot logs it and runs QuickJS inside itself, which keeps the interrupt handler and the memory cap but not the hard kill.
 
+## Starting and Stopping
+
+- On SIGTERM or SIGINT the bot stops polling, which also tells Telegram which updates it has taken, and then waits for the answers in progress. A message that was taken but not answered before the process exits is never sent again, so the wait is what keeps a restart from losing it.
+- A run shows nothing to Telegram until it is over, so "nothing left" means no call to Telegram in progress and none started for the time limit plus 400 ms (the 150 ms the sandbox allows past it, the restart of its process after a kill, and some room). An idle bot exits about 1.2 s after the signal.
+- After 8 s the bot exits with status 1 whatever is left, and a second signal exits at once. A signal while the bot is still starting exits immediately: nothing has been taken yet.
+- Pending updates are not dropped on start. Telegram keeps what arrived while the bot was down for 24 hours, and a restart takes seconds, so those messages are answered; a user who sent code during a deploy gets the answer. The per-user and sandbox-time limits apply to them like to any others.
+
 ## Security Model
 
 - Each execution is isolated: its own WebAssembly instance, runtime and context
