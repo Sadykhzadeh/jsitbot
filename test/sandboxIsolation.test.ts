@@ -115,7 +115,7 @@ describe("what the guest can reach", () => {
     const types = await value(`
       return [
         typeof process, typeof Bun, typeof require, typeof module, typeof fetch,
-        typeof tick, typeof setInterval, typeof WebAssembly, typeof hostLog,
+        typeof tick, typeof setImmediate, typeof WebAssembly, typeof hostLog,
         typeof __hostLog, typeof guest, typeof finish, typeof std, typeof os,
       ].join(" ");
     `);

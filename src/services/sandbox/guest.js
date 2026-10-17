@@ -742,18 +742,10 @@
   const timers = [];
   let timerClock = 0;
   let lastTimerId = 0;
+  // The interval whose callback is running, so that it can clear itself.
+  let firing = null;
 
-  function setTimeout(callback, delay, ...args) {
-    if (typeof callback !== "function") {
-      throw new TypeError("The callback must be a function");
-    }
-
-    const timer = {
-      id: ++lastTimerId,
-      at: timerClock + (delay >= 1 && delay <= MAX_TIMER_DELAY ? +delay : 1),
-      callback,
-      args,
-    };
+  function schedule(timer) {
     let low = 0;
     let high = timers.length;
     while (low < high) {
@@ -762,11 +754,38 @@
       else high = middle;
     }
     arraySplice(timers, low, 0, timer);
+  }
+
+  function addTimer(callback, delay, args, repeat) {
+    if (typeof callback !== "function") {
+      throw new TypeError("The callback must be a function");
+    }
+
+    const wait = delay >= 1 && delay <= MAX_TIMER_DELAY ? +delay : 1;
+    const timer = {
+      id: ++lastTimerId,
+      at: timerClock + wait,
+      callback,
+      args,
+      every: repeat ? wait : 0,
+    };
+    schedule(timer);
 
     return timer.id;
   }
 
+  function setTimeout(callback, delay, ...args) {
+    return addTimer(callback, delay, args, false);
+  }
+
+  // An interval that is never cleared runs until the time limit, like any loop.
+  function setInterval(callback, delay, ...args) {
+    return addTimer(callback, delay, args, true);
+  }
+
   function clearTimeout(id) {
+    if (firing !== null && firing.id === id) firing.every = 0;
+
     for (let i = 0; i < timers.length; i++) {
       if (timers[i].id === id) {
         arraySplice(timers, i, 1);
@@ -775,17 +794,68 @@
     }
   }
 
+  function clearInterval(id) {
+    clearTimeout(id);
+  }
+
   function tick() {
     if (timers.length === 0) return false;
 
     const timer = arraySplice(timers, 0, 1)[0];
     timerClock = timer.at;
-    timer.callback(...timer.args);
+    firing = timer;
+    try {
+      timer.callback(...timer.args);
+    } finally {
+      firing = null;
+    }
+    if (timer.every > 0) {
+      timer.at = timerClock + timer.every;
+      schedule(timer);
+    }
     return true;
   }
 
-  Object.defineProperty(globalThis, "setTimeout", { value: setTimeout, writable: true, configurable: true, enumerable: false });
-  Object.defineProperty(globalThis, "clearTimeout", { value: clearTimeout, writable: true, configurable: true, enumerable: false });
+  const resolved = Promise.resolve();
+  const promiseThen = uncurry(Promise.prototype.then);
+
+  // An error in the callback is not the run's result, since by then the code
+  // has moved on; it is logged the way a browser logs it.
+  function queueMicrotask(callback) {
+    if (typeof callback !== "function") {
+      throw new TypeError("The callback must be a function");
+    }
+
+    promiseThen(resolved, function () {
+      try {
+        callback();
+      } catch (error) {
+        write("Uncaught " + (isErrorLike(error) ? errorText(error, { cut: false }) : render(error, maxLogLength, false).text));
+      }
+    });
+  }
+
+  // Time on the virtual clock moves when a timer fires, so a sleep shows up in
+  // a measurement even though it took none of the real time.
+  const dateNow = Date.now;
+  const clockStart = dateNow();
+  const performance = {
+    now() {
+      return dateNow() - clockStart + timerClock;
+    },
+    timeOrigin: clockStart,
+  };
+
+  for (const [name, value] of [
+    ["setTimeout", setTimeout],
+    ["clearTimeout", clearTimeout],
+    ["setInterval", setInterval],
+    ["clearInterval", clearInterval],
+    ["queueMicrotask", queueMicrotask],
+    ["performance", performance],
+  ]) {
+    Object.defineProperty(globalThis, name, { value, writable: true, configurable: true, enumerable: false });
+  }
 
   return { finish, fail, tick };
 })
