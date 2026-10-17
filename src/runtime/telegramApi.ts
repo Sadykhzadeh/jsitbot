@@ -46,6 +46,8 @@ export interface ApiStats {
   rateLimited: number;
   /** Calls made again after a server error or a lost connection. */
   failedOver: number;
+  /** When a call last started or finished, on the clock the guard was given. */
+  lastActivityAt: number;
 }
 
 /**
@@ -59,7 +61,7 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
   const interval = 1_000 / policy.sendsPerSecond;
   // The earliest moment the next paced call may go out.
   let nextSlot = 0;
-  const stats: ApiStats = { pending: 0, rateLimited: 0, failedOver: 0 };
+  const stats: ApiStats = { pending: 0, rateLimited: 0, failedOver: 0, lastActivityAt: clock.now() };
 
   async function takeTurn(): Promise<void> {
     const now = clock.now();
@@ -81,6 +83,7 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
     }
 
     stats.pending++;
+    stats.lastActivityAt = clock.now();
     try {
       for (let attempt = 1; ; attempt++) {
         if (PACED.has(method)) {
@@ -124,6 +127,7 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
       }
     } finally {
       stats.pending--;
+      stats.lastActivityAt = clock.now();
     }
   };
 

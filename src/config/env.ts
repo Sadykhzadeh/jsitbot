@@ -30,6 +30,13 @@ const DEFAULT_TELEGRAM_API = {
   maxWaitMs: 5_000,
 };
 
+// After SIGTERM or SIGINT the bot stops taking messages and waits this long for
+// the answers in progress before it exits anyway. Under the ten seconds a
+// container runtime usually allows before it kills the process.
+const DEFAULT_SHUTDOWN = {
+  graceMs: 8_000,
+};
+
 // What BotFather hands out: the bot's numeric id, a colon, then a secret made of
 // letters, digits, "_" and "-".
 const BOT_TOKEN_PATTERN = /^\d+:[A-Za-z0-9_-]+$/;
@@ -75,6 +82,7 @@ export function loadEnv(source: Record<string, string | undefined>) {
       concurrency: DEFAULT_CONCURRENCY,
     },
     telegramApi: DEFAULT_TELEGRAM_API,
+    shutdown: DEFAULT_SHUTDOWN,
   } as const;
 }
 

@@ -1,8 +1,9 @@
-import { GrammyError, HttpError } from "grammy";
+import { GrammyError, HttpError, type Bot } from "grammy";
 
 import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
 import { logBotError } from "./runtime/logError";
+import { listenForShutdown } from "./runtime/shutdown";
 import { createApiGuard } from "./runtime/telegramApi";
 
 function fail(message: string): never {
@@ -20,7 +21,21 @@ try {
   throw error;
 }
 
-let bot;
+const apiGuard = createApiGuard(env.telegramApi);
+
+let bot: Bot | undefined;
+listenForShutdown({
+  bot: () => bot,
+  activity: { pending: () => apiGuard.stats.pending, lastAt: () => apiGuard.stats.lastActivityAt },
+  policy: {
+    graceMs: env.shutdown.graceMs,
+    // A run shows nothing to Telegram until it is over: its time limit, the
+    // 150 ms the sandbox allows past it, the restart of the sandbox process
+    // after a kill, and some room.
+    quietMs: env.sandbox.timeoutMs + 400,
+  },
+});
+
 try {
   bot = await createBot(env);
 } catch (error) {
@@ -36,7 +51,7 @@ try {
 
 // Updates are handled with the Api object of bot.api at the time, so this
 // reaches every call a handler makes.
-bot.api.config.use(createApiGuard(env.telegramApi).transformer);
+bot.api.config.use(apiGuard.transformer);
 
 // Replaces the handler createBot installs, which printed the whole error: for a
 // failed Telegram call that includes the message that was being sent.
