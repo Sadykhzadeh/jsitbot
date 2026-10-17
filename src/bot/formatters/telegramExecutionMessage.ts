@@ -193,20 +193,55 @@ export function formatHelpMessage(botUsername: string): { text: string; parseMod
   };
 }
 
+// The list of inline results shows one line per title and description.
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 export function formatInlineExecutionPreview(execution: SandboxExecution): {
   title: string;
   description: string;
 } {
   const headline = execution.ok ? execution.result : execution.error;
   const titlePrefix = execution.ok ? "Result: " : "Error: ";
-  const title = truncateText(`${titlePrefix}${headline}`, INLINE_TITLE_LIMIT).value;
+  const title = truncateText(oneLine(`${titlePrefix}${headline}`), INLINE_TITLE_LIMIT).value;
 
   const logSummary = execution.logs.length > 0
     ? `console: ${execution.logs.join(" | ")}`
     : execution.ok
       ? `done in ${execution.durationMs}ms`
       : `failed in ${execution.durationMs}ms`;
-  const description = truncateText(logSummary, INLINE_DESCRIPTION_LIMIT).value;
+  const description = truncateText(oneLine(logSummary), INLINE_DESCRIPTION_LIMIT).value;
 
   return { title, description };
+}
+
+const COMPACT_CODE_LIMIT = 600;
+const COMPACT_RESULT_LIMIT = 300;
+
+/**
+ * The code with its result as a comment, in one block, for sharing in a chat
+ * where the Code, Console and Result sections would be more than anyone wants
+ * to read. Only for a run that printed nothing and whose result is one short
+ * line: anything else is better served by the full message.
+ */
+export function formatCompactExecution(
+  execution: SandboxExecution,
+  code: string,
+): { title: string; text: string; parseMode: ParseMode } | undefined {
+  if (
+    !execution.ok ||
+    execution.logs.length > 0 ||
+    execution.result.includes("\n") ||
+    execution.result.length > COMPACT_RESULT_LIMIT ||
+    code.length > COMPACT_CODE_LIMIT
+  ) {
+    return undefined;
+  }
+
+  return {
+    title: truncateText(`Share: ${execution.result}`, INLINE_TITLE_LIMIT).value,
+    text: toMarkdownV2CodeBlock(`${code.trim()}\n// => ${execution.result}`),
+    parseMode: "MarkdownV2",
+  };
 }

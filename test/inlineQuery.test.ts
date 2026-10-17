@@ -65,3 +65,51 @@ describe("sandbox time budget", () => {
     expect(replies[1].payload.text).not.toContain("*Result*");
   });
 });
+
+describe("inline results to share", () => {
+  function allArticles(harness: ReturnType<typeof createHarness>) {
+    return harness.callsTo("answerInlineQuery").flatMap((call) => call.payload.results);
+  }
+
+  test("offer the code with its result in one block next to the full message", async () => {
+    const harness = createHarness();
+
+    await harness.inlineQuery("6 * 7");
+
+    const [full, compact] = allArticles(harness);
+    expect(full.id).toBe("execution");
+    expect(compact.id).toBe("compact");
+    expect(compact.title).toBe("Share: 42");
+    expect(compact.input_message_content.message_text).toBe("```\n6 * 7\n// => 42\n```");
+    expect(compact.input_message_content.parse_mode).toBe("MarkdownV2");
+  });
+
+  test("escape what is in the block", async () => {
+    const harness = createHarness();
+
+    await harness.inlineQuery("'a`b\\c'");
+
+    const compact = allArticles(harness)[1];
+    expect(compact.input_message_content.message_text).toBe("```\n'a\\`b\\\\c'\n// => a\\`bc\n```");
+  });
+
+  test("are not offered for a run that logged, failed or has a long answer", async () => {
+    for (const query of ["console.log(1); 2", "null.x", "[1, 2, 3].map(n => ({ n, text: 'abcdefghij' }))", "'x'.repeat(400)"]) {
+      const harness = createHarness();
+
+      await harness.inlineQuery(query);
+
+      expect(allArticles(harness).map((article) => article.id)).toEqual(["execution"]);
+    }
+  });
+
+  test("show a result that spans lines on one line in the list", async () => {
+    const harness = createHarness();
+
+    await harness.inlineQuery("[1, 2, 3].map(n => ({ n, text: 'abcdefghij' }))");
+
+    const [full] = allArticles(harness);
+    expect(full.title).not.toMatch(/\s{2}|\n/);
+    expect(full.description).not.toContain("\n");
+  });
+});
