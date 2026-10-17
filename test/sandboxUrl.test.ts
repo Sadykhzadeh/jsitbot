@@ -326,6 +326,7 @@ describe("hostile input to URL", () => {
       `"http://a/" + "../".repeat(100000)`,
       `"http://a/?" + "&=".repeat(100000)`,
       `"http://a/" + "%".repeat(100000)`,
+      `"http://a/" + " ".repeat(100000) + "x" + " ".repeat(100000)`,
       `"http://[" + ":".repeat(100000) + "]"`,
       `"\\u0000".repeat(1000) + "http://a"`,
       `"http://a/" + "\\ud800".repeat(1000)`,
