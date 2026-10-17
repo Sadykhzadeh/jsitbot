@@ -215,3 +215,82 @@ describe("atob and btoa", () => {
     ).toBe("héllo 😀");
   });
 });
+
+describe("crypto", () => {
+  test("randomUUID gives version 4 identifiers that do not repeat", async () => {
+    expect(
+      await value(`
+        const seen = new Set();
+        for (let i = 0; i < 2000; i++) seen.add(crypto.randomUUID());
+        const all = [...seen];
+        return [seen.size, all.every((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id))].join();
+      `),
+    ).toBe("2000,true");
+  });
+
+  test("every run starts from somewhere else", async () => {
+    const first = await value(`return crypto.randomUUID() + crypto.getRandomValues(new Uint32Array(2)).join()`);
+    const second = await value(`return crypto.randomUUID() + crypto.getRandomValues(new Uint32Array(2)).join()`);
+
+    expect(first).not.toBe(second);
+  });
+
+  test("getRandomValues fills the array it is given and hands it back", async () => {
+    expect(
+      await value(`
+        const array = new Uint32Array(8);
+        const same = crypto.getRandomValues(array) === array;
+        return [same, array.some((n) => n !== 0), new Set(array).size].join();
+      `),
+    ).toBe("true,true,8");
+  });
+
+  test("getRandomValues works on every integer type and leaves bytes outside a view alone", async () => {
+    expect(
+      await value(`
+        const types = [Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array, BigInt64Array, BigUint64Array];
+        const filled = types.every((Type) => crypto.getRandomValues(new Type(16)).some((n) => n != 0));
+        const buffer = new Uint8Array(32);
+        crypto.getRandomValues(buffer.subarray(8, 24));
+        const edges = [...buffer.subarray(0, 8), ...buffer.subarray(24)].every((n) => n === 0);
+        const middle = buffer.subarray(8, 24).some((n) => n !== 0);
+        return [filled, edges, middle].join();
+      `),
+    ).toBe("true,true,true");
+  });
+
+  test("the bytes are spread evenly", async () => {
+    expect(
+      await value(`
+        const bytes = crypto.getRandomValues(new Uint8Array(65536));
+        const counts = new Array(256).fill(0);
+        let ones = 0;
+        for (const byte of bytes) {
+          counts[byte]++;
+          for (let bit = 0; bit < 8; bit++) ones += (byte >> bit) & 1;
+        }
+        const mean = bytes.reduce((sum, n) => sum + n, 0) / bytes.length;
+        return [
+          counts.every((n) => n > 150 && n < 370),
+          Math.abs(mean - 127.5) < 2,
+          Math.abs(ones / (bytes.length * 8) - 0.5) < 0.01,
+        ].join();
+      `),
+    ).toBe("true,true,true");
+  });
+
+  test("refuses what a browser refuses", async () => {
+    expect(await value(`crypto.getRandomValues(new Float64Array(2))`)).toBe(
+      "error: TypeError: The data argument must be an integer-type TypedArray",
+    );
+    expect(await value(`crypto.getRandomValues([1, 2])`)).toContain("TypeError");
+    expect(await value(`crypto.getRandomValues(new Uint8Array(65537))`)).toBe(
+      "error: QuotaExceededError: The requested length exceeds 65536 bytes",
+    );
+    expect(await value(`return crypto.getRandomValues(new Uint8Array(65536)).length`)).toBe("65536");
+  });
+
+  test("has nothing else on it", async () => {
+    expect(await value(`return [typeof crypto.subtle, Object.prototype.toString.call(crypto)].join()`)).toBe("undefined,[object Crypto]");
+  });
+});

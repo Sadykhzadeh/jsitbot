@@ -11,7 +11,7 @@
 //   <status: o|e> \n <line> \n <flags> \n <text>
 // where line is the line of the user's code an error came from (0 if unknown)
 // and flags is a bit set: 1 = result was cut short, 2 = console output was.
-(function setup(hostLog, loadExtra, maxLogs, maxLogLength, maxResultLength) {
+(function setup(hostLog, loadExtra, maxLogs, maxLogLength, maxResultLength, seed0, seed1, seed2, seed3) {
   "use strict";
 
   const FILE = "input.js";
@@ -889,7 +889,7 @@
     let exported;
 
     function load() {
-      if (exported === undefined) exported = indirectEval(loadExtra(module))(registerInspector);
+      if (exported === undefined) exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3]);
       return exported;
     }
 
@@ -913,6 +913,7 @@
   lazyGlobals("clone", ["structuredClone"]);
   lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
   lazyGlobals("url", ["URL", "URLSearchParams"]);
+  lazyGlobals("crypto", ["crypto"]);
 
   for (const [name, value] of [
     ["setTimeout", setTimeout],
