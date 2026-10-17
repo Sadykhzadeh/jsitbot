@@ -13,7 +13,7 @@ export const guestRuntimeSource = readFileSync(new URL("./guest.js", import.meta
  * that does not use them does not pay for parsing them.
  */
 export const guestExtras: Record<string, string> = Object.fromEntries(
-  ["clone"].map((name) => [name, readFileSync(new URL(`./extras/${name}.js`, import.meta.url), "utf8")]),
+  ["clone", "encoding"].map((name) => [name, readFileSync(new URL(`./extras/${name}.js`, import.meta.url), "utf8")]),
 );
 
 // The wrappers add nothing but text on the first line, so line numbers in the
