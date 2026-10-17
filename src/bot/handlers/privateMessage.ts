@@ -1,31 +1,13 @@
 import { GrammyError, type Api, type Bot } from "grammy";
 import type { ParseMode } from "grammy/types";
 
-import type { SandboxService } from "../../services/sandbox/types";
-import {
-  type RateLimitPolicy,
-  SandboxTimeBudget,
-  SlidingWindowRateLimiter,
-  type TimeBudgetPolicy,
-  TIMEOUT_PENALTY_REQUESTS,
-  isCodeLengthAllowed,
-} from "../../security/rateLimiter";
 import { stripCodeFence } from "../codeInput";
 import { isBotCommand } from "../commands";
-import {
-  formatExecutionMessage,
-  formatRejectionMessage,
-} from "../formatters/telegramExecutionMessage";
 import { ReplyTracker, type TrackedReply } from "../replyTracker";
+import { createRunner, type RunnerOptions } from "../runner";
 
-interface PrivateMessageHandlerOptions {
+interface PrivateMessageHandlerOptions extends RunnerOptions {
   botUserId: number;
-  sandbox: SandboxService;
-  rateLimiter: SlidingWindowRateLimiter;
-  rateLimitPolicy: RateLimitPolicy;
-  timeBudget: SandboxTimeBudget;
-  timeBudgetPolicy: TimeBudgetPolicy;
-  maxCodeLength: number;
   replies?: ReplyTracker;
 }
 
@@ -49,46 +31,12 @@ function isNotModified(error: unknown): boolean {
 
 export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageHandlerOptions): void {
   const replies = options.replies ?? new ReplyTracker();
+  const runCode = createRunner(options);
 
   async function answerFor(request: Request): Promise<Answer> {
-    const rateLimit = options.rateLimiter.consume(
-      `private:${request.userId}`,
-      options.rateLimitPolicy,
-    );
-    if (!rateLimit.allowed) {
-      const message = formatRejectionMessage(
-        `Rate limit exceeded. Try again in ${Math.ceil(rateLimit.retryAfterMs / 1000)}s.`,
-      );
-      return { text: message.text, parseMode: message.parseMode, quote: false };
-    }
+    const outcome = await runCode(request.userId, request.code);
 
-    if (!isCodeLengthAllowed(request.code, options.maxCodeLength)) {
-      const message = formatRejectionMessage(
-        `Code exceeds the ${options.maxCodeLength}-character limit.`,
-      );
-      return { text: message.text, parseMode: message.parseMode, quote: false };
-    }
-
-    const budgetKey = `user:${request.userId}`;
-    const budget = options.timeBudget.check(budgetKey, options.timeBudgetPolicy);
-    if (!budget.allowed) {
-      const message = formatRejectionMessage(
-        `Your code has used up its run time for now. Try again in ${Math.ceil(budget.retryAfterMs / 1000)}s.`,
-      );
-      return { text: message.text, parseMode: message.parseMode, quote: false };
-    }
-
-    const execution = await options.sandbox.execute(request.code);
-    options.timeBudget.record(budgetKey, execution.durationMs, options.timeBudgetPolicy);
-    if (execution.timedOut) {
-      options.rateLimiter.charge(
-        `private:${request.userId}`,
-        options.rateLimitPolicy,
-        TIMEOUT_PENALTY_REQUESTS,
-      );
-    }
-    const message = formatExecutionMessage(execution, request.code);
-    return { text: message.text, parseMode: message.parseMode, quote: true };
+    return { text: outcome.message.text, parseMode: outcome.message.parseMode, quote: outcome.ran };
   }
 
   /** Updates the earlier answer when there is one that can still be edited, sends a new one otherwise. */
