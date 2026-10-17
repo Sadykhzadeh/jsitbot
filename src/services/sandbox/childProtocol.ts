@@ -6,4 +6,6 @@ export type ChildRequest =
 
 export type ChildResponse =
   | { type: "ready" }
+  // The guest's clock has started: from here the run has its timeout to finish.
+  | { type: "started"; id: number }
   | { type: "result"; id: number; execution: SandboxExecution };

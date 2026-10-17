@@ -190,7 +190,8 @@ export class QuickJsSandboxService implements SandboxService {
     return prepared;
   }
 
-  async execute(code: string): Promise<SandboxExecution> {
+  /** `onStart` is called when the guest's clock starts, just before its code does. */
+  async execute(code: string, onStart?: () => void): Promise<SandboxExecution> {
     let startedAt = performance.now();
     let logs: string[] = [];
     let interrupted = false;
@@ -244,6 +245,7 @@ export class QuickJsSandboxService implements SandboxService {
         return true;
       });
 
+      onStart?.();
       const packed = this.evaluate(context, runtime, guest, code, () => interrupted);
 
       if (interrupted) {
