@@ -157,7 +157,12 @@
   }
 
   function parse(input, base) {
-    const text = String(input).replace(/^[\u0000- ]+|[\u0000- ]+$/g, "").replace(/[\t\n\r]/g, "");
+    const raw = String(input);
+    let start = 0;
+    let end = raw.length;
+    while (start < end && raw.charCodeAt(start) <= 0x20) start++;
+    while (end > start && raw.charCodeAt(end - 1) <= 0x20) end--;
+    const text = raw.slice(start, end).replace(/[\t\n\r]/g, "");
     const match = /^([a-zA-Z][a-zA-Z0-9+.\-]*):/.exec(text);
 
     if (match) {
