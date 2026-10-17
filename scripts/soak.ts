@@ -3,7 +3,7 @@
 // the bot and its sandbox process hold idle and after a burst of messages, and
 // how long it takes to answer the burst.
 //
-// Usage: bun run soak [--starts=7] [--messages=300] [--latency=30] [--limit=30]
+// Usage: bun run soak [--starts=7] [--messages=300] [--latency=30] [--limit=30] [--users=60]
 import { startFakeTelegram, type FakeTelegram } from "./fakeTelegram";
 
 function option(name: string, fallback: number): number {
@@ -16,7 +16,7 @@ const MESSAGES = option("messages", 300);
 const LATENCY_MS = option("latency", 30);
 // 0 for no limit; Telegram allows a bot about 30 messages per second.
 const SENDS_PER_SECOND = option("limit", 0);
-const USERS = 60;
+const USERS = option("users", 60);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
