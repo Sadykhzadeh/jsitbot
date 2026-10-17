@@ -412,6 +412,8 @@ export class QuickJsSandboxService implements SandboxService {
     });
     // Hands the guest the source of a part it asked for by name. Nothing else
     // crosses: the names are fixed in the guest runtime and the sources are ours.
+    // Where the guest's random numbers start from. It goes in; nothing comes out.
+    const seed = Array.from(crypto.getRandomValues(new Uint32Array(4)));
     const loadExtra = context.newFunction("loadExtra", (name) => {
       const source = guestExtras[readString(context, name) ?? ""];
       return context.newString(source ?? "");
@@ -425,6 +427,7 @@ export class QuickJsSandboxService implements SandboxService {
         context.newNumber(maxLogs),
         context.newNumber(maxLogLength),
         context.newNumber(maxResultLength),
+        ...seed.map((word) => context.newNumber(word)),
       ),
     );
 
