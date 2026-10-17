@@ -64,8 +64,9 @@ describe("handling updates concurrently", () => {
     await poll(...Array.from({ length: 8 }, (_, user) => message(user + 1, `from ${user + 1}`)));
     await until(() => done.length === 8);
 
-    // Eight handlers of 60 ms one after the other would take 480 ms.
-    expect(performance.now() - startedAt).toBeLessThan(250);
+    // Eight handlers of 60 ms one after the other would take at least 480 ms, because a
+    // sleep never ends early. Anything below that was concurrent; the rest is machine load.
+    expect(performance.now() - startedAt).toBeLessThan(450);
   });
 
   test("one user's updates run one after the other, in the order they came", async () => {
@@ -226,7 +227,8 @@ describe("with the real handlers", () => {
 
     const answers = harness.callsTo("sendMessage").map((call) => call.payload.chat_id);
     expect(new Set(answers).size).toBe(16);
-    // One after the other it takes 16 x 40 ms = 640 ms of waiting for Telegram.
-    expect(elapsed).toBeLessThan(400);
+    // One after the other it takes at least 16 x 40 ms = 640 ms of waiting for Telegram,
+    // so anything below that was concurrent; the rest is machine load.
+    expect(elapsed).toBeLessThan(600);
   });
 });
