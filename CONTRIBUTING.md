@@ -11,7 +11,7 @@ bun test
 bun run typecheck
 ```
 
-CI (`.forgejo/workflows/check.yml`) runs exactly these two after `bun install --frozen-lockfile`, on every pull request and on every push to `master`, with the Bun version pinned in that file. A change should pass both before you send it, and so should every commit in it, not only the last one. If you change dependencies, commit the updated `bun.lock`.
+CI (`.forgejo/workflows/check.yml`) runs these two after `bun install --frozen-lockfile`, on every pull request and on every push to `master`, with the Bun version pinned in that file. It type-checks first and then runs `bun test --parallel=3`, which is the same suite with the test files spread over three processes; on a recent Bun that roughly halves the time. Plain `bun test` runs the files one after the other and is the one to use when you suspect two files interfere. A change should pass both before you send it, and so should every commit in it, not only the last one. If you change dependencies, commit the updated `bun.lock`.
 
 The tests need no bot token and no network. Bot handlers are tested against a recorder in place of Telegram (`test/helpers/botHarness.ts`), and the sandbox tests run real QuickJS instances.
 
