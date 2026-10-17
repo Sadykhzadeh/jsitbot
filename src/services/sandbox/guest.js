@@ -91,6 +91,57 @@
     return head(text, limit > 3 ? limit - 3 : 0) + "...";
   }
 
+  function hexByte(code) {
+    return (code < 16 ? "0" : "") + numberToString(code, 16);
+  }
+
+  // Text leaves the guest as a C string. A NUL character would end it there, so
+  // "a\0b" came back as "a", and a lone surrogate has no UTF-8 form and came
+  // back as three replacement characters. Control characters other than tab,
+  // newline and carriage return are shown as \xNN, since Telegram would not.
+  function visible(text) {
+    let out = "";
+    let from = 0;
+    for (let i = 0; i < text.length; i++) {
+      const c = stringCharCodeAt(text, i);
+      if (c >= 32 && c < 127) continue;
+
+      let replacement;
+      if (c < 32) {
+        if (c === 9 || c === 10 || c === 13) continue;
+        replacement = "\\x" + hexByte(c);
+      } else if (c === 127) {
+        replacement = "\\x7f";
+      } else if (c >= 0xd800 && c <= 0xdfff) {
+        if (c <= 0xdbff && i + 1 < text.length) {
+          const next = stringCharCodeAt(text, i + 1);
+          if (next >= 0xdc00 && next <= 0xdfff) {
+            i++;
+            continue;
+          }
+        }
+        replacement = "�";
+      } else {
+        continue;
+      }
+      out += stringSlice(text, from, i) + replacement;
+      from = i + 1;
+    }
+    return from === 0 ? text : out + stringSlice(text, from);
+  }
+
+  // Shortens text that is too long, then makes what is left safe to hand over.
+  // Looking at the first `limit` characters only keeps a huge string cheap.
+  function bound(text, limit, state) {
+    const clipped = text.length > limit;
+    let out = visible(clipped ? head(text, limit) : text);
+    if (clipped || out.length > limit) {
+      state.cut = true;
+      out = head(out, limit > 3 ? limit - 3 : 0) + "...";
+    }
+    return out;
+  }
+
   function isIdentifier(key) {
     if (key.length === 0) return false;
     for (let i = 0; i < key.length; i++) {
@@ -426,7 +477,7 @@
     } catch (ignored) {
       text = "[Unformattable value]";
     }
-    return { text: cut(text, limit, state), cut: state.cut };
+    return { text: bound(text, limit, state), cut: state.cut };
   }
 
   // The line of the user's code that an error came from, read off its stack.
@@ -474,7 +525,7 @@
 
     if (isErrorLike(error)) {
       const state = { left: maxResultLength, cut: false, stack: [] };
-      text = cut(errorText(error, state), maxResultLength, state);
+      text = bound(errorText(error, state), maxResultLength, state);
       cutShort = state.cut;
       line = lineOf(error);
     } else {
@@ -532,12 +583,8 @@
       if (line.length > maxLogLength) break;
     }
     if (groupIndent) line = indent(line);
-    if (line.length > maxLogLength) {
-      logsCutShort = true;
-      line = head(line, maxLogLength - 3) + "...";
-    } else if (state.cut) {
-      logsCutShort = true;
-    }
+    line = bound(line, maxLogLength, state);
+    if (state.cut) logsCutShort = true;
     hostLog(line);
   }
 

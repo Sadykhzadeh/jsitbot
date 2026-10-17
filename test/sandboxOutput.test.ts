@@ -172,3 +172,37 @@ describe("cutting text that holds characters outside the BMP", () => {
     }
   });
 });
+
+describe("characters that cannot cross the boundary as they are", () => {
+  async function outcome(code: string): Promise<string> {
+    const result = await sandbox.execute(code);
+
+    return result.ok ? result.result : result.error;
+  }
+
+  test("a NUL character is shown, not taken for the end of the text", async () => {
+    expect(await outcome(String.raw`"a\0b"`)).toBe(String.raw`a\x00b`);
+    expect(await outcome(String.raw`throw new Error("p\0q")`)).toBe(String.raw`Error: p\x00q`);
+
+    const logged = await sandbox.execute(String.raw`console.log("x\0y", 1); 2`);
+    expect(logged.logs).toEqual([String.raw`x\x00y 1`]);
+  });
+
+  test("other control characters are shown, but tabs and line breaks stay", async () => {
+    expect(await outcome(String.raw`"\x01\x1b[0m\x7f"`)).toBe(String.raw`\x01\x1b[0m\x7f`);
+    expect(await outcome(String.raw`"a\tb\r\nc"`)).toBe("a\tb\r\nc");
+  });
+
+  test("a lone surrogate becomes one replacement character, a pair is kept", async () => {
+    expect(await outcome(String.raw`"a\ud83d" + "b"`)).toBe("a\ufffdb");
+    expect(await outcome(String.raw`"\ude00\ud83d\ude00"`)).toBe("\ufffd😀");
+  });
+
+  test("a result that grows when its characters are shown still fits the limit", async () => {
+    const result = await sandbox.execute(String.raw`"\0".repeat(3000)`);
+
+    expect(result.ok && result.result.length).toBeLessThanOrEqual(4_000);
+    expect(result.ok && result.result.endsWith("...")).toBe(true);
+    expect(result.truncated).toBe(true);
+  });
+});
