@@ -2,6 +2,7 @@
   "name": "jsitbot",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.ts",
