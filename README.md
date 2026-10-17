@@ -108,7 +108,7 @@ The only setting read from the environment is the token:
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
-| `BOT_TOKEN` | yes | Telegram bot token from @BotFather |
+| `BOT_TOKEN` | yes | Telegram bot token from @BotFather, as `<digits>:<letters and digits>`. The bot stops at start with a one-line message when it is missing, malformed or refused by Telegram |
 
 Everything else is a constant in the source, so a change to a limit is a code change and goes through review and tests:
 

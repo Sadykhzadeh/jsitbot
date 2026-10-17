@@ -26,6 +26,8 @@ export function startFakeTelegram(
     port?: number;
     /** Messages the bot may send per second before Telegram answers 429. No limit when left out. */
     sendsPerSecond?: number;
+    /** Answers 401 to any other token, as Telegram does for one it does not know. */
+    token?: string;
   } = {},
 ): FakeTelegram {
   const latencyMs = options.latencyMs ?? 0;
@@ -106,6 +108,10 @@ export function startFakeTelegram(
       const method = new URL(request.url).pathname.split("/").pop() ?? "";
       const body = await readBody(request);
       count(method);
+
+      if (options.token && !new URL(request.url).pathname.startsWith(`/bot${options.token}/`)) {
+        return Response.json({ ok: false, error_code: 401, description: "Unauthorized" }, { status: 401 });
+      }
 
       if (options.sendsPerSecond && SENDING.has(method)) {
         const now = performance.now();

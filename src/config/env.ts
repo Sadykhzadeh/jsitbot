@@ -23,31 +23,51 @@ const DEFAULT_SANDBOX_TIME_BUDGET = {
   maxMs: 1_000,
 };
 
-function getRequiredEnv(name: string): string {
-  const value = Bun.env[name]?.trim();
+// What BotFather hands out: the bot's numeric id, a colon, then a secret made of
+// letters, digits, "_" and "-".
+const BOT_TOKEN_PATTERN = /^\d+:[A-Za-z0-9_-]+$/;
+
+/** A setting is missing or wrong. The message says which one and never repeats its value. */
+export class ConfigError extends Error {
+  override name = "ConfigError";
+}
+
+function getRequiredEnv(source: Record<string, string | undefined>, name: string): string {
+  const value = source[name]?.trim();
 
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    throw new ConfigError(`${name} is not set. Put the token from @BotFather in .env, see .env.example.`);
   }
 
   return value;
 }
 
-export const env = {
-  botToken: getRequiredEnv("BOT_TOKEN"),
-  sandbox: {
-    timeoutMs: DEFAULT_TIMEOUT_MS,
-    memoryLimitBytes: DEFAULT_MEMORY_LIMIT_BYTES,
-    maxStackSizeBytes: DEFAULT_MAX_STACK_SIZE_BYTES,
-  },
-  limits: {
-    maxCodeLength: DEFAULT_MAX_CODE_LENGTH,
-    inlineMinLength: DEFAULT_INLINE_MIN_LENGTH,
-    privateRateLimit: DEFAULT_PRIVATE_RATE_LIMIT,
-    inlineRateLimit: DEFAULT_INLINE_RATE_LIMIT,
-    sandboxTimeBudget: DEFAULT_SANDBOX_TIME_BUDGET,
-    concurrency: DEFAULT_CONCURRENCY,
-  },
-} as const;
+export function loadEnv(source: Record<string, string | undefined>) {
+  const botToken = getRequiredEnv(source, "BOT_TOKEN");
 
-export type AppEnv = typeof env;
+  if (!BOT_TOKEN_PATTERN.test(botToken)) {
+    throw new ConfigError(
+      "BOT_TOKEN does not look like a Telegram bot token. " +
+        "It is digits, a colon, then letters and digits, as BotFather sent it.",
+    );
+  }
+
+  return {
+    botToken,
+    sandbox: {
+      timeoutMs: DEFAULT_TIMEOUT_MS,
+      memoryLimitBytes: DEFAULT_MEMORY_LIMIT_BYTES,
+      maxStackSizeBytes: DEFAULT_MAX_STACK_SIZE_BYTES,
+    },
+    limits: {
+      maxCodeLength: DEFAULT_MAX_CODE_LENGTH,
+      inlineMinLength: DEFAULT_INLINE_MIN_LENGTH,
+      privateRateLimit: DEFAULT_PRIVATE_RATE_LIMIT,
+      inlineRateLimit: DEFAULT_INLINE_RATE_LIMIT,
+      sandboxTimeBudget: DEFAULT_SANDBOX_TIME_BUDGET,
+      concurrency: DEFAULT_CONCURRENCY,
+    },
+  } as const;
+}
+
+export type AppEnv = ReturnType<typeof loadEnv>;
