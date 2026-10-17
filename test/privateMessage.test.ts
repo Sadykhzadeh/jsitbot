@@ -242,3 +242,14 @@ describe("code in a fence", () => {
     expect(edit.payload.text).toContain("*Result*\n```\n42\n```");
   });
 });
+
+describe("code over the length limit", () => {
+  test("is told how long it is", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("1".repeat(2_345));
+
+    const [reply] = harness.callsTo("sendMessage");
+    expect(reply.payload.text).toContain("exceeds the 2000-character limit (yours has 2345)");
+  });
+});

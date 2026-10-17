@@ -65,7 +65,7 @@ export function createRunner(options: RunnerOptions) {
     }
 
     if (!isCodeLengthAllowed(code, options.maxCodeLength)) {
-      return refuse("too-long", `Code exceeds the ${options.maxCodeLength}-character limit.`);
+      return refuse("too-long", `Code exceeds the ${options.maxCodeLength}-character limit (yours has ${code.length}).`);
     }
 
     const budgetKey = `user:${userId}`;
