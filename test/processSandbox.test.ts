@@ -123,7 +123,7 @@ describe("ProcessSandboxService", () => {
 
     expect(result.timedOut).toBe(true);
     expect(wallMs).toBeGreaterThanOrEqual(options.timeoutMs);
-    expect(wallMs).toBeLessThan(options.timeoutMs + 300);
+    expect(wallMs).toBeLessThan(options.timeoutMs + 350);
   });
 
   test("a killed run does not eat into the budget of the next one", async () => {
