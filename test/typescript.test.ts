@@ -72,6 +72,30 @@ describe("JavaScript comes first", () => {
 });
 
 
+describe("transpiler macros", () => {
+  // A macro runs while the types are being stripped, on the host, and its return
+  // value ends up in the code. `arch()` is harmless but would show it ran.
+  const macro = (call: string) =>
+    `import { arch } from "node:os" with { type: "macro" };
+const name: string = ${call};
+name`;
+
+  test("are never run on the host", async () => {
+    const execution = await sandbox.execute(macro("arch()"));
+
+    expect(execution.ok).toBe(false);
+    if (!execution.ok) {
+      expect(execution.error).toContain("Macros are disabled");
+    }
+  });
+
+  test("are refused by the type stripper", () => {
+    expect(stripTypes(macro("arch()"))).toEqual({
+      error: { message: "Macros are disabled", line: 2 },
+    });
+  });
+});
+
 describe("stripTypes", () => {
   test("removes annotations and keeps the code", () => {
     expect(stripTypes("const x: number = 1; x")).toEqual({ code: "const x = 1;\nx;\n" });
