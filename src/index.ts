@@ -3,6 +3,7 @@ import { GrammyError, HttpError } from "grammy";
 import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
 import { logBotError } from "./runtime/logError";
+import { createApiGuard } from "./runtime/telegramApi";
 
 function fail(message: string): never {
   console.error(message);
@@ -32,6 +33,10 @@ try {
   }
   throw error;
 }
+
+// Updates are handled with the Api object of bot.api at the time, so this
+// reaches every call a handler makes.
+bot.api.config.use(createApiGuard(env.telegramApi).transformer);
 
 // Replaces the handler createBot installs, which printed the whole error: for a
 // failed Telegram call that includes the message that was being sent.
