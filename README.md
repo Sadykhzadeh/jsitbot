@@ -13,6 +13,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 - Executes JavaScript from private messages and inline queries, answering up to 8 users at a time
 - Re-runs a message when you edit it, and updates the answer in place
+- Sends the whole output as a text file after the answer when it does not fit in one message
 - Returns the value of the last statement, like a REPL, and understands `return` and top-level `await`
 - Accepts TypeScript syntax (the types are stripped)
 - Has `setTimeout`, `setInterval` and their `clear` twins on a virtual clock: a sleep returns at once instead of using up the time limit, and `Date.now()` does not move. `performance.now()` does move with it, so a measurement around a sleep shows the sleep. An interval that is never cleared runs until the time limit

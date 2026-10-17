@@ -9,7 +9,11 @@ import {
   isCodeLengthAllowed,
 } from "../security/rateLimiter";
 import type { SandboxService } from "../services/sandbox/types";
-import { formatExecutionMessage, formatRejectionMessage } from "./formatters/telegramExecutionMessage";
+import {
+  formatExecutionDocument,
+  formatExecutionMessage,
+  formatRejectionMessage,
+} from "./formatters/telegramExecutionMessage";
 
 export interface RunnerOptions {
   sandbox: SandboxService;
@@ -29,7 +33,12 @@ export interface RunMessage {
 export type RunRefusal = "rate-limit" | "run-time" | "too-long";
 
 export type RunOutcome =
-  | { ran: true; message: RunMessage }
+  | {
+      ran: true;
+      message: RunMessage;
+      /** Everything the run produced as plain text, when the message could not hold it all. */
+      document?: string;
+    }
   | { ran: false; refusal: RunRefusal; message: RunMessage };
 
 /** The key the request limit counts a user's runs under, whichever chat they came from. */
@@ -74,6 +83,11 @@ export function createRunner(options: RunnerOptions) {
       options.rateLimiter.charge(rateKey(userId), options.rateLimitPolicy, TIMEOUT_PENALTY_REQUESTS);
     }
 
-    return { ran: true, message: formatExecutionMessage(execution, code) };
+    const message = formatExecutionMessage(execution, code);
+    return {
+      ran: true,
+      message,
+      document: message.cut ? formatExecutionDocument(execution, code) : undefined,
+    };
   };
 }

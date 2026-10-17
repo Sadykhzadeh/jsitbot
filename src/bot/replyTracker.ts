@@ -3,6 +3,8 @@ export interface TrackedReply {
   replyId: number;
   /** The code that answer was produced from. */
   code: string;
+  /** Id of the file with the whole output that was sent after the answer, when there is one. */
+  documentId?: number;
 }
 
 /**
