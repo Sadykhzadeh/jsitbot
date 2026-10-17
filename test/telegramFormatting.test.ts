@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  formatExecutionDocument,
   formatExecutionMessage,
   formatInlineExecutionPreview,
 } from "../src/bot/formatters/telegramExecutionMessage";
@@ -278,5 +279,42 @@ describe("curly quotes", () => {
     );
 
     expect(message.text).not.toContain("Hint");
+  });
+});
+
+describe("output that needs a file", () => {
+  const run = (logs: string[], result = "1") => ({
+    ok: true as const,
+    logs,
+    result,
+    durationMs: 2,
+    timedOut: false as const,
+    truncated: false,
+  });
+
+  test("the message says whether it had to leave something out", () => {
+    expect(formatExecutionMessage(run(["a"]), "x").cut).toBe(false);
+    expect(formatExecutionMessage(run(["a".repeat(5_000)]), "x").cut).toBe(true);
+  });
+
+  test("a cut made by the sandbox alone is not one", () => {
+    expect(formatExecutionMessage({ ...run(["a"]), truncated: true }, "x").cut).toBe(false);
+  });
+
+  test("the file holds every section whole and unescaped", () => {
+    const text = formatExecutionDocument(run(["a`b", "c"], "d\\e"), "code()");
+
+    expect(text).toBe(
+      ["Code", "----", "code()", "", "Console", "-------", "a`b", "c", "", "Result", "------", "d\\e", ""].join("\n"),
+    );
+  });
+
+  test("the file names the error and its line like the message does", () => {
+    const text = formatExecutionDocument(
+      { ok: false, logs: [], error: "ReferenceError: x is not defined", line: 2, durationMs: 1, timedOut: false, truncated: false },
+      "a();\nx;",
+    );
+
+    expect(text).toContain("Error\n-----\nReferenceError: x is not defined\n    at line 2: x;\n");
   });
 });

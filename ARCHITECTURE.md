@@ -39,6 +39,7 @@ Notes:
 - updates are handled several at a time (`src/bot/concurrency.ts`): grammY would otherwise wait for each reply to reach Telegram before it looked at the next update, and the sandbox, which takes a few milliseconds per run, sat idle for most of that. Up to 8 updates are in progress at once. Updates from one user still run one after the other, in order, so an edit is handled after the run it edits; a user who already has 3 in progress or waiting has the rest dropped, since that is a flood
 - normal private text is treated as code; only `/word`, `/word@bot` followed by a space or the end of the message is a command, so a snippet that starts with a regular expression or a comment still runs
 - bot-generated inline results received in private chat are handled separately
+- output that does not fit in one message (the three sections share about 4000 characters) is cut in the message and sent whole as `output.txt` right after it; an edit removes the old file and sends a new one if the new answer is also cut, and a failure to send the file is only logged
 - an edited message is run again and the earlier answer is edited in place; the table that maps messages to answers is in memory and bounded, so after a restart an edit is answered as a new message
 
 ## Group Flow

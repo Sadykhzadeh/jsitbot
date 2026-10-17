@@ -78,7 +78,7 @@ function renderExecutionSections(
   sections: ExecutionSection[],
   durationLine: (truncated: boolean) => string,
   alreadyTruncated: boolean,
-): string {
+): { text: string; cut: boolean } {
   const needs = sections.map((section) => section.content.length);
   const longestDuration = durationLine(true);
   // What the message weighs when every section is empty: titles, code fences, line breaks.
@@ -89,16 +89,16 @@ function renderExecutionSections(
 
   while (true) {
     const rooms = allocate(needs, Math.max(0, budget));
-    let truncated = alreadyTruncated;
+    let cutHere = false;
     const parts = sections.map((section, index) => {
       const cut = truncateText(section.content, rooms[index]);
-      truncated = truncated || cut.truncated;
+      cutHere = cutHere || cut.truncated;
       return buildSection(section.title, cut.value || " ");
     });
 
-    const text = [...parts, durationLine(truncated)].join("\n");
+    const text = [...parts, durationLine(cutHere || alreadyTruncated)].join("\n");
     if (text.length <= TELEGRAM_MESSAGE_LIMIT) {
-      return text;
+      return { text, cut: cutHere };
     }
 
     // Escaping made the text longer than the characters counted: scale the budget by how much.
@@ -108,21 +108,16 @@ function renderExecutionSections(
   }
 }
 
-export function formatExecutionMessage(execution: SandboxExecution): {
+export interface ExecutionMessage {
   text: string;
   parseMode: ParseMode;
-};
-export function formatExecutionMessage(execution: SandboxExecution, code: string): {
-  text: string;
-  parseMode: ParseMode;
-};
-export function formatExecutionMessage(
-  execution: SandboxExecution,
-  code = "",
-): {
-  text: string;
-  parseMode: ParseMode;
-} {
+  /** Whether this message had to leave out part of the code, console or result to fit. */
+  cut: boolean;
+}
+
+export function formatExecutionMessage(execution: SandboxExecution): ExecutionMessage;
+export function formatExecutionMessage(execution: SandboxExecution, code: string): ExecutionMessage;
+export function formatExecutionMessage(execution: SandboxExecution, code = ""): ExecutionMessage {
   const sections: ExecutionSection[] = [
     { title: "Code", content: code.trim().length > 0 ? code : " " },
   ];
@@ -135,13 +130,24 @@ export function formatExecutionMessage(
   });
 
   const duration = escapeMarkdownV2(`${execution.durationMs}ms`);
-  const text = renderExecutionSections(
+  const { text, cut } = renderExecutionSections(
     sections,
     (truncated) => `_Duration: ${duration}${truncated ? " \\(truncated\\)" : ""}_`,
     execution.truncated,
   );
 
-  return { text, parseMode: "MarkdownV2" };
+  return { text, parseMode: "MarkdownV2", cut };
+}
+
+/** Everything the sandbox returned, as plain text, for a message that could not hold it all. */
+export function formatExecutionDocument(execution: SandboxExecution, code: string): string {
+  const sections = [["Code", code]];
+  if (execution.logs.length > 0) {
+    sections.push(["Console", execution.logs.join("\n")]);
+  }
+  sections.push([execution.ok ? "Result" : "Error", describeError(execution, code)]);
+
+  return sections.map(([title, content]) => `${title}\n${"-".repeat(title.length)}\n${content}\n`).join("\n");
 }
 
 export function formatRejectionMessage(message: string): { text: string; parseMode: ParseMode } {
