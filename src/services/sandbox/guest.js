@@ -878,6 +878,7 @@
   }
 
   lazyGlobals("clone", ["structuredClone"]);
+  lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
 
   for (const [name, value] of [
     ["setTimeout", setTimeout],
