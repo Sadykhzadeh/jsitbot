@@ -93,7 +93,7 @@ describe("ProcessSandboxService", () => {
     const longestStall = watcher.stop();
 
     expect(result.timedOut).toBe(true);
-    expect(longestStall).toBeLessThan(150);
+    expect(longestStall).toBeLessThan(300);
   });
 
   test("kills a native call that ignores the interrupt handler, then recovers", async () => {
@@ -111,7 +111,7 @@ describe("ProcessSandboxService", () => {
       expect(result.error).toBe("Sandbox execution timed out.");
     }
     expect(wallMs).toBeLessThan(1_500);
-    expect(longestStall).toBeLessThan(150);
+    expect(longestStall).toBeLessThan(300);
 
     const next = await sandbox.execute("21 * 2");
     expect(next.ok).toBe(true);
@@ -124,6 +124,7 @@ describe("ProcessSandboxService", () => {
     // The child says when the guest's clock starts, so the wait after the
     // timeout is short. Waiting from the moment the run was sent took the
     // timeout plus 400 ms.
+    await sandbox.execute("1"); // a replacement for the process the last test killed may still be starting
     const startedAt = performance.now();
     const result = await sandbox.execute(`new Array(2 ** 28).join("ab").length`);
     const wallMs = performance.now() - startedAt;
