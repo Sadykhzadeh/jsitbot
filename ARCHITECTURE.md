@@ -71,10 +71,10 @@ flowchart TD
     G --> H["Back to the bot over IPC"]
 ```
 
-- The child process holds the QuickJS engine and a spare WebAssembly instance that is built while it is idle. Every run takes one instance and drops it afterwards. It is started with a minimal environment (no bot token) and exits when the bot goes away.
+- The child process holds the QuickJS engine and a spare WebAssembly instance that is built while it is idle. Every run takes one instance and drops it afterwards. It is started with a minimal environment and without Bun's automatic `.env` loading, so it never sees the bot token, and it exits when the bot goes away.
 - The instance's memory has a hard maximum. QuickJS's own memory limit counts allocations rather than bytes in the Emscripten build, so it is not what stops a memory bomb.
 - The guest runtime (`guest.js`) is evaluated first. It captures the built-ins it relies on, installs `console`, and turns results, errors and log lines into short strings, so nothing the guest controls is walked by the host.
-- The code is tried as one expression, then as a script (the last statement's value is the result), then as a function body (`return`, top-level `await`). If none parses, the types are stripped with Bun's transpiler and the same readings are tried again.
+- The code is tried as one expression, then as a script (the last statement's value is the result), then as a function body (`return`, top-level `await`). If none parses, the types are stripped with Bun's transpiler and the same readings are tried again. The transpiler runs outside the guest, so its macros are switched off: a macro import would otherwise execute there while the types are being removed.
 - `setTimeout` and `clearTimeout` live in the guest runtime. Once the promise queue is empty the host asks the guest to fire the earliest timer, repeating until none is left, so a sleep costs no real time and a run never holds the sandbox while it waits. A timer that keeps rescheduling itself runs into the time limit like any other loop.
 - The bot waits for the child for the timeout plus a grace period. If it is still busy after that, it is killed and replaced (a replacement is ready in about 70 ms), and the run is reported as timed out. A process is killed outright; a worker thread kept running a stuck native call, and its memory, for seconds after being terminated.
 - If a process cannot be started in the environment, the bot logs it and runs QuickJS inside itself, which keeps the interrupt handler and the memory cap but not the hard kill.
