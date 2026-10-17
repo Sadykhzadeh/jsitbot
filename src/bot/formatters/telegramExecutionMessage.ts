@@ -1,6 +1,6 @@
 import type { ParseMode } from "grammy/types";
 
-import type { SandboxExecution } from "../../services/sandbox/types";
+import type { SandboxExecution, SandboxExecutionFailure } from "../../services/sandbox/types";
 import {
   escapeMarkdownV2,
   escapeMarkdownV2Code,
@@ -13,15 +13,27 @@ const INLINE_TITLE_LIMIT = 64;
 const INLINE_DESCRIPTION_LIMIT = 128;
 const ERROR_SOURCE_EXCERPT_LIMIT = 60;
 
-/**
- * Adds where an error happened. Only worth the extra line when the code has
- * several of them: for a one-liner the location is obvious.
- */
+// Phone keyboards turn " and ' into curly quotes, and the engine can only say
+// "unexpected character" about them.
+const CURLY_QUOTES = /[\u2018\u2019\u201C\u201D]/;
+const CURLY_QUOTES_HINT = "Hint: the code has curly quotes (\u201C \u201D \u2018 \u2019), JavaScript needs straight ones (\" ').";
+
 function describeError(execution: SandboxExecution, code: string): string {
   if (execution.ok) {
     return execution.result;
   }
 
+  const located = locateError(execution, code);
+  const curlyQuotes = /^SyntaxError: unexpected character/.test(execution.error) && CURLY_QUOTES.test(code);
+
+  return curlyQuotes ? located + "\n" + CURLY_QUOTES_HINT : located;
+}
+
+/**
+ * Adds where an error happened. Only worth the extra line when the code has
+ * several of them: for a one-liner the location is obvious.
+ */
+function locateError(execution: SandboxExecutionFailure, code: string): string {
   const sourceLines = code.split("\n");
   if (!execution.line || sourceLines.length < 2 || execution.line > sourceLines.length) {
     return execution.error;

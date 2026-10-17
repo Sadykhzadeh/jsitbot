@@ -4,6 +4,7 @@ import {
   formatExecutionMessage,
   formatInlineExecutionPreview,
 } from "../src/bot/formatters/telegramExecutionMessage";
+import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 
 describe("telegramExecutionMessage", () => {
   test("formats execution results with code and console", () => {
@@ -249,5 +250,33 @@ describe("sharing the room in one message", () => {
 
     expect(message.text.length).toBeLessThanOrEqual(4_000);
     expect(message.text.length).toBeGreaterThan(3_800);
+  });
+});
+
+describe("curly quotes", () => {
+  const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
+
+  test("an error caused by them says so", async () => {
+    const code = "console.log(“hello”)";
+    const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+    expect(message.text).toContain("SyntaxError: unexpected character");
+    expect(message.text).toContain("Hint: the code has curly quotes");
+  });
+
+  test("curly quotes inside a string that runs fine get no hint", async () => {
+    const code = "'“hello”'";
+    const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+    expect(message.text).not.toContain("Hint");
+  });
+
+  test("another error in code that has curly quotes gets no hint", () => {
+    const message = formatExecutionMessage(
+      { ok: false, logs: [], error: "SyntaxError: unexpected token in expression: ';'", durationMs: 1, timedOut: false, truncated: false },
+      "'\u201Cx\u201D'; let b = ;",
+    );
+
+    expect(message.text).not.toContain("Hint");
   });
 });
