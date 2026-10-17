@@ -5,7 +5,15 @@ export type Stripped =
 let transpiler: Bun.Transpiler | undefined;
 
 function transform(source: string): string {
-  transpiler ??= new Bun.Transpiler({ loader: "ts", deadCodeElimination: false });
+  // Macros are off: an `import ... with { type: "macro" }` is run by the
+  // transpiler itself, in the process that holds the host's modules and files,
+  // and its return value is pasted into the output. Guest code must never get
+  // to run anything there. The runtime takes `false`; the typings do not list it.
+  transpiler ??= new Bun.Transpiler({
+    loader: "ts",
+    deadCodeElimination: false,
+    macro: false,
+  } as unknown as Bun.TranspilerOptions);
 
   return transpiler.transformSync(source);
 }
