@@ -39,7 +39,7 @@ describe("help message", () => {
 
   test("every example in it actually runs", async () => {
     const sandbox = new QuickJsSandboxService();
-    const runnable = examplesIn(help.text).filter((example) => !example.startsWith("@"));
+    const runnable = examplesIn(help.text).filter((example) => !/^[@/]/.test(example));
 
     expect(runnable.length).toBeGreaterThanOrEqual(4);
     for (const example of runnable) {
@@ -47,5 +47,11 @@ describe("help message", () => {
 
       expect(execution.ok).toBe(true);
     }
+  });
+});
+
+describe("help message for groups", () => {
+  test("shows how to run code in a group", () => {
+    expect(examplesIn(formatHelpMessage("jsitbot").text)).toContain("/run 6 * 7");
   });
 });

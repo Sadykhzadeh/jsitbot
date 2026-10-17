@@ -168,13 +168,17 @@ export function formatHelpMessage(botUsername: string): { text: string; parseMod
     inlineCode('const user = { name: "Ada" }; user'),
     inlineCode('console.log("hi"); await Promise.resolve(42)'),
     inlineCode("const n: number = 5; n * 2"),
+    inlineCode("console.table([{ n: 1 }, { n: 2 }])"),
+    inlineCode('await new Promise(r => setTimeout(r, 5000)); "slept"'),
     "",
     "*Good to know*",
     escapeMarkdownV2("• The value of the last statement is the result. Use return to stop early."),
     escapeMarkdownV2("• Top-level await works."),
     escapeMarkdownV2("• TypeScript annotations are fine, the types are stripped."),
     escapeMarkdownV2("• Edit your message and the answer updates."),
+    escapeMarkdownV2("• A sleep does not use up the time limit: it returns at once."),
     `• Inline, in any chat: ${inlineCode(`@${botUsername} 1 + 1`)}`,
+    `• In a group: ${inlineCode("/run 6 * 7")}, or reply to a message that has code with /run\\.`,
   ].join("\n");
 
   return {
