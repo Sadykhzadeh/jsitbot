@@ -9,7 +9,6 @@ import {
 } from "../../utils/markdownV2";
 
 const TELEGRAM_MESSAGE_LIMIT = 4000;
-const SECTION_OVERHEAD = 64;
 const INLINE_TITLE_LIMIT = 64;
 const INLINE_DESCRIPTION_LIMIT = 128;
 const ERROR_SOURCE_EXCERPT_LIMIT = 60;
@@ -38,61 +37,62 @@ function buildSection(title: string, content: string): string {
   return `*${title}*\n${toMarkdownV2CodeBlock(content)}`;
 }
 
-function fitSection(title: string, content: string, maxSectionLength: number): { text: string; truncated: boolean } {
-  const available = Math.max(0, maxSectionLength - title.length - SECTION_OVERHEAD);
-  const truncated = truncateText(content, available);
-
-  return {
-    text: buildSection(title, truncated.value || " "),
-    truncated: truncated.truncated,
-  };
-}
-
 interface ExecutionSection {
-  key: "code" | "console" | "outcome";
   title: string;
   content: string;
-  maxLength: number;
-  minLength: number;
-  priority: number;
+}
+
+/**
+ * Splits a budget of characters between sections so that nobody gets more than
+ * it needs and the sections that need more share what is left equally: a
+ * 30-character result keeps all of it, and a long result and a long console
+ * log get half of the room each.
+ */
+function allocate(needs: number[], budget: number): number[] {
+  const order = needs.map((_, index) => index).sort((a, b) => needs[a] - needs[b]);
+  const rooms = needs.map(() => 0);
+  let remaining = budget;
+
+  order.forEach((index, position) => {
+    const share = Math.floor(remaining / (order.length - position));
+    rooms[index] = Math.min(needs[index], share);
+    remaining -= rooms[index];
+  });
+
+  return rooms;
 }
 
 function renderExecutionSections(
   sections: ExecutionSection[],
-  durationLine: string,
-): { text: string; truncated: boolean } {
-  const maxLengths = Object.fromEntries(
-    sections.map((section) => [section.key, section.maxLength]),
-  ) as Record<ExecutionSection["key"], number>;
-
-  let truncated = false;
+  durationLine: (truncated: boolean) => string,
+  alreadyTruncated: boolean,
+): string {
+  const needs = sections.map((section) => section.content.length);
+  const longestDuration = durationLine(true);
+  // What the message weighs when every section is empty: titles, code fences, line breaks.
+  const overhead =
+    sections.reduce((sum, section) => sum + buildSection(section.title, " ").length + 1, 0) +
+    longestDuration.length;
+  let budget = TELEGRAM_MESSAGE_LIMIT - overhead;
 
   while (true) {
-    const renderedSections = sections.map((section) => {
-      const rendered = fitSection(section.title, section.content, maxLengths[section.key]);
-      truncated = truncated || rendered.truncated;
-      return { ...section, rendered };
+    const rooms = allocate(needs, Math.max(0, budget));
+    let truncated = alreadyTruncated;
+    const parts = sections.map((section, index) => {
+      const cut = truncateText(section.content, rooms[index]);
+      truncated = truncated || cut.truncated;
+      return buildSection(section.title, cut.value || " ");
     });
 
-    const text = [...renderedSections.map((section) => section.rendered.text), durationLine].join("\n");
+    const text = [...parts, durationLine(truncated)].join("\n");
     if (text.length <= TELEGRAM_MESSAGE_LIMIT) {
-      return { text, truncated };
+      return text;
     }
 
-    const overflow = text.length - TELEGRAM_MESSAGE_LIMIT;
-    const shrinkTarget = [...sections]
-      .sort((left, right) => left.priority - right.priority)
-      .find((section) => maxLengths[section.key] > section.minLength);
-
-    if (!shrinkTarget) {
-      return { text: text.slice(0, TELEGRAM_MESSAGE_LIMIT), truncated: true };
-    }
-
-    maxLengths[shrinkTarget.key] = Math.max(
-      shrinkTarget.minLength,
-      maxLengths[shrinkTarget.key] - Math.max(overflow, 96),
-    );
-    truncated = true;
+    // Escaping made the text longer than the characters counted: scale the budget by how much.
+    const room = rooms.reduce((sum, value) => sum + value, 0);
+    const scaled = Math.floor((room * (TELEGRAM_MESSAGE_LIMIT - overhead)) / (text.length - overhead));
+    budget = Math.min(scaled, room) - 1;
   }
 }
 
@@ -111,51 +111,25 @@ export function formatExecutionMessage(
   text: string;
   parseMode: ParseMode;
 } {
-  const trimmedCode = code.trim().length > 0 ? code : " ";
-  const outcomeTitle = execution.ok ? "Result" : "Error";
-  const outcomeValue = describeError(execution, code);
   const sections: ExecutionSection[] = [
-    {
-      key: "code",
-      title: "Code",
-      content: trimmedCode,
-      maxLength: TELEGRAM_MESSAGE_LIMIT,
-      minLength: 640,
-      priority: 3,
-    },
-    {
-      key: "outcome",
-      title: outcomeTitle,
-      content: outcomeValue,
-      maxLength: Math.min(1200, TELEGRAM_MESSAGE_LIMIT),
-      minLength: 180,
-      priority: 2,
-    },
+    { title: "Code", content: code.trim().length > 0 ? code : " " },
   ];
-
   if (execution.logs.length > 0) {
-    sections.splice(1, 0, {
-      key: "console",
-      title: "Console",
-      content: execution.logs.join("\n"),
-      maxLength: Math.min(900, TELEGRAM_MESSAGE_LIMIT),
-      minLength: 0,
-      priority: 1,
-    });
+    sections.push({ title: "Console", content: execution.logs.join("\n") });
   }
+  sections.push({
+    title: execution.ok ? "Result" : "Error",
+    content: describeError(execution, code),
+  });
 
-  const baseDurationLine = `_Duration: ${escapeMarkdownV2(`${execution.durationMs}ms`)}_`;
-  const rendered = renderExecutionSections(sections, baseDurationLine);
-  const wasTruncated = execution.truncated || rendered.truncated;
-  const durationLine = `_Duration: ${escapeMarkdownV2(`${execution.durationMs}ms`)}${
-    wasTruncated ? " \\(truncated\\)" : ""
-  }_`;
-  const finalRendered = renderExecutionSections(sections, durationLine);
+  const duration = escapeMarkdownV2(`${execution.durationMs}ms`);
+  const text = renderExecutionSections(
+    sections,
+    (truncated) => `_Duration: ${duration}${truncated ? " \\(truncated\\)" : ""}_`,
+    execution.truncated,
+  );
 
-  return {
-    text: finalRendered.text,
-    parseMode: "MarkdownV2",
-  };
+  return { text, parseMode: "MarkdownV2" };
 }
 
 export function formatRejectionMessage(message: string): { text: string; parseMode: ParseMode } {

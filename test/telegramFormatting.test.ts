@@ -197,3 +197,57 @@ describe("cutting text that holds characters outside the BMP", () => {
     }
   });
 });
+
+describe("sharing the room in one message", () => {
+  const run = (overrides: { logs?: string[]; result?: string }) => ({
+    ok: true as const,
+    logs: overrides.logs ?? [],
+    result: overrides.result ?? "1",
+    durationMs: 2,
+    timedOut: false as const,
+    truncated: false,
+  });
+  const count = (text: string, char: string) => text.split(char).length - 1;
+
+  test("shows a long result in full when the code is short", () => {
+    const message = formatExecutionMessage(run({ result: "r".repeat(3_000) }), "bigString()");
+
+    expect(count(message.text, "r")).toBeGreaterThanOrEqual(3_000);
+    expect(message.text).not.toContain("truncated");
+  });
+
+  test("shows a long console log in full when the rest is short", () => {
+    const logs = Array.from({ length: 20 }, (_, index) => `line ${index} ${"l".repeat(90)}`);
+    const message = formatExecutionMessage(run({ logs }), "print()");
+
+    expect(message.text).toContain(logs[19]);
+    expect(message.text).not.toContain("truncated");
+  });
+
+  test("gives a result and a console log of the same size the same room", () => {
+    const message = formatExecutionMessage(
+      run({ logs: ["c".repeat(3_000)], result: "r".repeat(3_000) }),
+      "x",
+    );
+
+    const console = count(message.text, "c");
+    const result = count(message.text, "r");
+    expect(Math.abs(console - result)).toBeLessThan(10);
+    expect(console).toBeGreaterThan(1_500);
+    expect(message.text).toContain("truncated");
+  });
+
+  test("keeps a short result whole next to a long console log", () => {
+    const message = formatExecutionMessage(run({ logs: ["c".repeat(5_000)], result: "the answer" }), "x");
+
+    expect(message.text).toContain("the answer");
+    expect(message.text.length).toBeLessThanOrEqual(4_000);
+  });
+
+  test("fills the message but stays within it when escaping doubles the text", () => {
+    const message = formatExecutionMessage(run({ result: "`".repeat(4_000) }), "`".repeat(2_000));
+
+    expect(message.text.length).toBeLessThanOrEqual(4_000);
+    expect(message.text.length).toBeGreaterThan(3_800);
+  });
+});
