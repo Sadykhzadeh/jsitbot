@@ -7,6 +7,12 @@ export interface ApiPolicy {
   attempts: number;
   /** The longest "retry after" the bot will sit out. A longer one is given back as the error. */
   maxWaitMs: number;
+  /**
+   * How long past a long poll's own timeout to wait for its answer. A connection
+   * that died without closing would otherwise leave the bot deaf until grammY's
+   * default of 500 s runs out.
+   */
+  pollSlackMs: number;
 }
 
 export interface Clock {
@@ -102,9 +108,17 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
   }
 
   const transformer: Transformer = async (previous, method, payload, signal) => {
-    // Polling has its own back-off in grammY and must not be held up here.
     if (method === "getUpdates") {
-      return previous(method, payload, signal);
+      const waitMs = ((payload as { timeout?: number }).timeout ?? 0) * 1_000 + policy.pollSlackMs;
+      const deadline = new AbortController();
+      const timer = setTimeout(() => deadline.abort(), waitMs);
+      // grammY types its signal with the abort-controller package; the runtime one is the same thing.
+      const combined = signal ? AbortSignal.any([signal as unknown as AbortSignal, deadline.signal]) : deadline.signal;
+      try {
+        return await previous(method, payload, combined as never);
+      } finally {
+        clearTimeout(timer);
+      }
     }
 
     const chat = (payload as { chat_id?: unknown }).chat_id;
