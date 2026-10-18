@@ -26,6 +26,9 @@ const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
 const TIMEOUT_MESSAGE = "Sandbox execution timed out.";
 const NEVER_SETTLES_MESSAGE = "The code is waiting on a promise that can never settle.";
 const UNREADABLE_MESSAGE = "The sandbox returned a result it could not read.";
+// What QuickJS says when a string or a heap runs out: the length of a string is
+// capped as well as its memory, and a doubled string reaches the cap first.
+const MEMORY_ERRORS = new Set(["InternalError: out of memory", "InternalError: string too long"]);
 
 // Jobs are run in batches so the deadline is checked between them as well as
 // by the interrupt handler inside them.
@@ -206,7 +209,7 @@ export class QuickJsSandboxService implements SandboxService {
       const timedOut = details.timedOut ?? interrupted;
       // With the heap used up to the last page QuickJS cannot even allocate its
       // out-of-memory error, so the guest sees a bare null instead of a message.
-      const outOfMemory = error === "InternalError: out of memory" || (heapExhausted() && !timedOut);
+      const outOfMemory = MEMORY_ERRORS.has(error) || (heapExhausted() && !timedOut);
       const message = timedOut ? TIMEOUT_MESSAGE : outOfMemory ? MEMORY_LIMIT_MESSAGE : error;
       const bounded = truncateText(message, this.options.maxResultLength);
 
@@ -515,8 +518,9 @@ export class QuickJsSandboxService implements SandboxService {
         return { ok: false, text: NEVER_SETTLES_MESSAGE, truncated: false };
       }
       if (state.type === "rejected") {
-        state.error.dispose();
-        return undefined;
+        // Only the guest's own bounding of the result can fail here, which is
+        // how a result too big to flatten shows up. It is reported as it is.
+        return this.packFailure(context, guest.fail, state.error);
       }
 
       const raw = readString(context, state.value);
