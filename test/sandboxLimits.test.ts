@@ -53,6 +53,10 @@ describe("memory limits", () => {
       while (true) kept.push(new Array(100000).fill(1));
     `,
     "one huge string": `"x".repeat(2 ** 29).length`,
+    "a string doubled until it cannot grow": `
+      let s = "x";
+      while (true) s += s;
+    `,
     "one huge typed array": `new Uint8Array(2 ** 30).length`,
     "array buffers in a loop": `
       const kept = [];
@@ -86,6 +90,17 @@ describe("memory limits", () => {
       await expectStillHealthy();
     });
   }
+
+  test("reports a result too big to flatten as the memory limit, not as an unreadable result", async () => {
+    // A doubled string costs almost nothing to build, and holding it as text needs the memory it does not have.
+    const { result } = await timed(`let s = "x"; for (let i = 0; i < 28; i++) s += s; s`);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Sandbox exceeded its memory limit.");
+    }
+    await expectStillHealthy();
+  });
 
   test("honours a lower configured limit", async () => {
     const small = new QuickJsSandboxService({ memoryLimitBytes: 4 * 1024 * 1024 });
