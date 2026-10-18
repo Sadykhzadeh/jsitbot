@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { createApiGuard, type ApiPolicy } from "../src/runtime/telegramApi";
 import { FakeClock, settle } from "./fakeClock";
 
-const POLICY: ApiPolicy = { sendsPerSecond: 10, attempts: 3, maxWaitMs: 5_000 };
+const POLICY: ApiPolicy = { sendsPerSecond: 10, attempts: 3, maxWaitMs: 5_000, pollSlackMs: 50 };
 
 const ok = { ok: true, result: true } as const;
 const tooMany = (seconds: number) =>
@@ -196,7 +196,34 @@ describe("server errors and lost connections", () => {
   });
 });
 
-describe("polling", () => {
+describe("long polling", () => {
+  test("gives up on a poll that nobody answers once its own timeout and the slack are over", async () => {
+    const guard = createApiGuard(POLICY, new FakeClock());
+    let signal: AbortSignal | undefined;
+    const previous = (_method: string, _payload: unknown, given: AbortSignal) =>
+      new Promise((_resolve, reject) => {
+        signal = given;
+        given.addEventListener("abort", () => reject(new Error("deadline")));
+      });
+
+    const result = guard.transformer(previous as never, "getUpdates", { timeout: 0 } as never, undefined);
+
+    await expect(result).rejects.toThrow("deadline");
+    expect(signal?.aborted).toBe(true);
+  });
+
+  test("still stops when the bot is stopped", async () => {
+    const guard = createApiGuard({ ...POLICY, pollSlackMs: 60_000 }, new FakeClock());
+    const stop = new AbortController();
+    const previous = (_method: string, _payload: unknown, given: AbortSignal) =>
+      new Promise((_resolve, reject) => given.addEventListener("abort", () => reject(new Error("stopped"))));
+
+    const result = guard.transformer(previous as never, "getUpdates", { timeout: 30 } as never, stop.signal as never);
+    stop.abort();
+
+    await expect(result).rejects.toThrow("stopped");
+  });
+
   test("is not paced or retried", async () => {
     const { tries, call } = setup([failed(502)]);
 
