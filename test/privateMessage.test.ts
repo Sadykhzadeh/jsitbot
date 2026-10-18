@@ -14,8 +14,17 @@ describe("private messages", () => {
     expect(replies[0].payload.chat_id).toBe(USER_ID);
     expect(replies[0].payload.text).toContain("*Result*");
     expect(replies[0].payload.text).toContain("42");
-    expect(replies[0].payload.reply_parameters).toEqual({ message_id: 77 });
+    expect(replies[0].payload.reply_parameters).toEqual({ message_id: 77, allow_sending_without_reply: true });
     expect(replies[0].payload.parse_mode).toBe("MarkdownV2");
+  });
+
+  test("still answers when the message it replies to has been deleted meanwhile", async () => {
+    const harness = createHarness({ deletedReplyTargets: true });
+
+    await harness.sendMessage("6 * 7", 77);
+
+    const [reply] = harness.callsTo("sendMessage");
+    expect(reply.payload.reply_parameters.allow_sending_without_reply).toBe(true);
   });
 
   test("shows errors the same way", async () => {
@@ -130,7 +139,7 @@ describe("edited messages", () => {
     expect(harness.callsTo("editMessageText")).toHaveLength(0);
     const [reply] = harness.callsTo("sendMessage");
     expect(reply.payload.text).toContain("42");
-    expect(reply.payload.reply_parameters).toEqual({ message_id: 5 });
+    expect(reply.payload.reply_parameters).toEqual({ message_id: 5, allow_sending_without_reply: true });
   });
 
   test("sends a new answer when the old one can no longer be edited", async () => {
