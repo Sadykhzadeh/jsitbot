@@ -30,7 +30,10 @@ let concurrency: ConcurrentMiddleware<Context> | undefined;
 listenForShutdown({
   bot: () => bot,
   beforeStop: () => concurrency?.close(),
-  activity: { pending: () => apiGuard.stats.pending, lastAt: () => apiGuard.stats.lastActivityAt },
+  activity: {
+    pending: () => apiGuard.stats.pending + (concurrency?.inProgress() ?? 0),
+    lastAt: () => apiGuard.stats.lastActivityAt,
+  },
   policy: {
     graceMs: env.shutdown.graceMs,
     // A run shows nothing to Telegram until it is over: its time limit, the
