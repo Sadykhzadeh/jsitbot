@@ -34,9 +34,6 @@ const REPEATABLE = new Set([
   "deleteWebhook",
 ]);
 
-// Polling has its own back-off in grammY and must not be held up here.
-const UNTOUCHED = new Set(["getUpdates"]);
-
 const SERVER_ERROR_BACKOFF_MS = 250;
 
 export interface ApiStats {
@@ -56,14 +53,43 @@ export interface ApiStats {
  * Sits between the bot and Telegram. It spaces out the calls that send messages
  * so a burst cannot go over the limit and have most of its answers refused, and
  * it makes a call again when Telegram asks the bot to wait, once that wait is
- * over. When Telegram does say to wait, every paced call waits with it, not only
- * the one that was refused.
+ * over. The wait is kept for the chat that was refused: the limit that answers
+ * with it is mostly the per-chat one (a busy group), and holding every chat for
+ * one of them would let a single group slow down everybody's answers.
  */
 export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
   const interval = 1_000 / policy.sendsPerSecond;
   // The earliest moment the next paced call may go out.
   let nextSlot = 0;
+  // Chats Telegram asked the bot to leave alone for a while, and until when.
+  const holds = new Map<unknown, number>();
   const stats: ApiStats = { pending: 0, peakPending: 0, rateLimited: 0, failedOver: 0, lastActivityAt: clock.now() };
+
+  async function waitOutHold(chat: unknown): Promise<void> {
+    for (;;) {
+      const until = chat === undefined ? undefined : holds.get(chat);
+      const left = until === undefined ? 0 : until - clock.now();
+      if (left <= 0) {
+        holds.delete(chat);
+        return;
+      }
+      await clock.sleep(left);
+    }
+  }
+
+  function hold(chat: unknown, ms: number): void {
+    if (chat === undefined) {
+      return;
+    }
+    if (holds.size > 1_000) {
+      for (const [key, until] of holds) {
+        if (until <= clock.now()) {
+          holds.delete(key);
+        }
+      }
+    }
+    holds.set(chat, Math.max(holds.get(chat) ?? 0, clock.now() + ms));
+  }
 
   async function takeTurn(): Promise<void> {
     const now = clock.now();
@@ -75,21 +101,20 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
     }
   }
 
-  function holdAll(ms: number): void {
-    nextSlot = Math.max(nextSlot, clock.now() + ms);
-  }
-
   const transformer: Transformer = async (previous, method, payload, signal) => {
-    if (UNTOUCHED.has(method)) {
+    // Polling has its own back-off in grammY and must not be held up here.
+    if (method === "getUpdates") {
       return previous(method, payload, signal);
     }
 
+    const chat = (payload as { chat_id?: unknown }).chat_id;
     stats.pending++;
     stats.peakPending = Math.max(stats.peakPending, stats.pending);
     stats.lastActivityAt = clock.now();
     try {
       for (let attempt = 1; ; attempt++) {
         if (PACED.has(method)) {
+          await waitOutHold(chat);
           await takeTurn();
         }
 
@@ -115,7 +140,7 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
             return response;
           }
           stats.rateLimited++;
-          holdAll(waitMs);
+          hold(chat, waitMs);
           await clock.sleep(waitMs);
           continue;
         }
