@@ -27,6 +27,8 @@ export interface HarnessOptions {
   apiLatencyMs?: number;
   /** Methods that should fail, with the error text Telegram would give. */
   failures?: Record<string, string>;
+  /** Telegram refuses a reply to a message that was deleted, unless the reply allows being sent without one. */
+  deletedReplyTargets?: boolean;
 }
 
 /**
@@ -57,6 +59,10 @@ export function createHarness(options: HarnessOptions = {}) {
     const failure = options.failures?.[method];
     if (failure) {
       return { ok: false, error_code: 400, description: failure } as any;
+    }
+    const reply = body.reply_parameters as { allow_sending_without_reply?: boolean } | undefined;
+    if (options.deletedReplyTargets && method === "sendMessage" && reply && !reply.allow_sending_without_reply) {
+      return { ok: false, error_code: 400, description: "Bad Request: message to be replied not found" } as any;
     }
     if (method === "sendMessage") {
       return {

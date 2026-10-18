@@ -69,7 +69,9 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
 
     const sent = await api.sendMessage(request.chatId, answer.text, {
       parse_mode: answer.parseMode,
-      ...(answer.quote ? { reply_parameters: { message_id: request.messageId } } : {}),
+      ...(answer.quote
+        ? { reply_parameters: { message_id: request.messageId, allow_sending_without_reply: true } }
+        : {}),
     });
     return sent.message_id;
   }
