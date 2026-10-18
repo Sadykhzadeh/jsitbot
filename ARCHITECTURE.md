@@ -50,6 +50,7 @@ A group has many people in it and most of what they write is not code for the bo
 - the limits are the ones of private messages and the counters are shared (`src/bot/runner.ts`), so a user gets no more by mixing the two
 - a user who is over the request limit or the sandbox time budget gets no answer in a group, since an answer there is one more message for everybody; a message over the length limit does get one
 - an edit of the `/run` message is not run again
+- in a private chat, a `/run` whose output does not fit gets the whole output as `output.txt` after the answer, as an ordinary message does; in a group it does not, since the file would be one more message for everybody
 
 ## Inline Query Flow
 

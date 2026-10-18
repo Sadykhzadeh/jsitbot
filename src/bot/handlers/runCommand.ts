@@ -3,6 +3,7 @@ import type { Message } from "grammy/types";
 
 import { rateKey, createRunner, type RunnerOptions } from "../runner";
 import { stripCodeFence } from "../codeInput";
+import { sendWholeOutput } from "../wholeOutput";
 
 interface RunCommandOptions extends RunnerOptions {
   botUsername: string;
@@ -103,6 +104,11 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
       return;
     }
 
-    await reply(outcome.message.text, outcome.ran || !inPrivate);
+    const answer = await reply(outcome.message.text, outcome.ran || !inPrivate);
+
+    // A file in a group would be one more message for everybody, so only a private chat gets one.
+    if (inPrivate && outcome.ran && outcome.document !== undefined) {
+      await sendWholeOutput(ctx.api, ctx.chat.id, answer.message_id, outcome.document);
+    }
   });
 }

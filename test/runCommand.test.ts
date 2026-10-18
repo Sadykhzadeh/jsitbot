@@ -26,9 +26,10 @@ function createBotUnderTest(options: { maxRequests?: number } = {}) {
     } as UserFromGetMe,
   });
   const calls: { method: string; payload: Record<string, any> }[] = [];
+  let nextSentId = 5_000;
   bot.api.config.use(async (_previous, method, payload) => {
     calls.push({ method, payload: payload as Record<string, any> });
-    return { ok: true, result: { message_id: 5_000, date: 0, chat: { id: 1, type: "private" } } } as any;
+    return { ok: true, result: { message_id: nextSentId++, date: 0, chat: { id: 1, type: "private" } } } as any;
   });
 
   const shared = {
@@ -46,6 +47,7 @@ function createBotUnderTest(options: { maxRequests?: number } = {}) {
   let messageId = 10;
   return {
     sent: () => calls.filter((call) => call.method === "sendMessage").map((call) => call.payload),
+    documents: () => calls.filter((call) => call.method === "sendDocument").map((call) => ({ payload: call.payload })),
 
     async say(
       text: string,
@@ -228,5 +230,35 @@ describe("the same commands in a private chat", () => {
 
     expect(chat.sent()).toHaveLength(1);
     expect(chat.sent()[0].text).toContain("4");
+  });
+});
+
+describe("output that does not fit, from /run", () => {
+  const LONG_OUTPUT = 'for (let i = 0; i < 3; i++) console.log(String(i).repeat(1500)); "done"';
+
+  test("a private chat gets the whole output as a file after the answer, as a private message does", async () => {
+    const chat = createBotUnderTest();
+
+    await chat.say(`/run ${LONG_OUTPUT}`, { chat: "private" });
+
+    const [reply] = chat.sent();
+    expect(reply.text).toContain("truncated");
+    const [file] = chat.documents();
+    expect(file).toBeDefined();
+    expect(file.payload.document.filename).toBe("output.txt");
+    expect(file.payload.reply_parameters.message_id).toBe(5_000);
+    const text = new TextDecoder().decode((await file.payload.document.toRaw()) as Uint8Array);
+    for (const digit of ["0", "1", "2"]) {
+      expect(text).toContain(digit.repeat(1500));
+    }
+  });
+
+  test("a group does not get the file, since it would be one more message for everybody", async () => {
+    const chat = createBotUnderTest();
+
+    await chat.say(`/run ${LONG_OUTPUT}`);
+
+    expect(chat.sent()[0].text).toContain("truncated");
+    expect(chat.documents()).toHaveLength(0);
   });
 });
