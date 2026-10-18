@@ -20,10 +20,12 @@ interface UserQueue {
  * at once instead.
  *
  * An update from one user still waits for that user's earlier ones, so an edit
- * is handled after the run it edits and replies come in order. A user who has
- * `perUser` updates in progress gets the next ones dropped: that is a flood, and
- * answering each would cost more than what it is worth. When `limit` updates are
- * in progress, polling waits for a free place.
+ * is handled after the run it edits and replies come in order. Such an update
+ * takes a place only once the earlier one is done, so a user's queue cannot
+ * hold every place while it waits. A user who has `perUser` updates in progress
+ * or waiting gets the next ones dropped: that is a flood, and answering each
+ * would cost more than what it is worth. When `limit` updates are in progress,
+ * polling waits for a free place.
  */
 export function handleConcurrently<C extends Context>(
   bot: Bot<C>,
@@ -32,6 +34,14 @@ export function handleConcurrently<C extends Context>(
   const users = new Map<number, UserQueue>();
   const waiting: Array<() => void> = [];
   let running = 0;
+
+  function takePlace(): Promise<void> {
+    if (running < policy.limit) {
+      running++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => waiting.push(resolve));
+  }
 
   function release(): void {
     const next = waiting.shift();
@@ -52,30 +62,30 @@ export function handleConcurrently<C extends Context>(
 
   return async (ctx, next) => {
     const userId = ctx.from?.id;
-    if (userId !== undefined && (users.get(userId)?.count ?? 0) >= policy.perUser) {
-      return;
+    let own: UserQueue | undefined;
+    if (userId !== undefined) {
+      own = users.get(userId);
+      if (own && own.count >= policy.perUser) {
+        return;
+      }
+      if (!own) {
+        own = { tail: Promise.resolve(), count: 0 };
+        users.set(userId, own);
+      }
     }
 
-    if (running >= policy.limit) {
-      await new Promise<void>((resolve) => waiting.push(resolve));
-    } else {
-      running++;
-    }
-
-    // Looked up only now: the user's earlier updates may have finished while
-    // this one waited for a place.
-    let own = userId === undefined ? undefined : users.get(userId);
-    if (userId !== undefined && !own) {
-      own = { tail: Promise.resolve(), count: 0 };
-      users.set(userId, own);
-    }
-
-    const before = own?.tail ?? Promise.resolve();
+    // Counted from here on, so an update that waits for a place counts too.
+    const earlier = own && own.count > 0 ? own.tail : undefined;
     if (own) {
       own.count++;
     }
 
-    const finished = before
+    const place = earlier ? earlier.then(takePlace) : takePlace();
+    if (!earlier) {
+      await place;
+    }
+
+    const finished = place
       .then(() => next())
       .catch((error) => report(error, ctx))
       .finally(() => {
