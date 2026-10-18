@@ -13,6 +13,13 @@ interface UserQueue {
   count: number;
 }
 
+interface PendingEdit {
+  /** The arrival number of the newest edit of this message. */
+  latest: number;
+  /** Edits of this message that have arrived and are not finished. */
+  pending: number;
+}
+
 /**
  * grammY hands updates to the handlers one at a time, and a handler is not done
  * until Telegram has taken its reply, so the bot spent nearly all of its time
@@ -24,16 +31,21 @@ interface UserQueue {
  * takes a place only once the earlier one is done, so a user's queue cannot
  * hold every place while it waits. A user who has `perUser` updates in progress
  * or waiting gets the next ones dropped: that is a flood, and answering each
- * would cost more than what it is worth. When `limit` updates are in progress,
- * polling waits for a free place.
+ * would cost more than what it is worth. An edit of a message that already has
+ * an edit waiting is not dropped, since it replaces that one: an edit that was
+ * dropped would leave the answer to the message showing an earlier version of
+ * it. Of several edits of one message only the newest is handled, when its turn
+ * comes. When `limit` updates are in progress, polling waits for a free place.
  */
 export function handleConcurrently<C extends Context>(
   bot: Bot<C>,
   policy: ConcurrencyPolicy,
 ): MiddlewareFn<C> {
   const users = new Map<number, UserQueue>();
+  const editsPending = new Map<string, PendingEdit>();
   const waiting: Array<() => void> = [];
   let running = 0;
+  let arrivals = 0;
 
   function takePlace(): Promise<void> {
     if (running < policy.limit) {
@@ -62,16 +74,30 @@ export function handleConcurrently<C extends Context>(
 
   return async (ctx, next) => {
     const userId = ctx.from?.id;
+    const editKey =
+      ctx.editedMessage !== undefined ? `${ctx.editedMessage.chat.id}:${ctx.editedMessage.message_id}` : undefined;
+    const pendingEdit = editKey === undefined ? undefined : editsPending.get(editKey);
+
     let own: UserQueue | undefined;
     if (userId !== undefined) {
       own = users.get(userId);
-      if (own && own.count >= policy.perUser) {
+      if (own && own.count >= policy.perUser && !pendingEdit) {
         return;
       }
       if (!own) {
         own = { tail: Promise.resolve(), count: 0 };
         users.set(userId, own);
       }
+    }
+
+    let edit: PendingEdit | undefined;
+    let arrival = 0;
+    if (editKey !== undefined) {
+      edit = pendingEdit ?? { latest: 0, pending: 0 };
+      edit.pending++;
+      arrival = ++arrivals;
+      edit.latest = arrival;
+      editsPending.set(editKey, edit);
     }
 
     // Counted from here on, so an update that waits for a place counts too.
@@ -86,9 +112,12 @@ export function handleConcurrently<C extends Context>(
     }
 
     const finished = place
-      .then(() => next())
+      .then(() => (edit && edit.latest !== arrival ? undefined : next()))
       .catch((error) => report(error, ctx))
       .finally(() => {
+        if (edit && editKey !== undefined && --edit.pending === 0) {
+          editsPending.delete(editKey);
+        }
         if (own && --own.count === 0 && userId !== undefined) {
           users.delete(userId);
         }

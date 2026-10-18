@@ -156,6 +156,32 @@ describe("handling updates concurrently", () => {
     expect(handled.filter((text) => text !== "holder")).toEqual(["1", "2", "3"]);
   });
 
+  test("edits of different messages are still held to the per-user limit", async () => {
+    const { bot, poll } = createBot({ limit: 8, perUser: 3 });
+    const handled: number[] = [];
+    bot.on("edited_message", async (ctx) => {
+      await sleep(30);
+      handled.push(ctx.editedMessage.message_id);
+    });
+
+    const edit = (messageId: number): Update => ({
+      update_id: 500 + messageId,
+      edited_message: {
+        message_id: messageId,
+        date: 0,
+        edit_date: 1,
+        chat: { id: 9, type: "private", first_name: "U" },
+        from: { id: 9, is_bot: false, first_name: "U" },
+        text: "x",
+      },
+    });
+    await poll(edit(1), edit(2), edit(3), edit(4), edit(5));
+    await until(() => handled.length === 3);
+    await sleep(60);
+
+    expect([...handled].sort()).toEqual([1, 2, 3]);
+  });
+
   test("one user's queued updates do not keep the other places from a different user", async () => {
     const { bot, message, poll } = createBot({ limit: 2, perUser: 3 });
     const finished: string[] = [];
@@ -244,6 +270,21 @@ describe("with the real handlers", () => {
 
     expect(harness.callsTo("sendMessage")).toHaveLength(1);
     expect(harness.callsTo("editMessageText")[0].payload.text).toContain("42");
+  });
+
+  test("the last of several quick edits is the one that is answered", async () => {
+    const harness = createHarness({ concurrency: policy, sandbox: slowSandbox(40) });
+
+    await harness.sendMessage("1 + 1", 5);
+    await harness.editMessage("2 + 2", 5);
+    await harness.editMessage("3 + 3", 5);
+    await harness.editMessage("4 + 4", 5);
+    await harness.editMessage("5 + 5", 5);
+    await sleep(300);
+
+    const texts = harness.callsTo("editMessageText").map((call) => call.payload.text as string);
+    expect(texts.at(-1)).toContain("10");
+    expect(harness.callsTo("sendMessage")).toHaveLength(1);
   });
 
   test("answers many users in the time Telegram needs for a few", async () => {
