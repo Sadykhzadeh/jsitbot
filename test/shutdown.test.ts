@@ -255,6 +255,51 @@ describe("stopping in the middle of a batch", () => {
     expect(offsets.at(-1)).toBe(2);
     expect(exits).toEqual([0]);
   });
+
+  test("an update taken before the stop is answered before the process exits, however long it takes", async () => {
+    const bot = new Bot("1:test", {
+      botInfo: { id: 1, is_bot: true, first_name: "B", username: "b" } as UserFromGetMe,
+    });
+    const sent: string[] = [];
+    const exits: Array<{ code: number; sent: number }> = [];
+    let served = false;
+
+    bot.api.config.use(async (_previous, method, payload) => {
+      if (method === "sendMessage") {
+        sent.push((payload as { text: string }).text);
+      }
+      if (method !== "getUpdates") {
+        return { ok: true, result: true } as never;
+      }
+      const result = served ? [] : [messageUpdate(1)];
+      served = true;
+      return { ok: true, result } as never;
+    });
+    const concurrency = handleConcurrently(bot, { limit: 8, perUser: 3 });
+    bot.use(concurrency);
+
+    // The run takes far longer than the quiet time, and nothing reaches Telegram until it is over.
+    const shutdown = createShutdown({
+      bot: () => bot,
+      beforeStop: () => concurrency.close(),
+      activity: { pending: () => concurrency.inProgress(), lastAt: () => 0 },
+      policy: { graceMs: 2_000, quietMs: 50 },
+      exit: (code) => void exits.push({ code, sent: sent.length }),
+      log: () => undefined,
+    });
+    bot.on("message", async (ctx) => {
+      void shutdown("SIGTERM");
+      await sleep(200);
+      await ctx.reply("done");
+    });
+
+    await bot.start({ allowed_updates: ["message"] });
+    for (let waited = 0; exits.length === 0 && waited < 3_000; waited += 10) {
+      await sleep(10);
+    }
+
+    expect(exits).toEqual([{ code: 0, sent: 1 }]);
+  });
 });
 
 // A real process and a real signal; Windows has no SIGTERM to send.

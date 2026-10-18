@@ -44,6 +44,8 @@ export type ConcurrentMiddleware<C extends Context> = MiddlewareFn<C> & {
    * taken still run to the end.
    */
   close(): void;
+  /** Updates taken and not finished yet, the ones waiting for a place or for an earlier one of the user included. */
+  inProgress(): number;
 };
 
 export function handleConcurrently<C extends Context>(
@@ -56,6 +58,7 @@ export function handleConcurrently<C extends Context>(
   let running = 0;
   let arrivals = 0;
   let closed = false;
+  let taken = 0;
 
   function takePlace(): Promise<void> {
     if (running < policy.limit) {
@@ -114,6 +117,7 @@ export function handleConcurrently<C extends Context>(
       editsPending.set(editKey, edit);
     }
 
+    taken++;
     // Counted from here on, so an update that waits for a place counts too.
     const earlier = own && own.count > 0 ? own.tail : undefined;
     if (own) {
@@ -129,6 +133,7 @@ export function handleConcurrently<C extends Context>(
       .then(() => (edit && edit.latest !== arrival ? undefined : next()))
       .catch((error) => report(error, ctx))
       .finally(() => {
+        taken--;
         if (edit && editKey !== undefined && --edit.pending === 0) {
           editsPending.delete(editKey);
         }
@@ -147,5 +152,6 @@ export function handleConcurrently<C extends Context>(
     close(): void {
       closed = true;
     },
+    inProgress: () => taken,
   });
 }
