@@ -19,10 +19,10 @@ const failed = (code: number) => ({ ok: false, error_code: code, description: "b
 function setup(answers: Array<unknown> = []) {
   const clock = new FakeClock();
   const guard = createApiGuard(POLICY, clock);
-  const tries: Array<{ method: string; at: number }> = [];
+  const tries: Array<{ method: string; at: number; chat?: unknown }> = [];
 
-  const previous = async (method: string) => {
-    tries.push({ method, at: clock.now() });
+  const previous = async (method: string, payload: { chat_id?: unknown }) => {
+    tries.push({ method, at: clock.now(), chat: payload.chat_id });
     const answer = answers.length > 0 ? answers.shift() : ok;
     if (answer instanceof Error) {
       throw answer;
@@ -30,8 +30,8 @@ function setup(answers: Array<unknown> = []) {
     return answer as never;
   };
 
-  const call = (method: string, signal?: AbortSignal): Promise<unknown> =>
-    guard.transformer(previous as never, method as never, {} as never, signal);
+  const call = (method: string, signal?: AbortSignal, chat?: number): Promise<unknown> =>
+    guard.transformer(previous as never, method as never, { chat_id: chat } as never, signal as never);
 
   return { clock, guard, tries, call };
 }
@@ -95,17 +95,24 @@ describe("when Telegram says to wait", () => {
     expect(guard.stats.rateLimited).toBe(1);
   });
 
-  test("holds back the other sends too, not only the one that was refused", async () => {
+  test("holds back the other sends to that chat, and only that chat", async () => {
     const { clock, tries, call } = setup([tooMany(2)]);
 
-    const first = call("sendMessage");
+    const first = call("sendMessage", undefined, 1);
     await clock.advance(500);
-    const second = call("sendMessage");
+    const sameChat = call("sendMessage", undefined, 1);
+    const otherChat = call("sendMessage", undefined, 2);
     await clock.advance(5_000);
-    await Promise.all([first, second]);
+    await Promise.all([first, sameChat, otherChat]);
 
-    // The second call went out only after the wait the first one was told about.
-    expect(tries.map((t) => t.at)).toEqual([0, 2_000, 2_100]);
+    // The refused chat is left alone for the two seconds Telegram named; the
+    // other chat's answer did not have to wait for them.
+    expect(tries.map((t) => [t.chat, t.at])).toEqual([
+      [1, 0],
+      [2, 500],
+      [1, 2_000],
+      [1, 2_100],
+    ]);
   });
 
   test("gives the error back when the wait is longer than the bot will sit out", async () => {
@@ -185,6 +192,15 @@ describe("server errors and lost connections", () => {
     controller.abort();
 
     await expect(call("editMessageText", controller.signal)).rejects.toThrow("aborted");
+    expect(tries).toHaveLength(1);
+  });
+});
+
+describe("polling", () => {
+  test("is not paced or retried", async () => {
+    const { tries, call } = setup([failed(502)]);
+
+    expect(await call("getUpdates")).toEqual(failed(502));
     expect(tries).toHaveLength(1);
   });
 });
