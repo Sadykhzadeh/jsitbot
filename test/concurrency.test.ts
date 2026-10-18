@@ -140,6 +140,37 @@ describe("handling updates concurrently", () => {
     expect([...handled].sort()).toEqual(["1", "2", "3", "other user"]);
   });
 
+  test("drops a user's updates beyond the per-user limit even while every place is taken", async () => {
+    const { bot, message, poll } = createBot({ limit: 1, perUser: 3 });
+    const handled: string[] = [];
+    bot.on("message:text", async (ctx) => {
+      await sleep(ctx.message.text === "holder" ? 80 : 5);
+      handled.push(ctx.message.text);
+    });
+
+    void poll(message(2, "holder"));
+    await sleep(5);
+    await poll(...["1", "2", "3", "4", "5"].map((text) => message(1, text)));
+    await sleep(300);
+
+    expect(handled.filter((text) => text !== "holder")).toEqual(["1", "2", "3"]);
+  });
+
+  test("one user's queued updates do not keep the other places from a different user", async () => {
+    const { bot, message, poll } = createBot({ limit: 2, perUser: 3 });
+    const finished: string[] = [];
+    bot.on("message:text", async (ctx) => {
+      await sleep(ctx.message.text.startsWith("slow") ? 60 : 5);
+      finished.push(ctx.message.text);
+    });
+
+    await poll(message(1, "slow a"), message(1, "slow b"), message(1, "slow c"));
+    await poll(message(2, "quick"));
+    await until(() => finished.length === 4);
+
+    expect(finished.indexOf("quick")).toBeLessThan(finished.indexOf("slow b"));
+  });
+
   test("a user can send again once earlier updates have finished", async () => {
     const { bot, message, poll } = createBot({ limit: 8, perUser: 1 });
     const handled: string[] = [];
