@@ -1,10 +1,11 @@
-import { GrammyError, InputFile, type Api, type Bot } from "grammy";
+import { GrammyError, type Api, type Bot } from "grammy";
 import type { ParseMode } from "grammy/types";
 
 import { stripCodeFence } from "../codeInput";
 import { isBotCommand } from "../commands";
 import { ReplyTracker, type TrackedReply } from "../replyTracker";
 import { createRunner, type RunnerOptions } from "../runner";
+import { sendWholeOutput } from "../wholeOutput";
 
 interface PrivateMessageHandlerOptions extends RunnerOptions {
   botUserId: number;
@@ -94,17 +95,7 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       return undefined;
     }
 
-    try {
-      const sent = await api.sendDocument(chatId, new InputFile(Buffer.from(document, "utf8"), "output.txt"), {
-        caption: "The whole output",
-        reply_parameters: { message_id: replyId, allow_sending_without_reply: true },
-      });
-      return sent.message_id;
-    } catch (error) {
-      // The answer is already there; the file is only a bonus.
-      console.error("Could not send the output file:", error);
-      return undefined;
-    }
+    return sendWholeOutput(api, chatId, replyId, document);
   }
 
   async function run(api: Api, request: Request, earlier: TrackedReply | undefined): Promise<void> {
