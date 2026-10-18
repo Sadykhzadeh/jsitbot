@@ -57,6 +57,11 @@ export async function drain(
 export interface ShutdownHooks {
   /** The bot, once there is one. A signal before that has nothing to stop. */
   bot(): Bot | undefined;
+  /**
+   * Runs right before polling is stopped. Whatever it stops taking here is left
+   * for the next start, which is why it has to run before the offset is confirmed.
+   */
+  beforeStop?(): void;
   activity: Activity;
   policy: ShutdownPolicy;
   exit?: (code: number) => void;
@@ -95,6 +100,7 @@ export function createShutdown(hooks: ShutdownHooks): (signal: string) => Promis
     // The wait is bounded even if Telegram does not answer the call that stops polling.
     const bound = clock.sleep(hooks.policy.graceMs + 1_000).then(() => "bound" as const);
     const finished = (async () => {
+      hooks.beforeStop?.();
       await bot.stop().catch((error: unknown) => {
         log(`Could not confirm the last update to Telegram: ${error instanceof Error ? error.message : "unknown error"}`);
       });

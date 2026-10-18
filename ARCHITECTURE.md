@@ -96,7 +96,7 @@ flowchart TD
 
 ## Starting and Stopping
 
-- On SIGTERM or SIGINT the bot stops polling, which also tells Telegram which updates it has taken, and then waits for the answers in progress. A message that was taken but not answered before the process exits is never sent again, so the wait is what keeps a restart from losing it.
+- On SIGTERM or SIGINT the bot stops polling, which also tells Telegram which updates it has taken, and then waits for the answers in progress. The rest of a batch Telegram handed over at the same time is not taken: those updates are left for the next start, since they are not confirmed, and answering them now would answer them twice. A message that was taken but not answered before the process exits is never sent again, so the wait is what keeps a restart from losing it.
 - A run shows nothing to Telegram until it is over, so "nothing left" means no call to Telegram in progress and none started for the time limit plus 400 ms (the 150 ms the sandbox allows past it, the restart of its process after a kill, and some room). An idle bot exits about 1.2 s after the signal.
 - After 8 s the bot exits with status 1 whatever is left, and a second signal exits at once. A signal while the bot is still starting exits immediately: nothing has been taken yet.
 - Pending updates are not dropped on start. Telegram keeps what arrived while the bot was down for 24 hours, and a restart takes seconds, so those messages are answered; a user who sent code during a deploy gets the answer. The per-user and sandbox-time limits apply to them like to any others.
