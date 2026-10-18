@@ -1,8 +1,8 @@
-import { Bot } from "grammy";
+import { Bot, type Context } from "grammy";
 
 import type { AppEnv } from "../config/env";
 import { publishCommandMenus } from "./commandMenu";
-import { handleConcurrently } from "./concurrency";
+import { type ConcurrentMiddleware, handleConcurrently } from "./concurrency";
 import { registerInlineQueryHandler } from "./handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "./handlers/privateMessage";
 import { registerRunCommandHandler } from "./handlers/runCommand";
@@ -10,7 +10,9 @@ import { registerStartHelpHandlers } from "./handlers/startHelp";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../security/rateLimiter";
 import { createSandbox } from "../services/sandbox/createSandbox";
 
-export async function createBot(config: AppEnv): Promise<Bot> {
+export async function createBot(
+  config: AppEnv,
+): Promise<{ bot: Bot; concurrency: ConcurrentMiddleware<Context> }> {
   const bot = new Bot(config.botToken);
   const me = await bot.api.getMe();
   const botUsername = me.username ?? "jsitbot";
@@ -29,7 +31,8 @@ export async function createBot(config: AppEnv): Promise<Bot> {
   // The menu is a convenience: starting must not wait for it or fail without it.
   publishCommandMenus(bot.api).catch((error) => console.error("Could not publish the command menu:", error));
 
-  bot.use(handleConcurrently(bot, config.limits.concurrency));
+  const concurrency = handleConcurrently(bot, config.limits.concurrency);
+  bot.use(concurrency);
 
   registerStartHelpHandlers(bot, botUsername);
   // Before the private handler, so that "/run" and "@bot" are taken out of the
@@ -67,5 +70,5 @@ export async function createBot(config: AppEnv): Promise<Bot> {
     console.error("Bot error:", error.error);
   });
 
-  return bot;
+  return { bot, concurrency };
 }

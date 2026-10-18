@@ -37,15 +37,25 @@ interface PendingEdit {
  * it. Of several edits of one message only the newest is handled, when its turn
  * comes. When `limit` updates are in progress, polling waits for a free place.
  */
+export type ConcurrentMiddleware<C extends Context> = MiddlewareFn<C> & {
+  /**
+   * Stops taking updates: one that reaches the middleware after this is left
+   * unhandled, so Telegram offers it again to the next start. Updates already
+   * taken still run to the end.
+   */
+  close(): void;
+};
+
 export function handleConcurrently<C extends Context>(
   bot: Bot<C>,
   policy: ConcurrencyPolicy,
-): MiddlewareFn<C> {
+): ConcurrentMiddleware<C> {
   const users = new Map<number, UserQueue>();
   const editsPending = new Map<string, PendingEdit>();
   const waiting: Array<() => void> = [];
   let running = 0;
   let arrivals = 0;
+  let closed = false;
 
   function takePlace(): Promise<void> {
     if (running < policy.limit) {
@@ -72,7 +82,11 @@ export function handleConcurrently<C extends Context>(
     }
   }
 
-  return async (ctx, next) => {
+  const middleware: MiddlewareFn<C> = async (ctx, next) => {
+    if (closed) {
+      return;
+    }
+
     const userId = ctx.from?.id;
     const editKey =
       ctx.editedMessage !== undefined ? `${ctx.editedMessage.chat.id}:${ctx.editedMessage.message_id}` : undefined;
@@ -128,4 +142,10 @@ export function handleConcurrently<C extends Context>(
       own.tail = finished;
     }
   };
+
+  return Object.assign(middleware, {
+    close(): void {
+      closed = true;
+    },
+  });
 }

@@ -1,7 +1,8 @@
-import { GrammyError, HttpError, type Bot } from "grammy";
+import { GrammyError, HttpError, type Bot, type Context } from "grammy";
 
 import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
+import type { ConcurrentMiddleware } from "./bot/concurrency";
 import { logBotError } from "./runtime/logError";
 import { listenForShutdown } from "./runtime/shutdown";
 import { logStatsPeriodically } from "./runtime/stats";
@@ -25,8 +26,10 @@ try {
 const apiGuard = createApiGuard(env.telegramApi);
 
 let bot: Bot | undefined;
+let concurrency: ConcurrentMiddleware<Context> | undefined;
 listenForShutdown({
   bot: () => bot,
+  beforeStop: () => concurrency?.close(),
   activity: { pending: () => apiGuard.stats.pending, lastAt: () => apiGuard.stats.lastActivityAt },
   policy: {
     graceMs: env.shutdown.graceMs,
@@ -38,7 +41,7 @@ listenForShutdown({
 });
 
 try {
-  bot = await createBot(env);
+  ({ bot, concurrency } = await createBot(env));
 } catch (error) {
   // Both of these say what is wrong in a line; a stack trace adds nothing.
   if (error instanceof GrammyError && error.error_code === 401) {

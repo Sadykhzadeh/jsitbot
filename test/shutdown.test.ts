@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { Bot } from "grammy";
+import { Bot } from "grammy";
+import type { Update, UserFromGetMe } from "grammy/types";
 import { fileURLToPath } from "node:url";
 
+import { handleConcurrently } from "../src/bot/concurrency";
 import { startFakeTelegram } from "../scripts/fakeTelegram";
 import { createShutdown, drain, type Activity, type ShutdownPolicy } from "../src/runtime/shutdown";
 import { FakeClock } from "./fakeClock";
@@ -188,6 +190,70 @@ describe("shutdown on a signal", () => {
 
     expect(exits).toEqual([0]);
     expect(stops).toEqual([]);
+  });
+});
+
+// grammY's own polling loop with Telegram replaced by a function that hands out
+// one batch of three updates, and a shutdown that starts while the batch is
+// still being handed over.
+describe("stopping in the middle of a batch", () => {
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const messageUpdate = (id: number): Update => ({
+    update_id: id,
+    message: {
+      message_id: id,
+      date: 0,
+      chat: { id: 9, type: "private", first_name: "u" },
+      from: { id: 9, is_bot: false, first_name: "u" },
+      text: "1 + 1",
+    },
+  });
+
+  test("the updates after the one being taken are not answered, so the next start takes them", async () => {
+    const bot = new Bot("1:test", {
+      botInfo: { id: 1, is_bot: true, first_name: "B", username: "b" } as UserFromGetMe,
+    });
+    const offsets: number[] = [];
+    const handled: number[] = [];
+    const exits: number[] = [];
+    let served = false;
+
+    bot.api.config.use(async (_previous, method, payload) => {
+      if (method !== "getUpdates") {
+        return { ok: true, result: true } as never;
+      }
+      offsets.push((payload as { offset?: number }).offset ?? 0);
+      const result = served ? [] : [1, 2, 3].map(messageUpdate);
+      served = true;
+      return { ok: true, result } as never;
+    });
+    const concurrency = handleConcurrently(bot, { limit: 8, perUser: 3 });
+    bot.use(concurrency);
+
+    const shutdown = createShutdown({
+      bot: () => bot,
+      beforeStop: () => concurrency.close(),
+      activity: { pending: () => 0, lastAt: () => 0 },
+      policy: { graceMs: 2_000, quietMs: 50 },
+      exit: (code) => void exits.push(code),
+      log: () => undefined,
+    });
+    bot.on("message", async (ctx) => {
+      handled.push(ctx.message.message_id);
+      if (ctx.message.message_id === 1) {
+        void shutdown("SIGTERM");
+      }
+    });
+
+    await bot.start({ allowed_updates: ["message"] });
+    for (let waited = 0; exits.length === 0 && waited < 3_000; waited += 10) {
+      await sleep(10);
+    }
+
+    expect(handled).toEqual([1]);
+    expect(offsets.at(-1)).toBe(2);
+    expect(exits).toEqual([0]);
   });
 });
 
