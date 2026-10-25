@@ -45,6 +45,7 @@
   const stringIndexOf = uncurry(String.prototype.indexOf);
   const stringCharCodeAt = uncurry(String.prototype.charCodeAt);
   const numberToString = uncurry(Number.prototype.toString);
+  const numberToFixed = uncurry(Number.prototype.toFixed);
   const functionToString = uncurry(Function.prototype.toString);
   const symbolToString = uncurry(Symbol.prototype.toString);
   const bigintToString = uncurry(BigInt.prototype.toString);
@@ -752,6 +753,47 @@
     write(out + "\n" + rule("└", "┴", "┘"));
   }
 
+  function trace() {
+    if (arguments.length === 0) {
+      write("Trace");
+      return;
+    }
+
+    const details = ["Trace:"];
+    for (let i = 0; i < arguments.length; i++) details[i + 1] = arguments[i];
+    reflectApply(write, undefined, details);
+  }
+
+  // Started timers by label, with the moment each began on the sandbox clock.
+  const timersStarted = Object.create(null);
+
+  function time(label) {
+    const key = label === undefined ? "default" : toText(label);
+    if (timersStarted[key] === undefined) timersStarted[key] = performance.now();
+  }
+
+  function elapsed(key) {
+    const ms = performance.now() - timersStarted[key];
+    return key + ": " + (ms >= 1000 ? numberToFixed(ms / 1000, 3) + "s" : numberToFixed(ms, 3) + "ms");
+  }
+
+  function timeLog(label) {
+    const key = label === undefined ? "default" : toText(label);
+    if (timersStarted[key] === undefined) return;
+
+    const details = [elapsed(key)];
+    for (let i = 1; i < arguments.length; i++) details[i] = arguments[i];
+    reflectApply(write, undefined, details);
+  }
+
+  function timeEnd(label) {
+    const key = label === undefined ? "default" : toText(label);
+    if (timersStarted[key] === undefined) return;
+
+    write(elapsed(key));
+    delete timersStarted[key];
+  }
+
   // Node's second argument is options for the inspector, not another value to print.
   function dir(value) {
     write(value);
@@ -771,6 +813,10 @@
     groupCollapsed: group,
     groupEnd,
     table,
+    trace,
+    time,
+    timeLog,
+    timeEnd,
   });
   Object.defineProperty(globalThis, "console", { value: console, writable: false, configurable: false, enumerable: false });
 
