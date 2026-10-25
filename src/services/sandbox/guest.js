@@ -752,13 +752,18 @@
     write(out + "\n" + rule("└", "┴", "┘"));
   }
 
+  // Node's second argument is options for the inspector, not another value to print.
+  function dir(value) {
+    write(value);
+  }
+
   const console = freeze({
     log: write,
     info: write,
     warn: write,
     error: write,
     debug: write,
-    dir: write,
+    dir,
     assert,
     count,
     countReset,
