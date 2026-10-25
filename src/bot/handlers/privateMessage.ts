@@ -64,7 +64,12 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
         if (isNotModified(error)) {
           return earlier.replyId;
         }
-        // Deleted, or too old to edit: say it again as a new message.
+        // Deleted, or too old to edit, is a 400: say it again as a new message.
+        // Anything else, a server error or a wait too long to sit out, leaves
+        // the earlier answer where it is, and a new one would only repeat it.
+        if (!(error instanceof GrammyError && error.error_code === 400)) {
+          throw error;
+        }
       }
     }
 

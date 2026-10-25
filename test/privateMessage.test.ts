@@ -154,6 +154,30 @@ describe("edited messages", () => {
     expect(harness.callsTo("sendMessage")[1].payload.text).toContain("*Result*");
   });
 
+  test("does not send a second answer when Telegram fails to make the edit", async () => {
+    const harness = createHarness({
+      failures: { editMessageText: "Bad Gateway" },
+      failureCodes: { editMessageText: 502 },
+    });
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("2", 5).catch(() => undefined);
+
+    expect(harness.callsTo("sendMessage")).toHaveLength(1);
+  });
+
+  test("does not send a second answer when the edit is held back by the rate limit", async () => {
+    const harness = createHarness({
+      failures: { editMessageText: "Too Many Requests: retry after 600" },
+      failureCodes: { editMessageText: 429 },
+    });
+
+    await harness.sendMessage("1", 5);
+    await harness.editMessage("2", 5).catch(() => undefined);
+
+    expect(harness.callsTo("sendMessage")).toHaveLength(1);
+  });
+
   test("does not repeat an answer Telegram says is already up to date", async () => {
     const harness = createHarness({
       failures: {
