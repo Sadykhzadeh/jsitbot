@@ -115,3 +115,47 @@ describe("console.dir", () => {
     expect(await logs(`console.dir({ a: 1 }, { depth: 0 })`)).toEqual(["{ a: 1 }"]);
   });
 });
+
+describe("console.time", () => {
+  test("prints the time since console.time on the sandbox clock, so a sleep shows", async () => {
+    const [short, long] = await logs(`
+      console.time("a");
+      console.time();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      console.timeEnd("a");
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      console.timeEnd();
+    `);
+
+    expect(short).toMatch(/^a: 25\d\.\d{3}ms$/);
+    expect(long).toMatch(/^default: 1\.7\d\ds$/);
+  });
+
+  test("timeLog keeps the timer running and adds the values after the time", async () => {
+    const lines = await logs(`console.time("t"); console.timeLog("t", "so far", 1); console.timeEnd("t")`);
+
+    expect(lines[0]).toMatch(/^t: \d+\.\d{3}ms so far 1$/);
+    expect(lines[1]).toMatch(/^t: \d+\.\d{3}ms$/);
+  });
+
+  test("a timer that was never started or is already ended prints nothing", async () => {
+    expect(await logs(`console.timeEnd("none"); console.timeLog("none"); console.time("x"); console.timeEnd("x"); console.timeEnd("x")`)).toHaveLength(1);
+  });
+
+  test("starting a timer again does not restart it", async () => {
+    const [line] = await logs(`
+      console.time("t");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      console.time("t");
+      console.timeEnd("t");
+    `);
+
+    expect(line).toMatch(/^t: 10\d\.\d{3}ms$/);
+  });
+});
+
+describe("console.trace", () => {
+  test("prints its arguments after a Trace label", async () => {
+    expect(await logs(`console.trace("here", 1); console.trace()`)).toEqual(["Trace: here 1", "Trace"]);
+  });
+});
