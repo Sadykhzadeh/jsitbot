@@ -159,3 +159,42 @@ describe("console.trace", () => {
     expect(await logs(`console.trace("here", 1); console.trace()`)).toEqual(["Trace: here 1", "Trace"]);
   });
 });
+
+describe("console.log format specifiers", () => {
+  test("fills %s, %d, %i, %f, %j and %o from the arguments that follow", async () => {
+    expect(
+      await logs(`
+        console.log("%s is %d years, %i whole, %f exact", "Ada", 36.5, 36.5, "36.5abc");
+        console.log("%j and %o", { a: [1] }, { b: 2 });
+        console.log("%s", 5n, "%d", 7);
+      `),
+    ).toEqual(["Ada is 36.5 years, 36 whole, 36.5 exact", '{"a":[1]} and { b: 2 }', "5n %d 7"]);
+  });
+
+  test("%c takes its argument and prints nothing, %% is a percent sign", async () => {
+    expect(await logs(`console.log("%cstyled 100%%", "color: red", "after")`)).toEqual(["styled 100% after"]);
+  });
+
+  test("leaves a specifier with no argument left, and a single string, as it is", async () => {
+    expect(await logs(`console.log("%s and %s", "one"); console.log("100%% %s"); console.log("%d%", 5)`)).toEqual([
+      "one and %s",
+      "100%% %s",
+      "5%",
+    ]);
+  });
+
+  test("does not look for specifiers when the first argument is not a string", async () => {
+    expect(await logs(`console.log(1, "%s", "x"); console.log(["%s"], "x")`)).toEqual(["1 %s x", "[ '%s' ] x"]);
+  });
+
+  test("shows objects, symbols and unparsable numbers the way Node does", async () => {
+    expect(
+      await logs(`
+        console.log("%s %s %s", { a: 1 }, Symbol("s"), -0);
+        console.log("%d %d %i %f", "x", {}, Symbol("s"), "z");
+        const loop = {}; loop.self = loop;
+        console.log("%j", loop);
+      `),
+    ).toEqual(["{ a: 1 } Symbol(s) -0", "NaN NaN NaN NaN", "[Circular]"]);
+  });
+});
