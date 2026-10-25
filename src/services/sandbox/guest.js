@@ -596,6 +596,63 @@
     return out;
   }
 
+  const toNumber = Number;
+  const parseInteger = parseInt;
+  const parseDecimal = parseFloat;
+  const toJson = JSON.stringify;
+
+  // What a % specifier of console.log stands for. Objects are shown, never
+  // converted, so no code of the user's runs to make the number or the string.
+  function substitute(code, argument, state) {
+    switch (code) {
+      case "s":
+        return typeof argument === "string" ? argument : format(argument, 0, state);
+      case "d":
+      case "i":
+      case "f":
+        if (typeof argument === "bigint") return bigintToString(argument) + "n";
+        if (typeof argument === "symbol" || (typeof argument === "object" && argument !== null) || typeof argument === "function") return "NaN";
+        return formatNumber(code === "d" ? toNumber(argument) : code === "i" ? parseInteger(argument) : parseDecimal(argument));
+      case "j":
+        try {
+          const json = toJson(argument);
+          return json === undefined ? "undefined" : json;
+        } catch (ignored) {
+          return "[Circular]";
+        }
+      case "c":
+        return "";
+      default:
+        return format(argument, 0, state);
+    }
+  }
+
+  // The arguments of console.log with its specifiers filled in from the ones
+  // after the first. Returns the text, and how many arguments were used.
+  function fill(args, state) {
+    const template = args[0];
+    let out = "";
+    let from = 0;
+    let used = 1;
+
+    for (let i = 0; i < template.length - 1; i++) {
+      if (stringCharCodeAt(template, i) !== 37) continue;
+
+      const code = template[i + 1];
+      if (code === "%") {
+        out += stringSlice(template, from, i + 1);
+        from = i + 2;
+        i++;
+      } else if (used < args.length && stringIndexOf("sdifjoOc", code) >= 0) {
+        out += stringSlice(template, from, i) + substitute(code, args[used++], state);
+        from = i + 2;
+        i++;
+      }
+    }
+
+    return { text: out + stringSlice(template, from), used };
+  }
+
   function write() {
     if (logCount >= maxLogs) {
       logsCutShort = true;
@@ -605,7 +662,17 @@
 
     const state = { left: maxLogLength, cut: false, stack: [] };
     let line = "";
-    for (let i = 0; i < arguments.length; i++) {
+    let first = 0;
+    if (arguments.length > 1 && typeof arguments[0] === "string" && stringIndexOf(arguments[0], "%") >= 0) {
+      try {
+        const filled = fill(arguments, state);
+        line = filled.text;
+        first = filled.used;
+      } catch (ignored) {
+        line = "";
+      }
+    }
+    for (let i = first; i < arguments.length; i++) {
       const argument = arguments[i];
       let piece;
       try {
