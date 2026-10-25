@@ -109,3 +109,9 @@ describe("console.group", () => {
     expect(await logs(`console.groupCollapsed("g"); console.log("in")`)).toEqual(["g", "  in"]);
   });
 });
+
+describe("console.dir", () => {
+  test("prints the value and leaves out the options", async () => {
+    expect(await logs(`console.dir({ a: 1 }, { depth: 0 })`)).toEqual(["{ a: 1 }"]);
+  });
+});
