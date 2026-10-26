@@ -44,6 +44,13 @@ describe("the value of the last statement of code that awaits", () => {
     expect(await show("await null;\n`one;\ntwo`")).toBe("one;\ntwo");
   });
 
+  test("a last statement on the line of a block that ends before it", async () => {
+    expect(await show(`const out = []; for (const n of [1, 2]) { out.push(await Promise.resolve(n)) } out`)).toBe("[ 1, 2 ]");
+    expect(await show(`async function f() { return 3 } await f()`)).toBe("3");
+    expect(await show(`await null; const o = { a: 1 }; o`)).toBe("{ a: 1 }");
+    expect(await show(`let x = 1; x = { a: 1 } + 1; await x`)).toBe("[object Object]1");
+  });
+
   test("a statement that has nothing before it", async () => {
     expect(await show(`await 1`)).toBe("1");
     expect(await show(`await 1;`)).toBe("1");
