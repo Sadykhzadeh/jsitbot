@@ -126,6 +126,25 @@ describe("console methods that print nothing or the same as log", () => {
   });
 });
 
+describe("console.dir depth", () => {
+  const nested = "({ a: { b: { c: { d: { e: { f: 1 } } } } } })";
+
+  test("a depth of 0 shows nested objects as [Object]", async () => {
+    expect(await logs(`console.dir(${nested}, { depth: 0 })`)).toEqual(["{ a: [Object] }"]);
+  });
+
+  test("a depth of null shows everything", async () => {
+    expect(await logs(`console.dir(${nested}, { depth: null })`)).toEqual(["{ a: { b: { c: { d: { e: { f: 1 } } } } } }"]);
+  });
+
+  test("the depth belongs to that call only", async () => {
+    const [first, second] = await logs(`console.dir(${nested}, { depth: 1 }); console.log(${nested})`);
+
+    expect(first).toBe("{ a: { b: [Object] } }");
+    expect(second).toBe("{ a: { b: { c: { d: [Object] } } } }");
+  });
+});
+
 describe("console.time", () => {
   test("prints the time since console.time on the sandbox clock, so a sleep shows", async () => {
     const [short, long] = await logs(`
