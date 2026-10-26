@@ -2,18 +2,27 @@ import { describe, expect, test } from "bun:test";
 
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 import type { SandboxExecution } from "../src/services/sandbox/types";
+import { measure } from "./helpers/measure";
 
 // Values built to go wrong when the sandbox turns them into text: traps that
 // throw or never return, coercions that run user code, structures of absurd
 // size. The text is made inside the guest and under its deadline, so the worst
 // outcome has to be the run's own failure, never a hung or broken sandbox.
+//
+// Most of these must come out without the deadline having anything to do with
+// it, so they get a long one, and what they must not do is spend much time: that
+// is read off the CPU, which a loaded machine does not change. The few that end
+// at the deadline get a short one.
+const patient = new QuickJsSandboxService({ timeoutMs: 10_000 });
 const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
 
-async function run(code: string): Promise<{ result: SandboxExecution; wallMs: number }> {
-  const startedAt = performance.now();
-  const result = await sandbox.execute(code);
+async function run(
+  code: string,
+  service: QuickJsSandboxService = patient,
+): Promise<{ result: SandboxExecution; cpuMs: number }> {
+  const { value, cpuMs } = await measure(() => service.execute(code));
 
-  return { result, wallMs: performance.now() - startedAt };
+  return { result: value, cpuMs };
 }
 
 function text(result: SandboxExecution): string {
@@ -22,7 +31,7 @@ function text(result: SandboxExecution): string {
 
 describe("values the formatter must not trust", () => {
   test("coercion hooks are never called to print a value", async () => {
-    const { result, wallMs } = await run(`
+    const { result, cpuMs } = await run(`
       const trap = () => { while (true) {} };
       console.log({ [Symbol.toPrimitive]: trap, toString: trap, valueOf: trap, toJSON: trap }, [{ toString: trap }]);
       return { [Symbol.toPrimitive]: trap, toString: trap, valueOf: trap, toJSON: trap };
@@ -32,7 +41,7 @@ describe("values the formatter must not trust", () => {
     expect(result.timedOut).toBe(false);
     expect(result.logs).toHaveLength(1);
     expect(result.logs[0]).toContain("toString: [Function: trap]");
-    expect(wallMs).toBeLessThan(1_000);
+    expect(cpuMs).toBeLessThan(1_000);
   });
 
   test("a proxy whose traps throw prints as unformattable", async () => {
@@ -47,12 +56,12 @@ describe("values the formatter must not trust", () => {
   });
 
   test("a proxy that claims a billion items prints a bounded list quickly", async () => {
-    const { result, wallMs } = await run(`new Proxy([], { get(target, key) { return key === "length" ? 1e9 : 1 } })`);
+    const { result, cpuMs } = await run(`new Proxy([], { get(target, key) { return key === "length" ? 1e9 : 1 } })`);
 
     expect(result.ok).toBe(true);
     expect(text(result).length).toBeLessThan(4_000);
     expect(result.truncated).toBe(true);
-    expect(wallMs).toBeLessThan(1_000);
+    expect(cpuMs).toBeLessThan(1_000);
   });
 
   test("getters are named, not run", async () => {
@@ -85,12 +94,12 @@ describe("values the formatter must not trust", () => {
     "a thenable that never returns": `({ then() { while (true) {} } })`,
   })) {
     test(`${name} ends at the time limit and the sandbox keeps serving`, async () => {
-      const { result, wallMs } = await run(code);
+      const { result, cpuMs } = await run(code, sandbox);
 
       expect(result.ok).toBe(false);
       expect(result.timedOut).toBe(true);
-      expect(wallMs).toBeLessThan(900);
-      expect(text((await run("2 + 2")).result)).toBe("4");
+      expect(cpuMs).toBeLessThan(900);
+      expect(text((await run("2 + 2", sandbox)).result)).toBe("4");
     });
   }
 
@@ -127,11 +136,11 @@ describe("structures of absurd size", () => {
 
   for (const [name, code] of Object.entries(shapes)) {
     test(`prints ${name} as a bounded text`, async () => {
-      const { result, wallMs } = await run(code);
+      const { result, cpuMs } = await run(code);
 
       expect(result.ok).toBe(true);
       expect(text(result).length).toBeLessThanOrEqual(4_000);
-      expect(wallMs).toBeLessThan(600);
+      expect(cpuMs).toBeLessThan(600);
     });
   }
 

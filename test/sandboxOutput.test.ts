@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test";
 
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 import type { SandboxExecution } from "../src/services/sandbox/types";
+import { measure } from "./helpers/measure";
 
+// A long deadline: what these runs must not do is take much work, which is read
+// off the CPU time, and a loaded machine must not turn that into a timeout.
 const sandbox = new QuickJsSandboxService({
-  timeoutMs: 700,
+  timeoutMs: 10_000,
   memoryLimitBytes: 64 * 1024 * 1024,
   maxStackSizeBytes: 512 * 1024,
   maxLogs: 50,
@@ -12,15 +15,14 @@ const sandbox = new QuickJsSandboxService({
   maxResultLength: 4_000,
 });
 
-async function timed(code: string): Promise<{ result: SandboxExecution; wallMs: number }> {
-  const startedAt = performance.now();
-  const result = await sandbox.execute(code);
-  return { result, wallMs: performance.now() - startedAt };
+async function timed(code: string): Promise<{ result: SandboxExecution; cpuMs: number }> {
+  const { value, cpuMs } = await measure(() => sandbox.execute(code));
+  return { result: value, cpuMs };
 }
 
 describe("output limits", () => {
   test("keeps only the first logs of a flood", async () => {
-    const { result, wallMs } = await timed(`
+    const { result, cpuMs } = await timed(`
       for (let i = 0; i < 100000; i++) console.log("line " + i);
       return "done";
     `);
@@ -30,7 +32,7 @@ describe("output limits", () => {
     expect(result.logs[0]).toBe("line 0");
     expect(result.logs[49]).toBe("line 49");
     expect(result.truncated).toBe(true);
-    expect(wallMs).toBeLessThan(1_000);
+    expect(cpuMs).toBeLessThan(1_000);
   });
 
   test("cuts one enormous log line down to size", async () => {
@@ -63,7 +65,7 @@ describe("output limits", () => {
   });
 
   test("summarises a huge object graph instead of walking it", async () => {
-    const { result, wallMs } = await timed(`
+    const { result, cpuMs } = await timed(`
       return Array.from({ length: 200000 }, (_, i) => ({ id: i, payload: "x".repeat(50) }));
     `);
 
@@ -73,11 +75,11 @@ describe("output limits", () => {
       expect(result.result).toContain("more items");
     }
     expect(result.truncated).toBe(true);
-    expect(wallMs).toBeLessThan(2_000);
+    expect(cpuMs).toBeLessThan(2_000);
   });
 
   test("summarises an object with a very large number of keys", async () => {
-    const { result, wallMs } = await timed(`
+    const { result, cpuMs } = await timed(`
       const bag = {};
       for (let i = 0; i < 100000; i++) bag["key" + i] = i;
       return bag;
@@ -88,7 +90,7 @@ describe("output limits", () => {
       expect(result.result.length).toBeLessThanOrEqual(4_000);
       expect(result.result).toContain("more properties");
     }
-    expect(wallMs).toBeLessThan(2_000);
+    expect(cpuMs).toBeLessThan(2_000);
   });
 
   test("summarises a map with a very large number of entries", async () => {
@@ -106,7 +108,7 @@ describe("output limits", () => {
   });
 
   test("does not walk a structure nested a hundred thousand levels deep", async () => {
-    const { result, wallMs } = await timed(`
+    const { result, cpuMs } = await timed(`
       let nested = [];
       for (let i = 0; i < 100000; i++) nested = [nested];
       return nested;
@@ -116,7 +118,7 @@ describe("output limits", () => {
     if (result.ok) {
       expect(result.result).toBe("[ [ [ [ [Array] ] ] ] ]");
     }
-    expect(wallMs).toBeLessThan(1_000);
+    expect(cpuMs).toBeLessThan(1_000);
   });
 
   test("cuts an enormous error message", async () => {

@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
+import { measure } from "./helpers/measure";
 
 const sandbox = new QuickJsSandboxService();
+// For the run that must not time out however busy the machine is: how long it
+// works is read off the CPU time instead.
+const patient = new QuickJsSandboxService({ timeoutMs: 10_000 });
 
 async function value(code: string): Promise<string> {
   const result = await sandbox.execute(code);
@@ -331,11 +335,12 @@ describe("hostile input to URL", () => {
       `"\\u0000".repeat(1000) + "http://a"`,
       `"http://a/" + "\\ud800".repeat(1000)`,
     ]) {
-      const startedAt = performance.now();
-      const result = await sandbox.execute(`try { new URL(${input}).href.length } catch (e) { e.name }`);
+      const { value: result, cpuMs } = await measure(() =>
+        patient.execute(`try { new URL(${input}).href.length } catch (e) { e.name }`),
+      );
 
       expect(result.timedOut).toBe(false);
-      expect(performance.now() - startedAt).toBeLessThan(650);
+      expect(cpuMs).toBeLessThan(650);
     }
     expect((await sandbox.execute("1 + 1")).ok).toBe(true);
   });
