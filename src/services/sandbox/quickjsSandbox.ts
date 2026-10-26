@@ -20,7 +20,7 @@ import {
 } from "./types";
 import { truncateText } from "../../utils/markdownV2";
 import { stripTypes } from "./typescript";
-import { createCappedModule, isHeapExhausted, isHeapGrown } from "./wasmHeap";
+import { createCappedModule, isHeapExhausted, isHeapGrown, isHeapNearlyFull } from "./wasmHeap";
 
 const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
 const TIMEOUT_MESSAGE = "Sandbox execution timed out.";
@@ -29,6 +29,8 @@ const UNREADABLE_MESSAGE = "The sandbox returned a result it could not read.";
 // What QuickJS says when a string or a heap runs out: the length of a string is
 // capped as well as its memory, and a doubled string reaches the cap first.
 const MEMORY_ERRORS = new Set(["InternalError: out of memory", "InternalError: string too long"]);
+// What the guest reports for a thrown null, which is also all that is left of an out-of-memory error.
+const NULL_THROWN = "Uncaught null";
 
 // Jobs are run in batches so the deadline is checked between them as well as
 // by the interrupt handler inside them.
@@ -200,6 +202,7 @@ export class QuickJsSandboxService implements SandboxService {
     let logs: string[] = [];
     let interrupted = false;
     let heapExhausted = () => false;
+    let heapNearlyFull = () => false;
     let heavy = () => false;
 
     const failure = (
@@ -209,7 +212,8 @@ export class QuickJsSandboxService implements SandboxService {
       const timedOut = details.timedOut ?? interrupted;
       // With the heap used up to the last page QuickJS cannot even allocate its
       // out-of-memory error, so the guest sees a bare null instead of a message.
-      const outOfMemory = MEMORY_ERRORS.has(error) || (heapExhausted() && !timedOut);
+      const outOfMemory =
+        MEMORY_ERRORS.has(error) || ((heapExhausted() || (error === NULL_THROWN && heapNearlyFull())) && !timedOut);
       const message = timedOut ? TIMEOUT_MESSAGE : outOfMemory ? MEMORY_LIMIT_MESSAGE : error;
       const bounded = truncateText(message, this.options.maxResultLength);
 
@@ -234,6 +238,7 @@ export class QuickJsSandboxService implements SandboxService {
       const { module, runtime, context, guest, logs: sink } = await this.takePrepared();
       logs = sink;
       heapExhausted = () => isHeapExhausted(module, this.options.memoryLimitBytes);
+      heapNearlyFull = () => isHeapNearlyFull(module, this.options.memoryLimitBytes);
       const residentBefore = process.memoryUsage.rss();
       heavy = () => isHeapGrown(module) || process.memoryUsage.rss() - residentBefore > HEAVY_RUN_BYTES;
 
