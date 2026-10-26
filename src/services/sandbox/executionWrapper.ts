@@ -80,12 +80,12 @@ const MAX_STATEMENT_STARTS = 200;
  * does not, so `const a = await f(); a + 1` had no result. Returns undefined
  * when the code has no such statement.
  *
- * The start of the last statement is looked for after each semicolon and line
- * break, from the end. It is taken when the transpiler reads the code the same
- * with a semicolon put there, and each part is a program of its own: so the
- * statement does not go on from the line before (`x = 1\n+ 2`), does not end
- * before the line after, and does not begin inside a block. The code stays where
- * it is, so line numbers are the same.
+ * The start of the last statement is looked for after each semicolon, line
+ * break and closing brace, from the end. It is taken when the transpiler reads
+ * the code the same with a semicolon put there, and each part is a program of
+ * its own: so the statement does not go on from the line before (`x = 1\n+ 2`),
+ * does not end before the line after, and does not begin inside a block. The
+ * code stays where it is, so line numbers are the same.
  */
 export function wrapAsStatementsWithValue(code: string): string | undefined {
   const whole = readAsRepl(code);
@@ -96,7 +96,7 @@ export function wrapAsStatementsWithValue(code: string): string | undefined {
   let tried = 0;
   for (let start = code.length - 1; start >= 0 && tried < MAX_STATEMENT_STARTS; start--) {
     const before = code[start - 1];
-    if (start > 0 && before !== ";" && before !== "\n") {
+    if (start > 0 && before !== ";" && before !== "\n" && before !== "}") {
       continue;
     }
     tried++;
