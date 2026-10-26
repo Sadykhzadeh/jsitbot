@@ -770,14 +770,31 @@
 
   // Laid out like Node's console.table: an (index) column, one column for each
   // key found in the rows, and a Values column for rows that are not objects.
-  function table(data) {
+  function table(data, only) {
     if (typeof data !== "object" || data === null) {
       write(data);
       return;
     }
 
+    const tag = objectToString(data);
+    if (tag === "[object Map]" || tag === "[object Set]") {
+      tableOfCollection(data, tag === "[object Map]");
+      return;
+    }
+
     const columns = [];
     const known = Object.create(null);
+    // The columns the caller asked for, which stay even when no row has them.
+    const chosen = isArray(only);
+    if (chosen) {
+      for (let i = 0; i < only.length && columns.length < MAX_TABLE_COLUMNS; i++) {
+        const name = toText(only[i]);
+        if (!known[name]) {
+          known[name] = true;
+          columns[columns.length] = name;
+        }
+      }
+    }
     const rows = [];
     let hasValues = false;
     const keys = getKeys(data);
@@ -796,6 +813,7 @@
         const fields = getKeys(item);
         for (let j = 0; j < fields.length; j++) {
           if (!known[fields[j]]) {
+            if (chosen) continue;
             if (columns.length >= MAX_TABLE_COLUMNS) {
               logsCutShort = true;
               continue;
@@ -828,6 +846,31 @@
       body[body.length] = parts;
     }
 
+    drawTable(headers, body);
+  }
+
+  // A map or a set, one row for each entry.
+  function tableOfCollection(collection, isMap) {
+    const headers = isMap ? ["(iteration index)", "Key", "Values"] : ["(iteration index)", "Values"];
+    const body = [];
+    let count = 0;
+    function add(value, key) {
+      if (count++ >= MAX_TABLE_ROWS) {
+        logsCutShort = true;
+        return;
+      }
+      const row = [numberToString(body.length, 10)];
+      if (isMap) row[row.length] = cell(key);
+      row[row.length] = cell(value);
+      body[body.length] = row;
+    }
+    if (isMap) mapForEach(collection, add);
+    else setForEach(collection, add);
+
+    drawTable(headers, body);
+  }
+
+  function drawTable(headers, body) {
     const widths = [];
     for (let i = 0; i < headers.length; i++) {
       let width = headers[i].length;
