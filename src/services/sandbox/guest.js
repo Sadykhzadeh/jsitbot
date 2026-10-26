@@ -16,6 +16,8 @@
 
   const FILE = "input.js";
   const MAX_DEPTH = 3;
+  // What objects are shown down to: MAX_DEPTH, except during console.dir with a depth.
+  let depthLimit = MAX_DEPTH;
   const MAX_ENTRIES = 100;
   const MAX_SCAN = 100000;
   const LINE_WIDTH = 72;
@@ -489,7 +491,7 @@
     const name = constructorName(value);
     const label = name === null ? "[Object: null prototype]" : name;
 
-    if (depth > MAX_DEPTH) {
+    if (depth > depthLimit) {
       return "[" + (isArray(value) ? "Array" : label) + "]";
     }
 
@@ -530,7 +532,7 @@
     try {
       if (typeof value === "function") {
         const text = formatFunction(value);
-        return depth > MAX_DEPTH ? text : withProperties(text, value, depth, state);
+        return depth > depthLimit ? text : withProperties(text, value, depth, state);
       }
       return formatObject(value, depth, state);
     } catch (ignored) {
@@ -899,9 +901,27 @@
   }
 
   // Node's second argument is options for the inspector, not another value to print.
-  function dir(value) {
-    write(value);
+  // Its depth, when it has one, is how far down objects are shown.
+  function dir(value, options) {
+    let depth = MAX_DEPTH;
+    try {
+      if (typeof options === "object" && options !== null && options.depth !== undefined) {
+        const asked = options.depth;
+        depth = asked === null || asked === Infinity ? MAX_NESTING : typeof asked === "number" && asked >= 0 ? asked : MAX_DEPTH;
+      }
+    } catch (ignored) {}
+
+    depthLimit = depth < MAX_NESTING ? depth : MAX_NESTING;
+    try {
+      write(value);
+    } finally {
+      depthLimit = MAX_DEPTH;
+    }
   }
+
+  // Objects nested deeper than this are cut even when console.dir asks for all of them.
+  const MAX_NESTING = 30;
+
 
   function clear() {}
 
