@@ -172,11 +172,11 @@ describe("what the guest cannot do to block the process", () => {
   });
 
   test("a flood of promise jobs and of timers ends at the time limit", async () => {
-    const jobs = await run(`async function f() { while (true) await null } f(); await new Promise(() => {})`);
-    const timers = await run(`const f = () => setTimeout(f, 0); f(); await new Promise(() => {})`);
+    const jobs = await run(`async function f() { while (true) await null } f(); await new Promise(() => {})`, sandbox);
+    const timers = await run(`const f = () => setTimeout(f, 0); f(); await new Promise(() => {})`, sandbox);
 
     expect(jobs.result.timedOut).toBe(true);
     expect(timers.result.timedOut).toBe(true);
-    expect(text((await run("3 + 3")).result)).toBe("6");
+    expect(text((await run("3 + 3", sandbox)).result)).toBe("6");
   });
 });
