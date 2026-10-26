@@ -72,6 +72,46 @@ describe("console.table", () => {
   });
 });
 
+describe("console.table of collections and columns", () => {
+  test("a map has a row for each entry, with its key and value", async () => {
+    const [table] = await logs(`console.table(new Map([["k", 1], ["j", { x: 1 }]]))`);
+
+    expect(table.split("\n")).toEqual([
+      "┌───────────────────┬─────┬──────────┐",
+      "│ (iteration index) │ Key │ Values   │",
+      "├───────────────────┼─────┼──────────┤",
+      "│ 0                 │ 'k' │ 1        │",
+      "│ 1                 │ 'j' │ { x: 1 } │",
+      "└───────────────────┴─────┴──────────┘",
+    ]);
+  });
+
+  test("a set has a row for each value", async () => {
+    const [table] = await logs(`console.table(new Set([1, "b"]))`);
+
+    expect(table.split("\n")).toEqual([
+      "┌───────────────────┬────────┐",
+      "│ (iteration index) │ Values │",
+      "├───────────────────┼────────┤",
+      "│ 0                 │ 1      │",
+      "│ 1                 │ 'b'    │",
+      "└───────────────────┴────────┘",
+    ]);
+  });
+
+  test("the second argument picks the columns, in its order, even when no row has one", async () => {
+    const [table] = await logs(`console.table([{ a: 1, b: 2, c: 3 }], ["c", "a", "z"])`);
+
+    expect(table.split("\n")).toEqual([
+      "┌─────────┬───┬───┬───┐",
+      "│ (index) │ c │ a │ z │",
+      "├─────────┼───┼───┼───┤",
+      "│ 0       │ 3 │ 1 │   │",
+      "└─────────┴───┴───┴───┘",
+    ]);
+  });
+});
+
 describe("console.assert", () => {
   test("prints only when the condition is false", async () => {
     expect(await logs(`console.assert(true, "quiet"); console.assert(1 === 2, "bad", { a: 1 }); console.assert(false)`)).toEqual([
