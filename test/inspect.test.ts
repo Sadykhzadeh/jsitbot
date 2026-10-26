@@ -76,6 +76,13 @@ describe("result formatting", () => {
       "}",
     ].join("\n")],
     ["more than a hundred items are summarised", `Array.from({ length: 120 }, (_, i) => i)`, "... 20 more items"],
+    ["the match of a regular expression keeps its index and input", `/(\\d)/.exec("a1")`, "[ '1', '1', index: 1, input: 'a1', groups: undefined ]"],
+    ["properties added to a function", `function f() {} f.calls = 2; f`, "[Function: f] { calls: 2 }"],
+    ["properties added to a class", `class A { static count = 1 } A`, "[class A] { count: 1 }"],
+    ["properties added to an array", `Object.assign([1, 2], { label: "x" })`, "[ 1, 2, label: 'x' ]"],
+    ["properties added to a map and a set", `[Object.assign(new Map([[1, 2]]), { a: 1 }), Object.assign(new Set([1]), { b: 2 })]`, "[ Map(1) { 1 => 2, a: 1 }, Set(1) { 1, b: 2 } ]"],
+    ["properties added to a date and a regular expression", `[Object.assign(new Date(0), { a: 1 }), Object.assign(/x/, { b: 2 })]`, "[ 1970-01-01T00:00:00.000Z { a: 1 }, /x/ { b: 2 } ]"],
+    ["a function that holds itself", `const f = () => {}; f.self = f; f`, "[Function: f] { self: [Circular] }"],
   ];
 
   for (const [name, code, expected] of cases) {

@@ -317,7 +317,9 @@
       state.cut = true;
       parts[parts.length] = more(length - index, "item", "items");
     }
-    return layout("", "[", parts, "]", depth, true);
+    const items = parts.length;
+    addProperties(array, parts, depth, state, true);
+    return layout("", "[", parts, "]", depth, parts.length === items);
   }
 
   function formatTypedArray(array, name, depth, state) {
@@ -348,6 +350,7 @@
       state.cut = true;
       parts[parts.length] = more(size - parts.length, "item", "items");
     }
+    addProperties(map, parts, depth, state, false);
     return layout("Map(" + size + ") ", "{", parts, "}", depth);
   }
 
@@ -364,7 +367,9 @@
       state.cut = true;
       parts[parts.length] = more(size - parts.length, "item", "items");
     }
-    return layout("Set(" + size + ") ", "{", parts, "}", depth, true);
+    const items = parts.length;
+    addProperties(set, parts, depth, state, false);
+    return layout("Set(" + size + ") ", "{", parts, "}", depth, parts.length === items);
   }
 
   // Prototype -> function that lists what to show of an instance of a class the
@@ -395,10 +400,23 @@
     return layout(name + " ", "{", parts, "}", depth);
   }
 
-  function formatProperties(object, prefix, depth, state) {
+  // An array index such as "0" or "12", which an array already shows as an item.
+  function isIndexKey(key) {
+    const length = key.length;
+    if (length === 0 || (length > 1 && stringCharCodeAt(key, 0) === 48)) return false;
+    for (let i = 0; i < length; i++) {
+      const c = stringCharCodeAt(key, i);
+      if (c < 48 || c > 57) return false;
+    }
+    return true;
+  }
+
+  // Adds "key: value" for each enumerable own property to parts, and says how
+  // many it left out for want of room. Indexes are skipped for the objects that
+  // list their items on their own.
+  function addProperties(object, parts, depth, state, skipIndexes) {
     const names = getOwnPropertyNames(object);
     const symbols = getOwnPropertySymbols(object);
-    const parts = [];
     let seen = 0;
 
     for (let pass = 0; pass < 2; pass++) {
@@ -406,6 +424,7 @@
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
         if (!isEnumerable(object, key)) continue;
+        if (skipIndexes && pass === 0 && isIndexKey(key)) continue;
         if (parts.length >= MAX_ENTRIES || state.left <= 0) {
           seen++;
           continue;
@@ -431,16 +450,31 @@
       state.cut = true;
       parts[parts.length] = more(seen, "property", "properties");
     }
+  }
+
+  function formatProperties(object, prefix, depth, state) {
+    const parts = [];
+    addProperties(object, parts, depth, state, false);
     return layout(prefix, "{", parts, "}", depth);
+  }
+
+  // Text that stands for the whole value, followed by the properties that were
+  // added to it, as in `[Function: f] { calls: 2 }`.
+  function withProperties(text, object, depth, state) {
+    const parts = [];
+    addProperties(object, parts, depth, state, false);
+    return parts.length === 0 ? text : layout(text + " ", "{", parts, "}", depth);
   }
 
   function formatObject(value, depth, state) {
     const tag = objectToString(value);
 
     if (tag === "[object Date]") {
-      try { return dateToISOString(value); } catch (ignored) { return "Invalid Date"; }
+      let text = "Invalid Date";
+      try { text = dateToISOString(value); } catch (ignored) {}
+      return withProperties(text, value, depth, state);
     }
-    if (tag === "[object RegExp]") return regExpToString(value);
+    if (tag === "[object RegExp]") return withProperties(regExpToString(value), value, depth, state);
     if (tag === "[object Error]") return depth === 0 ? errorText(value, state) : "[" + errorText(value, state) + "]";
     if (tag === "[object Number]") return "[Number: " + formatNumber(numberValueOf(value)) + "]";
     if (tag === "[object String]") return "[String: " + quote(stringValueOf(value), state) + "]";
@@ -486,7 +520,6 @@
       case "boolean": return value ? "true" : "false";
       case "undefined": return "undefined";
       case "symbol": return symbolToString(value);
-      case "function": return formatFunction(value);
     }
     if (value === null) return "null";
 
@@ -495,6 +528,10 @@
     }
     state.stack[state.stack.length] = value;
     try {
+      if (typeof value === "function") {
+        const text = formatFunction(value);
+        return depth > MAX_DEPTH ? text : withProperties(text, value, depth, state);
+      }
       return formatObject(value, depth, state);
     } catch (ignored) {
       return "[Unformattable object]";
