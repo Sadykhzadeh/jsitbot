@@ -21,6 +21,17 @@ describe("stripCodeFence", () => {
     expect(stripCodeFence("```1 + 1```")).toBe("1 + 1");
   });
 
+  test("removes the language name of a fence written on one line", () => {
+    expect(stripCodeFence("```js console.log(1)```")).toBe("console.log(1)");
+    expect(stripCodeFence("```typescript const a: number = 1; a```")).toBe("const a: number = 1; a");
+  });
+
+  test("keeps a word that starts a one-line fence when it is part of the code", () => {
+    expect(stripCodeFence("```typeof x```")).toBe("typeof x");
+    expect(stripCodeFence("```js```")).toBe("js");
+    expect(stripCodeFence("```js + 1```")).toBe("js + 1");
+  });
+
   test("keeps blank lines inside the code", () => {
     expect(stripCodeFence("```js\na();\n\nb();\n```")).toBe("a();\n\nb();");
   });
