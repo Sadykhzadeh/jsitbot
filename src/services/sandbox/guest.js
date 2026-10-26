@@ -965,13 +965,11 @@
   // Objects nested deeper than this are cut even when console.dir asks for all of them.
   const MAX_NESTING = 30;
 
-
   function clear() {}
 
   function dirxml() {
     reflectApply(write, undefined, arguments);
   }
-
 
   const console = freeze({
     log: write,
