@@ -903,6 +903,13 @@
     write(value);
   }
 
+  function clear() {}
+
+  function dirxml() {
+    reflectApply(write, undefined, arguments);
+  }
+
+
   const console = freeze({
     log: write,
     info: write,
@@ -910,6 +917,11 @@
     error: write,
     debug: write,
     dir,
+    dirxml,
+    clear,
+    timeStamp: clear,
+    profile: clear,
+    profileEnd: clear,
     assert,
     count,
     countReset,

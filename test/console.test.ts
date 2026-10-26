@@ -116,6 +116,16 @@ describe("console.dir", () => {
   });
 });
 
+describe("console methods that print nothing or the same as log", () => {
+  test("clear, timeStamp, profile and profileEnd do nothing", async () => {
+    expect(await logs(`console.clear(); console.timeStamp("x"); console.profile(); console.profileEnd(); console.log("after")`)).toEqual(["after"]);
+  });
+
+  test("dirxml prints like log", async () => {
+    expect(await logs(`console.dirxml({ a: 1 }, "b")`)).toEqual(["{ a: 1 } b"]);
+  });
+});
+
 describe("console.time", () => {
   test("prints the time since console.time on the sandbox clock, so a sleep shows", async () => {
     const [short, long] = await logs(`
