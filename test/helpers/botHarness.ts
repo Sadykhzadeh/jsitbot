@@ -25,6 +25,12 @@ export interface HarnessOptions {
   maxSandboxMs?: number;
   /** How long each call to the API takes, as Telegram's network round trip would. */
   apiLatencyMs?: number;
+  /**
+   * Each call to the API waits until this many calls are waiting together, or a
+   * second has passed, and the sizes of the groups that were let through are in
+   * `barrierGroups`: a bot that does not make its calls together shows in them.
+   */
+  apiBarrier?: number;
   /** Methods that should fail, with the error text Telegram would give. */
   failures?: Record<string, string>;
   /** The error code a failing method answers with; 400 when it is not named here. */
@@ -49,11 +55,31 @@ export function createHarness(options: HarnessOptions = {}) {
   } as UserFromGetMe;
   const bot = new Bot("1:test", { botInfo });
   const calls: ApiCall[] = [];
+  const barrier: Array<() => void> = [];
+  const barrierGroups: number[] = [];
   let nextMessageId = 1_000;
 
   bot.api.config.use(async (_previous, method, payload) => {
     const body = payload as Record<string, any>;
     calls.push({ method, payload: body });
+    if (options.apiBarrier) {
+      await new Promise<void>((resolve) => {
+        const release = () => {
+          const group = barrier.splice(0);
+          if (group.length > 0) {
+            barrierGroups.push(group.length);
+            group.forEach((go) => go());
+          }
+        };
+        barrier.push(resolve);
+        if (barrier.length === 1) {
+          setTimeout(release, 1_000);
+        }
+        if (barrier.length === options.apiBarrier) {
+          release();
+        }
+      });
+    }
     if (options.apiLatencyMs) {
       await new Promise((resolve) => setTimeout(resolve, options.apiLatencyMs));
     }
@@ -87,8 +113,9 @@ export function createHarness(options: HarnessOptions = {}) {
     return { ok: true, result: true } as any;
   });
 
-  if (options.concurrency) {
-    bot.use(handleConcurrently(bot, options.concurrency));
+  const concurrency = options.concurrency ? handleConcurrently(bot, options.concurrency) : undefined;
+  if (concurrency) {
+    bot.use(concurrency);
   }
 
   const sandbox = options.sandbox ?? new QuickJsSandboxService();
@@ -126,7 +153,15 @@ export function createHarness(options: HarnessOptions = {}) {
   return {
     bot,
     calls,
+    barrierGroups,
     sandbox,
+
+    /** Resolves once every update the bot took has been handled; only for a harness that handles updates concurrently. */
+    async settled(): Promise<void> {
+      while (concurrency && concurrency.inProgress() > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    },
 
     callsTo(method: string): ApiCall[] {
       return calls.filter((call) => call.method === method);
