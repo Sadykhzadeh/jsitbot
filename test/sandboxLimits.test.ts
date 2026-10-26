@@ -71,6 +71,8 @@ describe("memory limits", () => {
       again();
       await new Promise(() => {});
     `,
+    "a replace whose result does not fit": `"a".repeat(5e7).replace(/a/g, "bb").length`,
+    "a million small objects built at once": `new Array(1e6).fill(0).map((_, i) => ({ i, s: "x".repeat(100) })).length`,
     "many small objects": `
       const kept = [];
       while (true) kept.push({ a: 1, b: [1, 2, 3] });
@@ -100,6 +102,15 @@ describe("memory limits", () => {
       expect(result.error).toBe("Sandbox exceeded its memory limit.");
     }
     await expectStillHealthy();
+  });
+
+  test("still reports a null that the code threw itself as that", async () => {
+    const result = await sandbox.execute(`throw null`);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Uncaught null");
+    }
   });
 
   test("honours a lower configured limit", async () => {

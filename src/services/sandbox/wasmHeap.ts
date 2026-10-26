@@ -75,6 +75,18 @@ export function isHeapExhausted(module: QuickJSWASMModule, guestHeapBytes: numbe
   return module.getWasmMemory().buffer.byteLength >= capBytes - WASM_PAGE_BYTES;
 }
 
+/**
+ * True when the instance has grown to within a tenth of its cap. A request for
+ * a big block (a string built to twice its size) fails while a few megabytes
+ * are still free, and with what is left the engine may not manage to build its
+ * out-of-memory error either, so the code sees a bare null.
+ */
+export function isHeapNearlyFull(module: QuickJSWASMModule, guestHeapBytes: number): boolean {
+  const capBytes = maximumPages(guestHeapBytes) * WASM_PAGE_BYTES;
+
+  return module.getWasmMemory().buffer.byteLength >= capBytes * 0.9;
+}
+
 /** True when the run needed more memory than the instance started with. */
 export function isHeapGrown(module: QuickJSWASMModule): boolean {
   return module.getWasmMemory().buffer.byteLength > BASE_HEAP_BYTES;
