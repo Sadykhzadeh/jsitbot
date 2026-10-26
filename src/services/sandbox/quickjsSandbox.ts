@@ -11,6 +11,7 @@ import {
   guestRuntimeSource,
   wrapAsExpression,
   wrapAsStatements,
+  wrapAsStatementsWithValue,
 } from "./executionWrapper";
 import {
   resolveSandboxOptions,
@@ -351,7 +352,7 @@ export class QuickJsSandboxService implements SandboxService {
     const attempts: Array<() => Attempt> = [
       () => this.attemptWrapped(context, runtime, guest, wrapAsExpression(code), expired),
       () => this.attemptScript(context, runtime, guest, code, expired),
-      () => this.attemptWrapped(context, runtime, guest, wrapAsStatements(code), expired),
+      () => this.attemptStatements(context, runtime, guest, code, expired),
     ];
     let outcome = attempts[0]();
     for (let next = 1; !outcome.settled && next < attempts.length; next++) {
@@ -359,6 +360,25 @@ export class QuickJsSandboxService implements SandboxService {
     }
 
     return outcome;
+  }
+
+  /** The code as a function body, with its last statement as the result when that is an expression. */
+  private attemptStatements(
+    context: QuickJSContext,
+    runtime: QuickJSRuntime,
+    guest: Guest,
+    code: string,
+    expired: () => boolean,
+  ): Attempt {
+    const withValue = wrapAsStatementsWithValue(code);
+    if (withValue !== undefined) {
+      const attempt = this.attemptWrapped(context, runtime, guest, withValue, expired);
+      if (attempt.settled) {
+        return attempt;
+      }
+    }
+
+    return this.attemptWrapped(context, runtime, guest, wrapAsStatements(code), expired);
   }
 
   private attemptWrapped(
