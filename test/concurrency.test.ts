@@ -55,18 +55,28 @@ describe("handling updates concurrently", () => {
   test("updates from different users are handled at the same time", async () => {
     const { bot, message, poll } = createBot({ limit: 8, perUser: 3 });
     const done: string[] = [];
+    let started = 0;
+    const startedWhenLeft: number[] = [];
+    let everyoneStarted!: () => void;
+    // Nobody leaves before all eight are in, or a second has passed, so a bot
+    // that does not run them together lets the first one go on its own.
+    const gate = new Promise<void>((resolve) => {
+      everyoneStarted = resolve;
+      setTimeout(resolve, 1_000);
+    });
     bot.on("message:text", async (ctx) => {
-      await sleep(60);
+      if (++started === 8) {
+        everyoneStarted();
+      }
+      await gate;
+      startedWhenLeft.push(started);
       done.push(ctx.message.text);
     });
 
-    const startedAt = performance.now();
     await poll(...Array.from({ length: 8 }, (_, user) => message(user + 1, `from ${user + 1}`)));
     await until(() => done.length === 8);
 
-    // Eight handlers of 60 ms one after the other would take at least 480 ms, because a
-    // sleep never ends early. Anything below that was concurrent; the rest is machine load.
-    expect(performance.now() - startedAt).toBeLessThan(450);
+    expect(startedWhenLeft).toEqual(Array(8).fill(8));
   });
 
   test("one user's updates run one after the other, in the order they came", async () => {
@@ -87,9 +97,17 @@ describe("handling updates concurrently", () => {
   test("a slow update from one user does not hold up another user", async () => {
     const { bot, message, poll } = createBot({ limit: 8, perUser: 3 });
     const finished: string[] = [];
+    // The slow one stays until the quick one is done, so it only ends if the quick one is not held up.
+    let quickDone!: () => void;
+    const quickFinished = new Promise<void>((resolve) => (quickDone = resolve));
     bot.on("message:text", async (ctx) => {
-      await sleep(ctx.message.text === "slow" ? 150 : 1);
+      if (ctx.message.text === "slow") {
+        await quickFinished;
+      }
       finished.push(ctx.message.text);
+      if (ctx.message.text === "quick") {
+        quickDone();
+      }
     });
 
     await poll(message(1, "slow"), message(2, "quick"));
@@ -103,10 +121,13 @@ describe("handling updates concurrently", () => {
     let active = 0;
     let mostActive = 0;
     const done: number[] = [];
+    // The two in progress stay so until they are let go, however long the machine takes.
+    let letGo!: () => void;
+    const hold = new Promise<void>((resolve) => (letGo = resolve));
     bot.on("message:text", async () => {
       active++;
       mostActive = Math.max(mostActive, active);
-      await sleep(40);
+      await hold;
       active--;
       done.push(1);
     });
@@ -120,6 +141,7 @@ describe("handling updates concurrently", () => {
     await sleep(15);
     expect(thirdAccepted).toBe(false);
 
+    letGo();
     await third;
     await until(() => done.length === 3);
     expect(mostActive).toBe(2);
@@ -151,7 +173,8 @@ describe("handling updates concurrently", () => {
     void poll(message(2, "holder"));
     await sleep(5);
     await poll(...["1", "2", "3", "4", "5"].map((text) => message(1, text)));
-    await sleep(300);
+    // The two beyond the limit were dropped as they came, so what is left is what runs.
+    await until(() => handled.filter((text) => text !== "holder").length === 3);
 
     expect(handled.filter((text) => text !== "holder")).toEqual(["1", "2", "3"]);
   });
@@ -185,9 +208,18 @@ describe("handling updates concurrently", () => {
   test("one user's queued updates do not keep the other places from a different user", async () => {
     const { bot, message, poll } = createBot({ limit: 2, perUser: 3 });
     const finished: string[] = [];
+    // The first slow one stays until the quick one is done: if the other two slow ones, which wait
+    // for it, took the second place, the quick one would never run.
+    let quickDone!: () => void;
+    const quickFinished = new Promise<void>((resolve) => (quickDone = resolve));
     bot.on("message:text", async (ctx) => {
-      await sleep(ctx.message.text.startsWith("slow") ? 60 : 5);
+      if (ctx.message.text === "slow a") {
+        await quickFinished;
+      }
       finished.push(ctx.message.text);
+      if (ctx.message.text === "quick") {
+        quickDone();
+      }
     });
 
     await poll(message(1, "slow a"), message(1, "slow b"), message(1, "slow c"));
@@ -280,7 +312,7 @@ describe("with the real handlers", () => {
     await harness.editMessage("3 + 3", 5);
     await harness.editMessage("4 + 4", 5);
     await harness.editMessage("5 + 5", 5);
-    await sleep(300);
+    await harness.settled();
 
     const texts = harness.callsTo("editMessageText").map((call) => call.payload.text as string);
     expect(texts.at(-1)).toContain("10");
@@ -288,19 +320,17 @@ describe("with the real handlers", () => {
   });
 
   test("answers many users in the time Telegram needs for a few", async () => {
-    const harness = createHarness({ concurrency: policy, apiLatencyMs: 40 });
+    // A reply is only taken by Telegram once eight are waiting for it together (or a second has
+    // passed), so the groups are of eight only if the eight places are in use at once.
+    const harness = createHarness({ concurrency: policy, apiBarrier: 8 });
 
-    const startedAt = performance.now();
     for (let user = 1; user <= 16; user++) {
       await harness.sendMessage(`${user} * 2`, 1, 1_000 + user);
     }
     await until(() => harness.callsTo("sendMessage").length === 16);
-    const elapsed = performance.now() - startedAt;
 
     const answers = harness.callsTo("sendMessage").map((call) => call.payload.chat_id);
     expect(new Set(answers).size).toBe(16);
-    // One after the other it takes at least 16 x 40 ms = 640 ms of waiting for Telegram,
-    // so anything below that was concurrent; the rest is machine load.
-    expect(elapsed).toBeLessThan(600);
+    expect(harness.barrierGroups).toEqual([8, 8]);
   });
 });
