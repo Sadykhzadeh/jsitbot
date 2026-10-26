@@ -82,6 +82,9 @@ describe("result formatting", () => {
     ["properties added to an array", `Object.assign([1, 2], { label: "x" })`, "[ 1, 2, label: 'x' ]"],
     ["properties added to a map and a set", `[Object.assign(new Map([[1, 2]]), { a: 1 }), Object.assign(new Set([1]), { b: 2 })]`, "[ Map(1) { 1 => 2, a: 1 }, Set(1) { 1, b: 2 } ]"],
     ["properties added to a date and a regular expression", `[Object.assign(new Date(0), { a: 1 }), Object.assign(/x/, { b: 2 })]`, "[ 1970-01-01T00:00:00.000Z { a: 1 }, /x/ { b: 2 } ]"],
+    ["a subclass of Array", `class Stack extends Array {} Stack.from([1, 2])`, "Stack(2) [ 1, 2 ]"],
+    ["an empty subclass of Array", `class Stack extends Array {} new Stack()`, "Stack(0) []"],
+    ["subclasses of Map and Set", `class Registry extends Map {} class Tags extends Set {} [new Registry([[1, 2]]), new Tags([3])]`, "[ Registry(1) [Map] { 1 => 2 }, Tags(1) [Set] { 3 } ]"],
     ["a function that holds itself", `const f = () => {}; f.self = f; f`, "[Function: f] { self: [Circular] }"],
   ];
 
