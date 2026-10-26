@@ -54,3 +54,72 @@ export function wrapAsExpression(code: string): string {
 export function wrapAsStatements(code: string): string {
   return `(async () => {${code}\n})()`;
 }
+
+let reader: Bun.Transpiler | undefined;
+
+/** What the transpiler's REPL mode makes of the code, or undefined when it cannot be parsed. */
+function readAsRepl(code: string): string | undefined {
+  // The same options as everywhere else a transpiler reads the user's code: no macros.
+  reader ??= new Bun.Transpiler({ loader: "js", replMode: true, macro: false } as unknown as Bun.TranspilerOptions);
+
+  try {
+    return reader.transformSync(code);
+  } catch {
+    return undefined;
+  }
+}
+
+// Only the mode that returns the value of the last expression writes this.
+const RETURNS_LAST_VALUE = "__proto__: null";
+// How far back from the end to look for where the last statement begins.
+const MAX_STATEMENT_STARTS = 200;
+
+/**
+ * Like wrapAsStatements, but the last statement is returned when it is an
+ * expression: a script has the value of its last statement and a function body
+ * does not, so `const a = await f(); a + 1` had no result. Returns undefined
+ * when the code has no such statement.
+ *
+ * The start of the last statement is looked for after each semicolon and line
+ * break, from the end. It is taken when the transpiler reads the code the same
+ * with a semicolon put there, and each part is a program of its own: so the
+ * statement does not go on from the line before (`x = 1\n+ 2`), does not end
+ * before the line after, and does not begin inside a block. The code stays where
+ * it is, so line numbers are the same.
+ */
+export function wrapAsStatementsWithValue(code: string): string | undefined {
+  const whole = readAsRepl(code);
+  if (whole === undefined || !whole.includes(RETURNS_LAST_VALUE)) {
+    return undefined;
+  }
+
+  let tried = 0;
+  for (let start = code.length - 1; start >= 0 && tried < MAX_STATEMENT_STARTS; start--) {
+    const before = code[start - 1];
+    if (start > 0 && before !== ";" && before !== "\n") {
+      continue;
+    }
+    tried++;
+
+    // Whitespace stays with what comes before, since a line break after
+    // return would end the statement there.
+    const rest = code.slice(start);
+    const last = rest.trimStart();
+    const from = start + (rest.length - last.length);
+    if (last === "" || last.startsWith("//") || last.startsWith("/*")) {
+      continue;
+    }
+
+    // Each part must be a program of its own, or the semicolon may have landed inside a block.
+    const first = code.slice(0, from);
+    if (
+      readAsRepl(`${first}\n;${last}`) === whole &&
+      readAsRepl(first) !== undefined &&
+      readAsRepl(last) !== undefined
+    ) {
+      return wrapAsStatements(`${first}return ${last}`);
+    }
+  }
+
+  return undefined;
+}
