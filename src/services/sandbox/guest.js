@@ -290,6 +290,13 @@
     return "... " + count + " more " + (count === 1 ? singular : plural);
   }
 
+  // What comes before the items of a collection of a class that extends Array, Map or Set.
+  function subclassPrefix(value, base, size) {
+    const name = constructorName(value);
+    if (name === null || name === base) return base === "Array" ? "" : base + "(" + size + ") ";
+    return name + "(" + size + ") " + (base === "Array" ? "" : "[" + base + "] ");
+  }
+
   function formatArray(array, depth, state) {
     const parts = [];
     const length = array.length;
@@ -321,7 +328,7 @@
     }
     const items = parts.length;
     addProperties(array, parts, depth, state, true);
-    return layout("", "[", parts, "]", depth, parts.length === items);
+    return layout(subclassPrefix(array, "Array", length), "[", parts, "]", depth, parts.length === items);
   }
 
   function formatTypedArray(array, name, depth, state) {
@@ -353,7 +360,7 @@
       parts[parts.length] = more(size - parts.length, "item", "items");
     }
     addProperties(map, parts, depth, state, false);
-    return layout("Map(" + size + ") ", "{", parts, "}", depth);
+    return layout(subclassPrefix(map, "Map", size), "{", parts, "}", depth);
   }
 
   function formatSet(set, depth, state) {
@@ -371,7 +378,7 @@
     }
     const items = parts.length;
     addProperties(set, parts, depth, state, false);
-    return layout("Set(" + size + ") ", "{", parts, "}", depth, parts.length === items);
+    return layout(subclassPrefix(set, "Set", size), "{", parts, "}", depth, parts.length === items);
   }
 
   // Prototype -> function that lists what to show of an instance of a class the
