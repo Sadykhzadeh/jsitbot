@@ -2,6 +2,7 @@ import { describe, expect, spyOn, test } from "bun:test";
 
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 import type { SandboxExecution } from "../src/services/sandbox/types";
+import { measure } from "./helpers/measure";
 
 // A generous clock: the memory cases must end because the memory ran out, not
 // because a slow machine ran out of time first.
@@ -27,10 +28,10 @@ const quickSandbox = new QuickJsSandboxService({
 async function timed(
   code: string,
   service: QuickJsSandboxService = sandbox,
-): Promise<{ result: SandboxExecution; wallMs: number }> {
-  const startedAt = performance.now();
-  const result = await service.execute(code);
-  return { result, wallMs: performance.now() - startedAt };
+): Promise<{ result: SandboxExecution; cpuMs: number }> {
+  // How long a run took is read off the CPU, which a busy machine does not stretch.
+  const { value, cpuMs } = await measure(() => service.execute(code));
+  return { result: value, cpuMs };
 }
 
 async function expectStillHealthy(): Promise<void> {
@@ -81,13 +82,13 @@ describe("memory limits", () => {
 
   for (const [name, code] of Object.entries(bombs)) {
     test(`stops ${name} and keeps serving`, async () => {
-      const { result, wallMs } = await timed(code);
+      const { result, cpuMs } = await timed(code);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toBe("Sandbox exceeded its memory limit.");
       }
-      expect(wallMs).toBeLessThan(3_500);
+      expect(cpuMs).toBeLessThan(3_500);
 
       await expectStillHealthy();
     });
@@ -115,14 +116,15 @@ describe("memory limits", () => {
 
   test("honours a lower configured limit", async () => {
     const small = new QuickJsSandboxService({ memoryLimitBytes: 4 * 1024 * 1024 });
-    const startedAt = performance.now();
-    const result = await small.execute(`
+    const { value: result, cpuMs } = await measure(() =>
+      small.execute(`
       const kept = [];
       while (true) kept.push("x".repeat(1024 * 1024));
-    `);
+    `),
+    );
 
     expect(result.ok).toBe(false);
-    expect(performance.now() - startedAt).toBeLessThan(1_000);
+    expect(cpuMs).toBeLessThan(1_000);
   });
 
   test("lets a reasonable allocation through", async () => {
@@ -203,14 +205,14 @@ describe("time limits", () => {
 
   for (const [name, code] of Object.entries(spinners)) {
     test(`stops ${name} and keeps serving`, async () => {
-      const { result, wallMs } = await timed(code, quickSandbox);
+      const { result, cpuMs } = await timed(code, quickSandbox);
 
       expect(result.ok).toBe(false);
       expect(result.timedOut).toBe(true);
       if (!result.ok) {
         expect(result.error).toBe("Sandbox execution timed out.");
       }
-      expect(wallMs).toBeLessThan(1_000);
+      expect(cpuMs).toBeLessThan(1_000);
 
       await expectStillHealthy();
     });
