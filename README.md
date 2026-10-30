@@ -18,6 +18,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Accepts TypeScript syntax (the types are stripped)
 - Has `setTimeout`, `setInterval` and their `clear` twins on a virtual clock: a sleep returns at once instead of using up the time limit, and `Date.now()` does not move. `performance.now()` does move with it, so a measurement around a sleep shows the sleep. An interval that is never cleared runs until the time limit
 - Has `queueMicrotask`, `structuredClone`, `TextEncoder` and `TextDecoder` (UTF-8 only), `atob` and `btoa`, and `URL` and `URLSearchParams` (host names are not converted to punycode and addresses are left as written)
+- Sorts with `localeCompare` the way a browser does for most text: small letters before capitals, accents after letters, and the options `numeric`, `sensitivity`, `caseFirst` and `ignorePunctuation`. The locale is not looked at and `Intl` is not there
 - Has `crypto.getRandomValues` and `crypto.randomUUID`. The numbers are well spread and differ from run to run, but they come from a small generator inside the sandbox and are not secure; do not use them for secrets
 - Takes code pasted in a fenced block, with or without a language name
 - Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, or `/run` as a reply to a message that has the code. It ignores everything else that is said there

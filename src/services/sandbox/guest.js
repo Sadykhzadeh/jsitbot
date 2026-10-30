@@ -1145,6 +1145,21 @@
     }
   }
 
+  // A built-in method that is replaced by one from an extra, evaluated the
+  // first time the method is called.
+  function lazyMethod(module, owner, name) {
+    let exported;
+    const stub = {
+      [name](that) {
+        if (exported === undefined) exported = indirectEval(loadExtra(module))()[name];
+        return reflectApply(exported, this, arguments);
+      },
+    }[name];
+
+    defineProperty(owner, name, { value: stub, writable: true, configurable: true, enumerable: false });
+  }
+
+  lazyMethod("collate", String.prototype, "localeCompare");
   lazyGlobals("clone", ["structuredClone"]);
   lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
   lazyGlobals("url", ["URL", "URLSearchParams"]);
