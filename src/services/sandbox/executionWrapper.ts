@@ -38,7 +38,7 @@ export const guestRuntimeSource = read("./guest.js");
  * that does not use them does not pay for parsing them.
  */
 export const guestExtras: Record<string, string> = Object.fromEntries(
-  ["clone", "encoding", "url", "crypto", "collate", "number"].map((name) => [name, read(`./extras/${name}.js`)]),
+  ["clone", "encoding", "url", "crypto", "collate", "number", "intl"].map((name) => [name, read(`./extras/${name}.js`)]),
 );
 
 // The wrappers add nothing but text on the first line, so line numbers in the

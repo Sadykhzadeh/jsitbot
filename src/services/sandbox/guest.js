@@ -1198,6 +1198,7 @@
   lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
   lazyGlobals("url", ["URL", "URLSearchParams"]);
   lazyGlobals("crypto", ["crypto"]);
+  lazyGlobals("intl", ["Intl"]);
 
   for (const [name, value] of [
     ["setTimeout", setTimeout],
