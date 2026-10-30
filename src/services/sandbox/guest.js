@@ -423,7 +423,7 @@
   // Adds "key: value" for each enumerable own property to parts, and says how
   // many it left out for want of room. Indexes are skipped for the objects that
   // list their items on their own.
-  function addProperties(object, parts, depth, state, skipIndexes) {
+  function addProperties(object, parts, depth, state, skipIndexes, skipErrorFields) {
     const names = getOwnPropertyNames(object);
     const symbols = getOwnPropertySymbols(object);
     let seen = 0;
@@ -434,6 +434,7 @@
         const key = keys[i];
         if (!isEnumerable(object, key)) continue;
         if (skipIndexes && pass === 0 && isIndexKey(key)) continue;
+        if (skipErrorFields && pass === 0 && (key === "name" || key === "message" || key === "stack")) continue;
         if (parts.length >= MAX_ENTRIES || state.left <= 0) {
           seen++;
           continue;
@@ -475,6 +476,20 @@
     return parts.length === 0 ? text : layout(text + " ", "{", parts, "}", depth);
   }
 
+  // An error shows as its name and message, and the properties added to it,
+  // such as a code or the error that caused it, follow.
+  function formatError(error, depth, state) {
+    const text = errorText(error, state);
+    const parts = [];
+    addProperties(error, parts, depth, state, false, true);
+    if (hasOwn(error, "cause") && !isEnumerable(error, "cause")) {
+      parts[parts.length] = "[cause]: " + format(error.cause, depth + 1, state);
+    }
+
+    const shown = depth === 0 ? text : "[" + text + "]";
+    return parts.length === 0 ? shown : layout(shown + " ", "{", parts, "}", depth);
+  }
+
   function formatObject(value, depth, state) {
     const tag = objectToString(value);
 
@@ -484,7 +499,7 @@
       return withProperties(text, value, depth, state);
     }
     if (tag === "[object RegExp]") return withProperties(regExpToString(value), value, depth, state);
-    if (tag === "[object Error]") return depth === 0 ? errorText(value, state) : "[" + errorText(value, state) + "]";
+    if (tag === "[object Error]") return formatError(value, depth, state);
     if (tag === "[object Number]") return "[Number: " + formatNumber(numberValueOf(value)) + "]";
     if (tag === "[object String]") return "[String: " + quote(stringValueOf(value), state) + "]";
     if (tag === "[object Boolean]") return "[Boolean: " + booleanValueOf(value) + "]";
