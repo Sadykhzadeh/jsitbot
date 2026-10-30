@@ -1148,18 +1148,22 @@
   // A built-in method that is replaced by one from an extra, evaluated the
   // first time the method is called.
   function lazyMethod(module, owner, name) {
+    const original = owner[name];
     let exported;
     const stub = {
-      [name](that) {
-        if (exported === undefined) exported = indirectEval(loadExtra(module))()[name];
+      [name]() {
+        if (exported === undefined) exported = indirectEval(loadExtra(module))(original, owner)[name];
         return reflectApply(exported, this, arguments);
       },
     }[name];
+    defineProperty(stub, "length", { value: original.length, configurable: true });
 
     defineProperty(owner, name, { value: stub, writable: true, configurable: true, enumerable: false });
   }
 
   lazyMethod("collate", String.prototype, "localeCompare");
+  lazyMethod("number", Number.prototype, "toLocaleString");
+  lazyMethod("number", BigInt.prototype, "toLocaleString");
   lazyGlobals("clone", ["structuredClone"]);
   lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
   lazyGlobals("url", ["URL", "URLSearchParams"]);
