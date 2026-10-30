@@ -294,3 +294,32 @@ describe("crypto", () => {
     expect(await value(`return [typeof crypto.subtle, Object.prototype.toString.call(crypto)].join()`)).toBe("undefined,[object Crypto]");
   });
 });
+
+describe("Error.captureStackTrace", () => {
+  test("can be called from the constructor of an error class", async () => {
+    expect(
+      await value(`
+        class ValidationError extends Error {
+          constructor(message) {
+            super(message);
+            this.name = "ValidationError";
+            Error.captureStackTrace(this, ValidationError);
+          }
+        }
+        const error = new ValidationError("bad");
+        return [error instanceof Error, error.name, error.message].join();
+      `),
+    ).toBe("true,ValidationError,bad");
+  });
+
+  test("gives the object a stack that opens with its name and message, out of sight", async () => {
+    expect(await value(`const o = { name: "Oops", message: "it broke" }; Error.captureStackTrace(o); return o.stack`)).toBe(
+      "Oops: it broke",
+    );
+    expect(await value(`const o = {}; Error.captureStackTrace(o); return Object.keys(o).length + o.stack`)).toBe("0Error");
+  });
+
+  test("refuses what is not an object", async () => {
+    expect(await value(`Error.captureStackTrace(5)`)).toBe("error: TypeError: Invalid argument");
+  });
+});

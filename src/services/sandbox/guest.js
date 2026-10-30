@@ -1176,6 +1176,21 @@
     defineProperty(owner, name, { value: stub, writable: true, configurable: true, enumerable: false });
   }
 
+  // Custom error classes call this in their constructors. The engine has no
+  // call stack to hand over, so what the object gets is the line a stack opens
+  // with.
+  defineProperty(Error, "captureStackTrace", {
+    value: function captureStackTrace(target) {
+      if ((typeof target !== "object" || target === null) && typeof target !== "function") {
+        throw new TypeError("Invalid argument");
+      }
+      defineProperty(target, "stack", { value: errorText(target, { cut: false }), writable: true, configurable: true, enumerable: false });
+    },
+    writable: true,
+    configurable: true,
+    enumerable: false,
+  });
+
   lazyMethod("collate", String.prototype, "localeCompare");
   lazyMethod("number", Number.prototype, "toLocaleString");
   lazyMethod("number", BigInt.prototype, "toLocaleString");
