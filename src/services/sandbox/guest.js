@@ -1232,6 +1232,9 @@
   defineProperty(Array.fromAsync, "length", { value: 1, configurable: true });
 
   lazyMethod("collate", String.prototype, "localeCompare");
+  lazyMethod("date", Date.prototype, "toLocaleString");
+  lazyMethod("date", Date.prototype, "toLocaleDateString");
+  lazyMethod("date", Date.prototype, "toLocaleTimeString");
   lazyMethod("number", Number.prototype, "toLocaleString");
   lazyMethod("number", BigInt.prototype, "toLocaleString");
   lazyGlobals("clone", ["structuredClone"]);
