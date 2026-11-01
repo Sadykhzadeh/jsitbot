@@ -48,9 +48,9 @@ describe("Intl.Collator", () => {
 });
 
 describe("Intl", () => {
-  test("is there, and has only what the two classes need", async () => {
+  test("is there, and has only the classes it has", async () => {
     expect(await value(`return [typeof Intl, Object.prototype.toString.call(Intl)].join()`)).toBe("object,[object Intl]");
-    expect(await value(`return typeof Intl.PluralRules`)).toBe("undefined");
+    expect(await value(`return typeof Intl.RelativeTimeFormat`)).toBe("undefined");
   });
 
   test("can be replaced by the program, and is not carried into the next run", async () => {
