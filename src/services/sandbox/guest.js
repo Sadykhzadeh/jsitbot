@@ -1195,6 +1195,42 @@
     enumerable: false,
   });
 
+  // Array.fromAsync, which the engine does not have. It always builds an Array.
+  defineProperty(Array, "fromAsync", {
+    value: {
+      async fromAsync(items, mapfn, thisArg) {
+        if (items === null || items === undefined) {
+          throw new TypeError("Array.fromAsync requires an iterable, async iterable or array-like object");
+        }
+        if (mapfn !== undefined && typeof mapfn !== "function") {
+          throw new TypeError("Array.fromAsync: the mapper is not a function");
+        }
+
+        const result = [];
+        let k = 0;
+        if (items[Symbol.asyncIterator] != null || items[Symbol.iterator] != null) {
+          for await (const item of items) {
+            result[k] = mapfn === undefined ? item : await reflectApply(mapfn, thisArg, [item, k]);
+            k++;
+          }
+          return result;
+        }
+
+        const source = Object(items);
+        const length = Math.min(Math.max(Math.trunc(+source.length) || 0, 0), Number.MAX_SAFE_INTEGER);
+        for (; k < length; k++) {
+          const item = await source[k];
+          result[k] = mapfn === undefined ? item : await reflectApply(mapfn, thisArg, [item, k]);
+        }
+        return result;
+      },
+    }.fromAsync,
+    writable: true,
+    configurable: true,
+    enumerable: false,
+  });
+  defineProperty(Array.fromAsync, "length", { value: 1, configurable: true });
+
   lazyMethod("collate", String.prototype, "localeCompare");
   lazyMethod("number", Number.prototype, "toLocaleString");
   lazyMethod("number", BigInt.prototype, "toLocaleString");
