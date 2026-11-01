@@ -499,7 +499,7 @@
       return withProperties(text, value, depth, state);
     }
     if (tag === "[object RegExp]") return withProperties(regExpToString(value), value, depth, state);
-    if (tag === "[object Error]") return formatError(value, depth, state);
+    if (tag === "[object Error]" || tag === "[object DOMException]") return formatError(value, depth, state);
     if (tag === "[object Number]") return "[Number: " + formatNumber(numberValueOf(value)) + "]";
     if (tag === "[object String]") return "[String: " + quote(stringValueOf(value), state) + "]";
     if (tag === "[object Boolean]") return "[Boolean: " + booleanValueOf(value) + "]";
@@ -598,7 +598,7 @@
   function isErrorLike(value) {
     try {
       return typeof value === "object" && value !== null
-        && (objectToString(value) === "[object Error]" || typeof value.message === "string");
+        && (objectToString(value) === "[object Error]" || objectToString(value) === "[object DOMException]" || typeof value.message === "string");
     } catch (ignored) {
       return false;
     }
@@ -1135,11 +1135,15 @@
   const indirectEval = eval;
   const defineProperty = Object.defineProperty;
 
+  // The timers and the clock as they are now, for extras that need them even
+  // after the program has replaced the globals.
+  const hostFunctions = { setTimeout, queueMicrotask, defineProperty, now: performance.now };
+
   function lazyGlobals(module, names) {
     let exported;
 
     function load() {
-      if (exported === undefined) exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3]);
+      if (exported === undefined) exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions);
       return exported;
     }
 
@@ -1199,6 +1203,7 @@
   lazyGlobals("url", ["URL", "URLSearchParams"]);
   lazyGlobals("crypto", ["crypto"]);
   lazyGlobals("intl", ["Intl"]);
+  lazyGlobals("events", ["DOMException", "Event", "CustomEvent", "EventTarget", "AbortController", "AbortSignal"]);
 
   for (const [name, value] of [
     ["setTimeout", setTimeout],
