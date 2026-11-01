@@ -89,6 +89,10 @@
           }
           return out;
         }
+        case "[object DOMException]":
+          out = new DOMException(source.message, source.name);
+          seen.set(source, out);
+          return out;
         case "[object Array]":
           out = new Array(source.length);
           seen.set(source, out);

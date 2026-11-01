@@ -94,6 +94,15 @@ describe("structuredClone", () => {
     ).toBe("true,r,1");
   });
 
+  test("copies a DOMException with its name, message and code", async () => {
+    expect(
+      await value(`
+        const copy = structuredClone(new DOMException("stop", "AbortError"));
+        return [copy instanceof DOMException, copy.name, copy.message, copy.code].join();
+      `),
+    ).toBe("true,AbortError,stop,20");
+  });
+
   test("refuses what cannot be copied, with the error name a browser uses", async () => {
     expect(await value(`structuredClone(() => 1)`)).toBe("error: DataCloneError: () => 1 could not be cloned.");
     expect(await value(`structuredClone({ f() {} })`)).toContain("DataCloneError");
