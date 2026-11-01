@@ -1137,7 +1137,16 @@
 
   // The timers and the clock as they are now, for extras that need them even
   // after the program has replaced the globals.
-  const hostFunctions = { setTimeout, queueMicrotask, defineProperty, now: performance.now };
+  // `extra` hands out what another extra exports, evaluating it if need be, so
+  // that an extra does not depend on a global the program may have replaced.
+  const loaders = Object.create(null);
+  const hostFunctions = {
+    setTimeout,
+    queueMicrotask,
+    defineProperty,
+    now: performance.now,
+    extra: (module) => loaders[module](),
+  };
 
   function lazyGlobals(module, names) {
     let exported;
@@ -1146,6 +1155,8 @@
       if (exported === undefined) exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions);
       return exported;
     }
+
+    loaders[module] = load;
 
     for (let i = 0; i < names.length; i++) {
       const name = names[i];

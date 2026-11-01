@@ -103,6 +103,20 @@ describe("structuredClone", () => {
     ).toBe("true,AbortError,stop,20");
   });
 
+  test("refuses with a DOMException named DataCloneError, as a browser does", async () => {
+    expect(
+      await value(`
+        try { structuredClone(() => 1) } catch (e) {
+          return [e instanceof DOMException, e instanceof Error, e.name, e.code, e.constructor === DOMException].join();
+        }
+      `),
+    ).toBe("true,true,DataCloneError,25,true");
+  });
+
+  test("still refuses when the program has replaced DOMException", async () => {
+    expect(await value(`DOMException = 5; structuredClone(() => 1)`)).toContain("DataCloneError");
+  });
+
   test("refuses what cannot be copied, with the error name a browser uses", async () => {
     expect(await value(`structuredClone(() => 1)`)).toBe("error: DataCloneError: () => 1 could not be cloned.");
     expect(await value(`structuredClone({ f() {} })`)).toContain("DataCloneError");

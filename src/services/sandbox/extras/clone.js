@@ -1,12 +1,10 @@
 // structuredClone, for the guest. Evaluated the first time the code asks for it;
 // see lazyGlobals in guest.js. Returns the globals it defines.
-(function () {
+(function (register, seed, host) {
   "use strict";
 
   function cloneError(what) {
-    const error = new Error(what + " could not be cloned.");
-    error.name = "DataCloneError";
-    return error;
+    return new (host.extra("events").DOMException)(what + " could not be cloned.", "DataCloneError");
   }
 
   const typedArrays = {
@@ -90,7 +88,7 @@
           return out;
         }
         case "[object DOMException]":
-          out = new DOMException(source.message, source.name);
+          out = new (host.extra("events").DOMException)(source.message, source.name);
           seen.set(source, out);
           return out;
         case "[object Array]":
