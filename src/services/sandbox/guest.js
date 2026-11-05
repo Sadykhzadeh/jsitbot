@@ -53,6 +53,7 @@
   const hasOwn = uncurry(Object.prototype.hasOwnProperty);
   const isEnumerable = uncurry(Object.prototype.propertyIsEnumerable);
   const stringSlice = uncurry(String.prototype.slice);
+  const stringToUpper = uncurry(String.prototype.toUpperCase);
   const stringIndexOf = uncurry(String.prototype.indexOf);
   const stringCharCodeAt = uncurry(String.prototype.charCodeAt);
   const numberToString = uncurry(Number.prototype.toString);
@@ -198,7 +199,9 @@
       else if (c === "\n") out += "\\n";
       else if (c === "\r") out += "\\r";
       else if (c === "\t") out += "\\t";
-      else if (c < " ") out += "\\x" + (stringCharCodeAt(c, 0) < 16 ? "0" : "") + numberToString(stringCharCodeAt(c, 0), 16);
+      else if (c === "\b") out += "\\b";
+      else if (c === "\f") out += "\\f";
+      else if (c < " " || (c >= "\x7f" && c <= "\x9f")) out += "\\x" + (stringCharCodeAt(c, 0) < 16 ? "0" : "") + stringToUpper(numberToString(stringCharCodeAt(c, 0), 16));
       else out += c;
     }
     return out + mark + (clipped ? "..." : "");

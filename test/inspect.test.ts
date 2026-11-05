@@ -165,3 +165,10 @@ describe("console", () => {
     `)).toEqual(["[Unformattable object]", "{ a: [Getter] }", "after"]);
   });
 });
+
+describe("escapes in quoted strings", () => {
+  test("are written the way Node writes them", async () => {
+    expect(await show(String.raw`["\b", "\f", "\v", "\x01", "\x1f"]`)).toBe(String.raw`[ '\b', '\f', '\x0B', '\x01', '\x1F' ]`);
+    expect(await show(String.raw`["\x7f", "\x85", "\x9f"]`)).toBe(String.raw`[ '\x7F', '\x85', '\x9F' ]`);
+  });
+});
