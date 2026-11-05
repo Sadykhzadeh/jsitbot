@@ -294,3 +294,65 @@ describe("setImmediate", () => {
     expect(await value(`return Object.keys(globalThis).includes("setImmediate")`)).toBe("false");
   });
 });
+
+describe("performance marks", () => {
+  test("a measure between two marks shows the sleep between them", async () => {
+    expect(
+      await value(`
+        performance.mark("a");
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        performance.mark("b");
+        const m = performance.measure("sleep", "a", "b");
+        return [m.name, m.entryType, m.duration >= 250 && m.duration < 260].join();
+      `),
+    ).toBe("sleep,measure,true");
+  });
+
+  test("a mark is an entry with a name, a start time, no duration and the detail given", async () => {
+    expect(
+      await value(`
+        const m = performance.mark("x", { detail: { n: 1 } });
+        return [m.name, m.entryType, typeof m.startTime, m.duration, JSON.stringify(m.detail)].join();
+      `),
+    ).toBe("x,mark,number,0,{\"n\":1}");
+    expect(await value(`return performance.mark("y").detail`)).toBe("null");
+  });
+
+  test("measure takes options, and a measure with no end runs to now", async () => {
+    expect(
+      await value(`
+        performance.mark("a", { startTime: 10 });
+        const upTo = performance.measure("one", { start: "a", end: 40 });
+        const toNow = performance.measure("two", { start: 0 });
+        return [upTo.startTime, upTo.duration, toNow.startTime, toNow.duration >= 0].join();
+      `),
+    ).toBe("10,30,0,true");
+  });
+
+  test("entries are listed by name and by type, and can be cleared", async () => {
+    expect(
+      await value(`
+        performance.mark("a"); performance.mark("a"); performance.mark("b");
+        performance.measure("m");
+        const seen = [
+          performance.getEntries().length,
+          performance.getEntriesByName("a").length,
+          performance.getEntriesByName("m", "mark").length,
+          performance.getEntriesByType("mark").length,
+        ];
+        performance.clearMarks("a");
+        seen.push(performance.getEntriesByType("mark").length);
+        performance.clearMarks();
+        performance.clearMeasures();
+        seen.push(performance.getEntries().length);
+        return seen.join();
+      `),
+    ).toBe("4,2,0,3,1,0");
+  });
+
+  test("measuring from a mark that was never set is an error", async () => {
+    expect(await value(`performance.measure("z", "nope")`)).toBe(
+      'error: SyntaxError: The "nope" performance mark has not been set',
+    );
+  });
+});

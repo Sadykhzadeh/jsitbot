@@ -1257,7 +1257,72 @@
       return dateNow() - clockStart + timerClock;
     },
     timeOrigin: clockStart,
+    mark(name, options) {
+      const at = options !== undefined && options !== null && options.startTime !== undefined ? +options.startTime : performance.now();
+      const detail = options !== undefined && options !== null && options.detail !== undefined ? options.detail : null;
+      const entry = { name: toText(name), entryType: "mark", startTime: at, duration: 0, detail };
+      entries[entries.length] = entry;
+      return entry;
+    },
+    measure(name, startOrOptions, endMark) {
+      let start = startOrOptions;
+      let end = endMark;
+      let detail = null;
+      if (typeof startOrOptions === "object" && startOrOptions !== null) {
+        start = startOrOptions.start;
+        end = startOrOptions.end;
+        if (startOrOptions.detail !== undefined) detail = startOrOptions.detail;
+      }
+      const from = start === undefined ? 0 : markTime(start);
+      const to = end === undefined ? performance.now() : markTime(end);
+      const entry = { name: toText(name), entryType: "measure", startTime: from, duration: to - from, detail };
+      entries[entries.length] = entry;
+      return entry;
+    },
+    getEntries() {
+      return sortedEntries(undefined, undefined);
+    },
+    getEntriesByName(name, type) {
+      return sortedEntries(toText(name), type);
+    },
+    getEntriesByType(type) {
+      return sortedEntries(undefined, type);
+    },
+    clearMarks(name) {
+      clearEntries("mark", name);
+    },
+    clearMeasures(name) {
+      clearEntries("measure", name);
+    },
   };
+
+  // The marks and measures of the run, for performance.
+  const entries = [];
+
+  function markTime(value) {
+    if (typeof value === "number") return value;
+    const wanted = toText(value);
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i].entryType === "mark" && entries[i].name === wanted) return entries[i].startTime;
+    }
+    throw new SyntaxError('The "' + wanted + '" performance mark has not been set');
+  }
+
+  function sortedEntries(name, type) {
+    const found = [];
+    for (let i = 0; i < entries.length; i++) {
+      if ((name === undefined || entries[i].name === name) && (type === undefined || entries[i].entryType === type)) {
+        found[found.length] = entries[i];
+      }
+    }
+    return found.sort((a, b) => a.startTime - b.startTime);
+  }
+
+  function clearEntries(type, name) {
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i].entryType === type && (name === undefined || entries[i].name === toText(name))) arraySplice(entries, i, 1);
+    }
+  }
 
   // Globals whose code is only evaluated, from source the host hands over by
   // name, when the program first reads one of them. Assigning to the global
