@@ -64,14 +64,14 @@ describe("QuickJsSandboxService", () => {
         Bun: typeof Bun,
         fetch: typeof fetch,
         require: typeof require,
-        setImmediate: typeof setImmediate,
+        Worker: typeof Worker,
       });
     `);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.result).toBe(
-        "{\"process\":\"undefined\",\"Bun\":\"undefined\",\"fetch\":\"undefined\",\"require\":\"undefined\",\"setImmediate\":\"undefined\"}",
+        "{\"process\":\"undefined\",\"Bun\":\"undefined\",\"fetch\":\"undefined\",\"require\":\"undefined\",\"Worker\":\"undefined\"}",
       );
     }
   });

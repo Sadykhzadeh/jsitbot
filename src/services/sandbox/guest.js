@@ -1181,6 +1181,15 @@
     clearTimeout(id);
   }
 
+  // Runs after the code that is running, like a timer of no delay.
+  function setImmediate(callback, ...args) {
+    return addTimer(callback, 0, args, false);
+  }
+
+  function clearImmediate(id) {
+    clearTimeout(id);
+  }
+
   function tick() {
     if (timers.length === 0) return false;
 
@@ -1360,6 +1369,8 @@
     ["clearTimeout", clearTimeout],
     ["setInterval", setInterval],
     ["clearInterval", clearInterval],
+    ["setImmediate", setImmediate],
+    ["clearImmediate", clearImmediate],
     ["queueMicrotask", queueMicrotask],
     ["performance", performance],
   ]) {

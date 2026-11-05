@@ -264,3 +264,33 @@ describe("performance.now", () => {
     `)).toBe("true");
   });
 });
+
+describe("setImmediate", () => {
+  test("runs its callback with the arguments after the code, and before a timer of 5 ms", async () => {
+    expect(
+      await value(`
+        const seen = [];
+        setTimeout(() => seen.push("timer"), 5);
+        setImmediate((a, b) => seen.push("immediate " + a + b), 1, 2);
+        seen.push("sync");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return seen.join();
+      `),
+    ).toBe("sync,immediate 12,timer");
+  });
+
+  test("can be cancelled with clearImmediate", async () => {
+    expect(
+      await value(`
+        let ran = false;
+        clearImmediate(setImmediate(() => { ran = true }));
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return ran;
+      `),
+    ).toBe("false");
+  });
+
+  test("is not listed among the globals of a program", async () => {
+    expect(await value(`return Object.keys(globalThis).includes("setImmediate")`)).toBe("false");
+  });
+});
