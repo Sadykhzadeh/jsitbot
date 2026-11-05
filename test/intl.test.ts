@@ -51,7 +51,7 @@ describe("Intl", () => {
   test("is there, and has only the classes it has", async () => {
     expect(await value(`return [typeof Intl, Object.prototype.toString.call(Intl)].join()`)).toBe("object,[object Intl]");
     expect(await value(`return Object.getOwnPropertyNames(Intl).join()`)).toBe(
-      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat",
+      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter",
     );
   });
 

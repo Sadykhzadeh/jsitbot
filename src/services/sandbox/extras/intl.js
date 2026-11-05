@@ -1,5 +1,5 @@
 // Intl.NumberFormat, Intl.Collator, Intl.DateTimeFormat, Intl.PluralRules,
-// Intl.ListFormat and Intl.RelativeTimeFormat, for the guest. Evaluated the
+// Intl.ListFormat, Intl.RelativeTimeFormat and Intl.Segmenter, for the guest. Evaluated the
 // first time the code asks for `Intl`; see lazyGlobals in guest.js.
 //
 // They are the toLocaleString of numbers, the localeCompare of strings and the
@@ -311,6 +311,66 @@
     }
   }
 
+  // Where a text is cut. These are approximations of the Unicode rules, the same
+  // for every language: a grapheme is a character with its marks and joined
+  // emoji, a word is a run of letters, digits and the apostrophe or the point
+  // between them, a sentence ends after . ! or ? and the space that follows.
+  const SEGMENT_PATTERNS = {
+    grapheme: /\r\n|\p{Regional_Indicator}{2}|[^\p{M}\u200d][\p{M}\ufe0f\p{Emoji_Modifier}]*(?:\u200d\p{Extended_Pictographic}[\p{M}\ufe0f\p{Emoji_Modifier}]*)*|[\s\S]/gu,
+    word: /[\p{L}\p{N}_]+(?:['’.][\p{L}\p{N}_]+)*|\s+|[\s\S]/gu,
+    sentence: /[\s\S]*?(?:[.!?]+['")\]]*(?:\s+|$)|$)/gu,
+  };
+
+  class Segments {
+    #input;
+    #granularity;
+
+    constructor(input, granularity) {
+      this.#input = input;
+      this.#granularity = granularity;
+    }
+
+    *[Symbol.iterator]() {
+      const input = this.#input;
+      const granularity = this.#granularity;
+      const pattern = new RegExp(SEGMENT_PATTERNS[granularity].source, "gu");
+      let match;
+      while ((match = pattern.exec(input)) !== null && match[0] !== "") {
+        const entry = { segment: match[0], index: match.index, input };
+        if (granularity === "word") entry.isWordLike = /[\p{L}\p{N}]/u.test(match[0]);
+        yield entry;
+      }
+    }
+
+    containing(index) {
+      const at = Math.trunc(Number(index)) || 0;
+      if (at < 0 || at >= this.#input.length) return undefined;
+      for (const entry of this) {
+        if (at < entry.index + entry.segment.length) return entry;
+      }
+      return undefined;
+    }
+  }
+
+  class Segmenter {
+    #granularity;
+
+    constructor(locales, options) {
+      if (options === null) throw new TypeError("Cannot convert undefined or null to object");
+      const asked = options === undefined ? {} : Object(options);
+      this.#granularity = choose(asked, "granularity", ["grapheme", "word", "sentence"], "grapheme", "Segmenter");
+    }
+
+    segment(input) {
+      return new Segments(String(input), this.#granularity);
+    }
+
+    resolvedOptions() {
+      return { locale: "en-US", granularity: this.#granularity };
+    }
+  }
+
+  Object.defineProperty(Segmenter.prototype, Symbol.toStringTag, { value: "Intl.Segmenter", configurable: true });
   Object.defineProperty(RelativeTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.RelativeTimeFormat", configurable: true });
   Object.defineProperty(PluralRules.prototype, Symbol.toStringTag, { value: "Intl.PluralRules", configurable: true });
   Object.defineProperty(ListFormat.prototype, Symbol.toStringTag, { value: "Intl.ListFormat", configurable: true });
@@ -333,6 +393,7 @@
   define(Intl, "PluralRules", PluralRules);
   define(Intl, "ListFormat", ListFormat);
   define(Intl, "RelativeTimeFormat", RelativeTimeFormat);
+  define(Intl, "Segmenter", Segmenter);
   Object.defineProperty(Intl, Symbol.toStringTag, { value: "Intl", configurable: true });
 
   return { Intl };
