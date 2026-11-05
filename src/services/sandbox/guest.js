@@ -1450,6 +1450,13 @@
   lazyGlobals("intl", ["Intl"]);
   lazyGlobals("events", ["DOMException", "Event", "CustomEvent", "EventTarget", "AbortController", "AbortSignal"]);
 
+  // The symbols for explicit resource management, which the engine has not got.
+  for (const name of ["dispose", "asyncDispose"]) {
+    if (Symbol[name] === undefined) {
+      Object.defineProperty(Symbol, name, { value: Symbol("Symbol." + name), writable: false, configurable: false, enumerable: false });
+    }
+  }
+
   for (const [name, value] of [
     ["setTimeout", setTimeout],
     ["clearTimeout", clearTimeout],

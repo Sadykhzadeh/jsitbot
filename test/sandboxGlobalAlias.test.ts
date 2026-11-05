@@ -20,3 +20,19 @@ describe("global", () => {
     expect(await value(`global = 5; return global`)).toBe("5");
   });
 });
+
+describe("Symbol.dispose and Symbol.asyncDispose", () => {
+  test("are symbols with the names Node gives them, so a class can define its disposal", async () => {
+    expect(
+      await value(`
+        class Handle { [Symbol.dispose]() { return "closed" } async [Symbol.asyncDispose]() {} }
+        const h = new Handle();
+        return [typeof Symbol.dispose, String(Symbol.dispose), String(Symbol.asyncDispose), h[Symbol.dispose](), Object.getOwnPropertyNames(Handle.prototype).join()].join();
+      `),
+    ).toBe("symbol,Symbol(Symbol.dispose),Symbol(Symbol.asyncDispose),closed,constructor");
+  });
+
+  test("cannot be changed, as the well-known symbols cannot", async () => {
+    expect(await value(`"use strict"; Symbol.dispose = 1`)).toContain("TypeError");
+  });
+});
