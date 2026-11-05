@@ -11,7 +11,7 @@
 //   <status: o|e> \n <line> \n <flags> \n <text>
 // where line is the line of the user's code an error came from (0 if unknown)
 // and flags is a bit set: 1 = result was cut short, 2 = console output was.
-(function setup(hostLog, loadExtra, maxLogs, maxLogLength, maxResultLength, seed0, seed1, seed2, seed3) {
+(function setup(hostLog, loadExtra, maxLogs, maxLogLength, maxResultLength, seed0, seed1, seed2, seed3, promiseState) {
   "use strict";
 
   const FILE = "input.js";
@@ -593,6 +593,24 @@
     return parts.length === 0 ? shown : layout(shown + " ", "{", parts, "}", depth, BASE);
   }
 
+  // A promise shows what it was settled with, or that it has not been. The
+  // host reads that off it: the guest has no way to.
+  function formatPromise(promise, depth, state) {
+    if (depth > depthLimit) return "[Promise]";
+
+    const name = constructorName(promise);
+    const prefix = name === "Promise" || name === null ? "Promise " : name + " [Promise] ";
+    const before = enter(depth);
+    const settled = promiseState(promise);
+    let part = "<pending>";
+    if (settled[0] !== "pending") {
+      part = (settled[0] === "rejected" ? "<rejected> " : "") + format(settled[1], depth + 1, state);
+    } else {
+      currentDepth = before;
+    }
+    return layout(prefix, "{", [part], "}", depth);
+  }
+
   function formatObject(value, depth, state) {
     const tag = objectToString(value);
 
@@ -608,7 +626,7 @@
     if (tag === "[object Boolean]") return "[Boolean: " + booleanValueOf(value) + "]";
     if (tag === "[object BigInt]") return "[BigInt: " + bigintToString(bigintValueOf(value)) + "n]";
     if (tag === "[object Symbol]") return "[Symbol: " + symbolToString(symbolValueOf(value)) + "]";
-    if (tag === "[object Promise]") return "Promise {}";
+    if (tag === "[object Promise]") return formatPromise(value, depth, state);
     if (tag === "[object WeakMap]") return "WeakMap { <items unknown> }";
     if (tag === "[object WeakSet]") return "WeakSet { <items unknown> }";
     if (tag === "[object ArrayBuffer]") return "ArrayBuffer { byteLength: " + arrayBufferLength(value) + " }";

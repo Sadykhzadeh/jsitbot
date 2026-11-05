@@ -446,6 +446,23 @@ export class QuickJsSandboxService implements SandboxService {
       const source = guestExtras[readString(context, name) ?? ""];
       return context.newString(source ?? "");
     });
+    // Says whether a promise is settled and with what: [state, value]. The guest
+    // keeps it to itself and calls it only with promises it is about to print.
+    const promiseState = context.newFunction("promiseState", (promise) => {
+      const settled = context.getPromiseState(promise);
+      const out = context.newArray();
+      const type = context.newString(settled.type);
+      context.setProp(out, 0, type);
+      type.dispose();
+      if (settled.type === "fulfilled") {
+        context.setProp(out, 1, settled.value);
+        settled.value.dispose();
+      } else if (settled.type === "rejected") {
+        context.setProp(out, 1, settled.error);
+        settled.error.dispose();
+      }
+      return out;
+    });
     const api = context.unwrapResult(
       context.callFunction(
         setup,
@@ -456,6 +473,7 @@ export class QuickJsSandboxService implements SandboxService {
         context.newNumber(maxLogLength),
         context.newNumber(maxResultLength),
         ...seed.map((word) => context.newNumber(word)),
+        promiseState,
       ),
     );
 
