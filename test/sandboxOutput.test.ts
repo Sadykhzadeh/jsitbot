@@ -116,7 +116,7 @@ describe("output limits", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.result).toBe("[ [ [ [ [Array] ] ] ] ]");
+      expect(result.result).toBe("[\n  [ [ [ [Array] ] ] ]\n]");
     }
     expect(cpuMs).toBeLessThan(1_000);
   });

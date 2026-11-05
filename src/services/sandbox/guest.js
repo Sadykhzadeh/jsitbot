@@ -20,7 +20,11 @@
   let depthLimit = MAX_DEPTH;
   const MAX_ENTRIES = 100;
   const MAX_SCAN = 100000;
-  const LINE_WIDTH = 72;
+  const LINE_WIDTH = 80;
+  // Objects with more levels than this in them are not put on one line.
+  const COMPACT = 3;
+  const ARRAY = 1;
+  const BASE = 2;
   const MAX_TIMER_DELAY = 2147483647;
   const MAX_TABLE_ROWS = 50;
   const MAX_TABLE_COLUMNS = 8;
@@ -38,6 +42,11 @@
   const functionPrototype = Function.prototype;
   const getKeys = Object.keys;
   const reflectApply = Reflect.apply;
+  const mathSqrt = Math.sqrt;
+  const mathRound = Math.round;
+  const mathFloor = Math.floor;
+  const mathMin = Math.min;
+  const mathMax = Math.max;
 
   const arraySplice = uncurry(Array.prototype.splice);
   const objectToString = uncurry(Object.prototype.toString);
@@ -77,6 +86,15 @@
   let logCount = 0;
   let logsCutShort = false;
   let groupIndent = "";
+  // The depth of the object whose entries were started on last, which is how
+  // deep what is being laid out goes (an empty object has no entries to start).
+  let currentDepth = 0;
+
+  function enter(depth) {
+    const before = currentDepth;
+    currentDepth = depth;
+    return before;
+  }
 
   function spaces(depth) {
     let out = "";
@@ -243,45 +261,109 @@
     return message ? name + ": " + message : name;
   }
 
-  // Lays out already formatted entries: on one line when they fit, otherwise
-  // one per line (or, for lists of short values, packed into rows).
-  function layout(prefix, open, parts, close, depth, packable) {
-    const count = parts.length;
-    if (count === 0) return prefix + open + close;
+  function blanks(count) {
+    let out = "";
+    for (let i = 0; i < count; i++) out += " ";
+    return out;
+  }
 
-    let total = prefix.length + open.length + close.length + 2;
-    let multiline = false;
-    let compact = packable && count > 6;
+  function padStartTo(text, width) {
+    return text.length >= width ? text : blanks(width - text.length) + text;
+  }
+
+  function padEndTo(text, width) {
+    return text.length >= width ? text : text + blanks(width - text.length);
+  }
+
+  // Sets out the entries of a long array in columns, the way Node does: as
+  // many as make the block roughly square, the numbers lined up on the right
+  // and anything else on the left. Returns the rows, or the entries unchanged
+  // when they are too uneven in length to be worth it.
+  function columnize(parts, indentation, numeric) {
+    let count = parts.length;
+    // The "... n more items" entry is not part of the table.
+    if (count > MAX_ENTRIES) count--;
+
+    const lengths = [];
+    let total = 0;
+    let longest = 0;
     for (let i = 0; i < count; i++) {
-      total += parts[i].length + 2;
-      if (stringIndexOf(parts[i], "\n") !== -1) multiline = true;
-      if (parts[i].length > 12 && stringSlice(parts[i], 0, 4) !== "... ") compact = false;
+      const length = parts[i].length;
+      lengths[i] = length;
+      total += length + 2;
+      if (length > longest) longest = length;
     }
 
-    if (!multiline && total <= LINE_WIDTH - depth * 2) {
-      let line = prefix + open + " ";
-      for (let i = 0; i < count; i++) line += (i > 0 ? ", " : "") + parts[i];
-      return line + " " + close;
+    const cell = longest + 2;
+    if (cell * 3 + indentation >= LINE_WIDTH || (total / cell <= 5 && longest > 6)) return parts;
+
+    const bias = mathSqrt(cell - total / parts.length);
+    const biased = mathMax(cell - 3 - bias, 1);
+    const columns = mathMin(
+      mathRound(mathSqrt(2.5 * biased * count) / biased),
+      mathFloor((LINE_WIDTH - indentation) / cell),
+      COMPACT * 4,
+      15,
+    );
+    if (columns <= 1) return parts;
+
+    const widths = [];
+    for (let column = 0; column < columns; column++) {
+      let widest = 0;
+      for (let i = column; i < count; i += columns) {
+        if (lengths[i] > widest) widest = lengths[i];
+      }
+      widths[column] = widest + 2;
+    }
+
+    const rows = [];
+    for (let from = 0; from < count; from += columns) {
+      const to = mathMin(from + columns, count);
+      let row = "";
+      for (let i = from; i < to - 1; i++) {
+        const cellText = parts[i] + ", ";
+        row += numeric ? padStartTo(cellText, widths[i - from]) : padEndTo(cellText, widths[i - from]);
+      }
+      row += numeric ? padStartTo(parts[to - 1], widths[to - 1 - from] - 2) : parts[to - 1];
+      rows[rows.length] = row;
+    }
+    if (count < parts.length) rows[rows.length] = parts[count];
+    return rows;
+  }
+
+  // Lays out already formatted entries as Node does: on one line when they are
+  // few enough for that and fit in 80 columns, otherwise one per line, with a
+  // long array's entries set out in columns. `kind` is ARRAY for the lists
+  // that are grouped (`numeric` when all their items are numbers) and BASE
+  // when the braces follow a text of their own, as in `[Function: f] { a: 1 }`.
+  function layout(prefix, open, parts, close, depth, kind, numeric) {
+    if (parts.length === 0) return prefix + open + close;
+
+    const indentation = depth * 2;
+    let rows = parts;
+    if (kind === ARRAY && parts.length > 6) rows = columnize(parts, indentation, numeric);
+
+    // Only an object that does not hold more than three levels of its own fits on one line.
+    if (rows === parts && currentDepth - depth < COMPACT) {
+      const count = parts.length;
+      let used = count + indentation + prefix.length + open.length - (kind === BASE ? 1 : 0) + 10;
+      let fits = used + count <= LINE_WIDTH;
+      let multiline = false;
+      for (let i = 0; fits && i < count; i++) {
+        used += parts[i].length + 1;
+        if (stringIndexOf(parts[i], "\n") !== -1) multiline = true;
+      }
+      if (fits && !multiline && used <= LINE_WIDTH) {
+        let line = prefix + open + " ";
+        for (let i = 0; i < count; i++) line += (i > 0 ? ", " : "") + parts[i];
+        return line + " " + close;
+      }
     }
 
     const inner = spaces(depth + 1);
     let out = prefix + open + "\n";
-
-    if (compact && !multiline) {
-      let row = inner;
-      for (let i = 0; i < count; i++) {
-        const piece = parts[i] + (i < count - 1 ? "," : "");
-        if (row.length > inner.length && row.length + piece.length + 1 > LINE_WIDTH) {
-          out += row + "\n";
-          row = inner;
-        }
-        row += (row.length > inner.length ? " " : "") + piece;
-      }
-      return out + row + "\n" + spaces(depth) + close;
-    }
-
-    for (let i = 0; i < count; i++) {
-      out += inner + parts[i] + (i < count - 1 ? "," : "") + "\n";
+    for (let i = 0; i < rows.length; i++) {
+      out += inner + rows[i] + (i < rows.length - 1 ? "," : "") + "\n";
     }
     return out + spaces(depth) + close;
   }
@@ -300,6 +382,7 @@
   function formatArray(array, depth, state) {
     const parts = [];
     const length = array.length;
+    const before = enter(depth);
     let index = 0;
     let scanned = 0;
 
@@ -326,14 +409,20 @@
       state.cut = true;
       parts[parts.length] = more(length - index, "item", "items");
     }
-    const items = parts.length;
     addProperties(array, parts, depth, state, true);
-    return layout(subclassPrefix(array, "Array", length), "[", parts, "]", depth, parts.length === items);
+    if (parts.length === 0) currentDepth = before;
+
+    let numeric = true;
+    for (let i = 0; numeric && i < parts.length; i++) {
+      numeric = typeof array[i] === "number" || typeof array[i] === "bigint";
+    }
+    return layout(subclassPrefix(array, "Array", length), "[", parts, "]", depth, ARRAY, numeric);
   }
 
   function formatTypedArray(array, name, depth, state) {
     const length = typedArrayLength(array);
     const parts = [];
+    if (length > 0) enter(depth);
     for (let i = 0; i < length && i < MAX_ENTRIES && state.left > 0; i++) {
       const part = format(array[i], depth + 1, state);
       parts[parts.length] = part;
@@ -343,12 +432,13 @@
       state.cut = true;
       parts[parts.length] = more(length - parts.length, "item", "items");
     }
-    return layout(name + "(" + length + ") ", "[", parts, "]", depth, true);
+    return layout(name + "(" + length + ") ", "[", parts, "]", depth, ARRAY, true);
   }
 
   function formatMap(map, depth, state) {
     const size = mapSize(map);
     const parts = [];
+    const before = enter(depth);
     mapForEach(map, function (value, key) {
       if (parts.length >= MAX_ENTRIES || state.left <= 0) return;
       const part = format(key, depth + 1, state) + " => " + format(value, depth + 1, state);
@@ -360,12 +450,14 @@
       parts[parts.length] = more(size - parts.length, "item", "items");
     }
     addProperties(map, parts, depth, state, false);
+    if (parts.length === 0) currentDepth = before;
     return layout(subclassPrefix(map, "Map", size), "{", parts, "}", depth);
   }
 
   function formatSet(set, depth, state) {
     const size = setSize(set);
     const parts = [];
+    const before = enter(depth);
     setForEach(set, function (value) {
       if (parts.length >= MAX_ENTRIES || state.left <= 0) return;
       const part = format(value, depth + 1, state);
@@ -376,9 +468,9 @@
       state.cut = true;
       parts[parts.length] = more(size - parts.length, "item", "items");
     }
-    const items = parts.length;
     addProperties(set, parts, depth, state, false);
-    return layout(subclassPrefix(set, "Set", size), "{", parts, "}", depth, parts.length === items);
+    if (parts.length === 0) currentDepth = before;
+    return layout(subclassPrefix(set, "Set", size), "{", parts, "}", depth);
   }
 
   // Prototype -> function that lists what to show of an instance of a class the
@@ -393,6 +485,7 @@
     const described = inspect(value);
     const entries = described.entries;
     const parts = [];
+    const before = enter(depth);
 
     for (let i = 0; i < entries.length && i < MAX_ENTRIES && state.left > 0; i++) {
       const shown = format(entries[i][1], depth + 1, state);
@@ -406,6 +499,7 @@
       state.cut = true;
       parts[parts.length] = more(entries.length - parts.length, "item", "items");
     }
+    if (parts.length === 0) currentDepth = before;
     return layout(name + " ", "{", parts, "}", depth);
   }
 
@@ -464,7 +558,9 @@
 
   function formatProperties(object, prefix, depth, state) {
     const parts = [];
+    const before = enter(depth);
     addProperties(object, parts, depth, state, false);
+    if (parts.length === 0) currentDepth = before;
     return layout(prefix, "{", parts, "}", depth);
   }
 
@@ -472,8 +568,10 @@
   // added to it, as in `[Function: f] { calls: 2 }`.
   function withProperties(text, object, depth, state) {
     const parts = [];
+    const before = enter(depth);
     addProperties(object, parts, depth, state, false);
-    return parts.length === 0 ? text : layout(text + " ", "{", parts, "}", depth);
+    if (parts.length === 0) currentDepth = before;
+    return parts.length === 0 ? text : layout(text + " ", "{", parts, "}", depth, BASE);
   }
 
   // An error shows as its name and message, and the properties added to it,
@@ -481,13 +579,15 @@
   function formatError(error, depth, state) {
     const text = errorText(error, state);
     const parts = [];
+    const before = enter(depth);
     addProperties(error, parts, depth, state, false, true);
     if (hasOwn(error, "cause") && !isEnumerable(error, "cause")) {
       parts[parts.length] = "[cause]: " + format(error.cause, depth + 1, state);
     }
 
+    if (parts.length === 0) currentDepth = before;
     const shown = depth === 0 ? text : "[" + text + "]";
-    return parts.length === 0 ? shown : layout(shown + " ", "{", parts, "}", depth);
+    return parts.length === 0 ? shown : layout(shown + " ", "{", parts, "}", depth, BASE);
   }
 
   function formatObject(value, depth, state) {

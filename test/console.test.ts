@@ -174,14 +174,14 @@ describe("console.dir depth", () => {
   });
 
   test("a depth of null shows everything", async () => {
-    expect(await logs(`console.dir(${nested}, { depth: null })`)).toEqual(["{ a: { b: { c: { d: { e: { f: 1 } } } } } }"]);
+    expect(await logs(`console.dir(${nested}, { depth: null })`)).toEqual(["{\n  a: {\n    b: {\n      c: { d: { e: { f: 1 } } }\n    }\n  }\n}"]);
   });
 
   test("the depth belongs to that call only", async () => {
     const [first, second] = await logs(`console.dir(${nested}, { depth: 1 }); console.log(${nested})`);
 
     expect(first).toBe("{ a: { b: [Object] } }");
-    expect(second).toBe("{ a: { b: { c: { d: [Object] } } } }");
+    expect(second).toBe("{\n  a: { b: { c: { d: [Object] } } }\n}");
   });
 });
 

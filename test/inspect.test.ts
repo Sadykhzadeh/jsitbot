@@ -57,13 +57,16 @@ describe("result formatting", () => {
     ["a thenable is awaited", `({ then(resolve) { resolve("from thenable") } })`, "from thenable"],
     ["self references", `const o = { name: "o" }; o.self = o; return o`, "{ name: 'o', self: [Circular] }"],
     ["self references in arrays and maps", `const a = [1]; a.push(a); const m = new Map(); m.set("k", m); return [a, m]`, "[ [ 1, [Circular] ], Map(1) { 'k' => [Circular] } ]"],
-    ["depth is limited", `({ a: { b: { c: { d: { e: 1 } } } } })`, "{ a: { b: { c: { d: [Object] } } } }"],
-    ["deep arrays are limited too", `[[[[[1]]]]]`, "[ [ [ [ [Array] ] ] ] ]"],
-    ["a long list of numbers is packed into rows", `Array.from({ length: 30 }, (_, i) => i * 1000)`, [
+    ["depth is limited", `({ a: { b: { c: { d: { e: 1 } } } } })`, "{\n  a: { b: { c: { d: [Object] } } }\n}"],
+    ["deep arrays are limited too", `[[[[[1]]]]]`, "[\n  [ [ [ [Array] ] ] ]\n]"],
+    ["a long list of numbers is set out in columns, lined up on the right", `Array.from({ length: 30 }, (_, i) => i * 1000)`, [
       "[",
-      "  0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000,",
-      "  12000, 13000, 14000, 15000, 16000, 17000, 18000, 19000, 20000, 21000,",
-      "  22000, 23000, 24000, 25000, 26000, 27000, 28000, 29000",
+      "      0,  1000,  2000,  3000,  4000,",
+      "   5000,  6000,  7000,  8000,  9000,",
+      "  10000, 11000, 12000, 13000, 14000,",
+      "  15000, 16000, 17000, 18000, 19000,",
+      "  20000, 21000, 22000, 23000, 24000,",
+      "  25000, 26000, 27000, 28000, 29000",
       "]",
     ].join("\n")],
     ["a list of objects gets a line each", `Array.from({ length: 3 }, (_, i) => ({ id: i, name: "user" + i, tags: ["a", "b", "c"] }))`, [
