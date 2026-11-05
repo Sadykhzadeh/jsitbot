@@ -1,13 +1,13 @@
-// Intl.NumberFormat, Intl.Collator, Intl.DateTimeFormat, Intl.PluralRules and
-// Intl.ListFormat, for the guest. Evaluated the first time
-// the code asks for `Intl`; see lazyGlobals in guest.js.
+// Intl.NumberFormat, Intl.Collator, Intl.DateTimeFormat, Intl.PluralRules,
+// Intl.ListFormat and Intl.RelativeTimeFormat, for the guest. Evaluated the
+// first time the code asks for `Intl`; see lazyGlobals in guest.js.
 //
 // They are the toLocaleString of numbers, the localeCompare of strings and the
 // toLocaleString of dates under another name, with the same formatting and the
-// same limits (see number.js, collate.js and date.js). PluralRules and
-// ListFormat are written out here and know English only. There is no
-// RelativeTimeFormat, and no formatToParts on the others. `hostTimeZone` is the
-// zone of the process, which executionWrapper puts around this source.
+// same limits (see number.js, collate.js and date.js). PluralRules,
+// ListFormat and RelativeTimeFormat are written out here and know English only.
+// There is no formatToParts. `hostTimeZone` is the zone of the process, which
+// executionWrapper puts around this source.
 (function () {
   "use strict";
 
@@ -245,6 +245,73 @@
     }
   }
 
+  // What a unit is called when it is counted, per style: [one, other], or one text for both.
+  const UNIT_NAMES = {
+    long: {
+      second: ["second", "seconds"], minute: ["minute", "minutes"], hour: ["hour", "hours"], day: ["day", "days"],
+      week: ["week", "weeks"], month: ["month", "months"], quarter: ["quarter", "quarters"], year: ["year", "years"],
+    },
+    short: {
+      second: "sec.", minute: "min.", hour: "hr.", day: ["day", "days"],
+      week: "wk.", month: "mo.", quarter: ["qtr.", "qtrs."], year: "yr.",
+    },
+    narrow: {
+      second: "s", minute: "m", hour: "h", day: "d", week: "w", month: "mo", quarter: "q", year: "y",
+    },
+  };
+  // What the unit is called when it stands in a phrase of its own, as in "next wk.".
+  const PHRASE_NAMES = { long: UNIT_NAMES.long, short: UNIT_NAMES.short, narrow: UNIT_NAMES.short };
+  const WORDS = { "-1": "last", 0: "this", 1: "next" };
+  const DAY_WORDS = { "-1": "yesterday", 0: "today", 1: "tomorrow" };
+
+  class RelativeTimeFormat {
+    #style;
+    #numeric;
+
+    constructor(locales, options) {
+      checkLocale(locales, /^en(-[A-Za-z0-9]+)*$/i);
+      if (options === null) throw new TypeError("Cannot convert undefined or null to object");
+      const given = options === undefined ? {} : Object(options);
+      this.#style = choose(given, "style", ["long", "short", "narrow"], "long", "RelativeTimeFormat");
+      this.#numeric = choose(given, "numeric", ["always", "auto"], "always", "RelativeTimeFormat");
+    }
+
+    format(value, unit) {
+      const number = Number(value);
+      const text = String(unit);
+      const name = text.endsWith("s") ? text.slice(0, -1) : text;
+      if (!Object.prototype.hasOwnProperty.call(UNIT_NAMES.long, name)) {
+        throw new RangeError("Invalid unit argument for Intl.RelativeTimeFormat.prototype.format() '" + text + "'");
+      }
+      if (!Number.isFinite(number)) {
+        throw new RangeError("Value need to be finite number for Intl.RelativeTimeFormat.prototype.format()");
+      }
+
+      const style = this.#style;
+      if (this.#numeric === "auto" && (number === -1 || number === 0 || number === 1)) {
+        const key = Object.is(number, -0) ? 0 : number;
+        if (name === "day") return DAY_WORDS[key];
+        if (name === "second" && key === 0) return "now";
+        if ((name === "minute" || name === "hour") && key === 0) return "this " + name;
+        if (name !== "second" && name !== "minute" && name !== "hour") {
+          const unitName = PHRASE_NAMES[style][name];
+          return WORDS[key] + " " + (typeof unitName === "string" ? unitName : unitName[0]);
+        }
+      }
+
+      const shown = Number.prototype.toLocaleString.call(Math.abs(number), "en-US");
+      const names = UNIT_NAMES[style][name];
+      const unitName = typeof names === "string" ? names : names[shown === "1" ? 0 : 1];
+      const phrase = shown + (style === "narrow" ? "" : " ") + unitName;
+      return number < 0 || Object.is(number, -0) ? phrase + " ago" : "in " + phrase;
+    }
+
+    resolvedOptions() {
+      return { locale: "en-US", style: this.#style, numeric: this.#numeric, numberingSystem: "latn" };
+    }
+  }
+
+  Object.defineProperty(RelativeTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.RelativeTimeFormat", configurable: true });
   Object.defineProperty(PluralRules.prototype, Symbol.toStringTag, { value: "Intl.PluralRules", configurable: true });
   Object.defineProperty(ListFormat.prototype, Symbol.toStringTag, { value: "Intl.ListFormat", configurable: true });
 
@@ -265,6 +332,7 @@
   define(Intl, "DateTimeFormat", callable(DateTimeFormat));
   define(Intl, "PluralRules", PluralRules);
   define(Intl, "ListFormat", ListFormat);
+  define(Intl, "RelativeTimeFormat", RelativeTimeFormat);
   Object.defineProperty(Intl, Symbol.toStringTag, { value: "Intl", configurable: true });
 
   return { Intl };
