@@ -1459,6 +1459,7 @@
     ["clearImmediate", clearImmediate],
     ["queueMicrotask", queueMicrotask],
     ["performance", performance],
+    ["global", globalThis],
   ]) {
     Object.defineProperty(globalThis, name, { value, writable: true, configurable: true, enumerable: false });
   }
