@@ -6,12 +6,23 @@
 // toLocaleString of dates under another name, with the same formatting and the
 // same limits (see number.js, collate.js and date.js). PluralRules and
 // ListFormat are written out here and know English only. There is no
-// RelativeTimeFormat, and no formatToParts or resolvedOptions on the others.
+// RelativeTimeFormat, and no formatToParts on the others. `hostTimeZone` is the
+// zone of the process, which executionWrapper puts around this source.
 (function () {
   "use strict";
 
   function define(object, name, value) {
     Object.defineProperty(object, name, { value, writable: true, configurable: true, enumerable: false });
+  }
+
+  // Options that were given, in the order resolvedOptions lists them.
+  function given(options, names) {
+    const out = {};
+    if (options === undefined || options === null) return out;
+    for (const name of names) {
+      if (options[name] !== undefined) out[name] = options[name];
+    }
+    return out;
   }
 
   class NumberFormat {
@@ -24,6 +35,40 @@
           ? BigInt.prototype.toLocaleString.call(value, locales, options)
           : Number.prototype.toLocaleString.call(Number(value), locales, options);
       define(this, "format", format);
+      define(this, "resolvedOptions", () => {
+        const asked = given(options, [
+          "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",
+          "minimumFractionDigits", "maximumFractionDigits", "minimumSignificantDigits", "maximumSignificantDigits",
+          "useGrouping", "notation", "compactDisplay", "signDisplay",
+        ]);
+        const style = asked.style === undefined ? "decimal" : String(asked.style);
+        const out = { locale: "en-US", numberingSystem: "latn", style };
+        if (style === "currency") {
+          out.currency = String(asked.currency).toUpperCase();
+          out.currencyDisplay = asked.currencyDisplay === undefined ? "symbol" : asked.currencyDisplay;
+          out.currencySign = asked.currencySign === undefined ? "standard" : asked.currencySign;
+        } else if (style === "unit") {
+          out.unit = asked.unit;
+          out.unitDisplay = asked.unitDisplay === undefined ? "short" : asked.unitDisplay;
+        }
+        out.minimumIntegerDigits = asked.minimumIntegerDigits === undefined ? 1 : Number(asked.minimumIntegerDigits);
+        if (asked.minimumSignificantDigits !== undefined || asked.maximumSignificantDigits !== undefined) {
+          out.minimumSignificantDigits = asked.minimumSignificantDigits === undefined ? 1 : Number(asked.minimumSignificantDigits);
+          out.maximumSignificantDigits = asked.maximumSignificantDigits === undefined ? 21 : Number(asked.maximumSignificantDigits);
+        } else {
+          const base = style === "currency" ? 2 : 0;
+          const top = style === "currency" ? 2 : style === "percent" ? 0 : 3;
+          const min = asked.minimumFractionDigits === undefined ? undefined : Number(asked.minimumFractionDigits);
+          const max = asked.maximumFractionDigits === undefined ? undefined : Number(asked.maximumFractionDigits);
+          out.minimumFractionDigits = min === undefined ? Math.min(base, max === undefined ? base : max) : min;
+          out.maximumFractionDigits = max === undefined ? Math.max(top, out.minimumFractionDigits) : max;
+        }
+        out.useGrouping = asked.useGrouping === undefined ? "auto" : asked.useGrouping === true ? "always" : asked.useGrouping;
+        out.notation = asked.notation === undefined ? "standard" : asked.notation;
+        if (out.notation === "compact") out.compactDisplay = asked.compactDisplay === undefined ? "short" : asked.compactDisplay;
+        out.signDisplay = asked.signDisplay === undefined ? "auto" : asked.signDisplay;
+        return out;
+      });
     }
   }
 
@@ -31,11 +76,30 @@
     constructor(locales, options) {
       const compare = (a, b) => String(a).localeCompare(String(b), locales, options);
       define(this, "compare", compare);
+      define(this, "resolvedOptions", () => {
+        const asked = given(options, ["usage", "sensitivity", "ignorePunctuation", "numeric", "caseFirst"]);
+        return {
+          locale: "en-US",
+          usage: asked.usage === undefined ? "sort" : asked.usage,
+          sensitivity: asked.sensitivity === undefined ? "variant" : asked.sensitivity,
+          ignorePunctuation: asked.ignorePunctuation === undefined ? false : Boolean(asked.ignorePunctuation),
+          collation: "default",
+          numeric: asked.numeric === undefined ? false : Boolean(asked.numeric),
+          caseFirst: asked.caseFirst === undefined ? "false" : asked.caseFirst,
+        };
+      });
     }
   }
 
   const FORMAT_FIELDS = [
     "weekday", "year", "month", "day", "dayPeriod", "hour", "minute", "second", "fractionalSecondDigits", "dateStyle", "timeStyle",
+  ];
+
+  // The zones that mean UTC, as in date.js
+  const UTC_ZONES = ["utc", "gmt", "etc/utc", "etc/gmt"];
+  const RESOLVED_FIELDS = [
+    "weekday", "era", "year", "month", "day", "dayPeriod", "hour", "minute", "second", "fractionalSecondDigits",
+    "timeZoneName", "dateStyle", "timeStyle",
   ];
 
   class DateTimeFormat {
@@ -55,6 +119,19 @@
         return Date.prototype.toLocaleString.call(when, locales, given);
       };
       define(this, "format", format);
+      define(this, "resolvedOptions", () => {
+        const zone = given.timeZone === undefined ? hostTimeZone : String(given.timeZone);
+        const out = { locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: UTC_ZONES.indexOf(zone.toLowerCase()) === -1 ? zone : "UTC" };
+        if (given.hour !== undefined || given.timeStyle !== undefined) {
+          const cycle = given.hourCycle !== undefined ? given.hourCycle : given.hour12 === undefined ? "h12" : given.hour12 ? "h12" : "h23";
+          out.hourCycle = cycle;
+          out.hour12 = cycle === "h12" || cycle === "h11";
+        }
+        for (const name of RESOLVED_FIELDS) {
+          if (given[name] !== undefined) out[name] = given[name];
+        }
+        return out;
+      });
     }
   }
 

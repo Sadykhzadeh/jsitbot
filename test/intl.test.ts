@@ -58,3 +58,50 @@ describe("Intl", () => {
     expect(await value(`return typeof Intl`)).toBe("object");
   });
 });
+
+describe("resolvedOptions", () => {
+  const hostZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  test("of a date format names the time zone of the sandbox", async () => {
+    expect(await value(`return Intl.DateTimeFormat().resolvedOptions().timeZone`)).toBe(hostZone);
+    expect(await value(`return new Intl.DateTimeFormat("en-US", { timeZone: "UTC" }).resolvedOptions().timeZone`)).toBe("UTC");
+  });
+
+  test("of a date format has the locale, the calendar and what was asked for", async () => {
+    expect(
+      await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long", hour: "numeric" }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","calendar":"gregory","numberingSystem":"latn","timeZone":"UTC","hourCycle":"h12","hour12":true,"weekday":"long","hour":"numeric"}`,
+    );
+    expect(
+      await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", { timeZone: "UTC" }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","calendar":"gregory","numberingSystem":"latn","timeZone":"UTC","year":"numeric","month":"numeric","day":"numeric"}`,
+    );
+  });
+
+  test("of a number format fills in the defaults of its style", async () => {
+    expect(await value(`return JSON.stringify(new Intl.NumberFormat("en-US").resolvedOptions())`)).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumFractionDigits":0,"maximumFractionDigits":3,"useGrouping":"auto","notation":"standard","signDisplay":"auto"}`,
+    );
+    expect(
+      await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"currency","currency":"USD","currencyDisplay":"symbol","currencySign":"standard","minimumIntegerDigits":1,"minimumFractionDigits":2,"maximumFractionDigits":2,"useGrouping":"auto","notation":"standard","signDisplay":"auto"}`,
+    );
+    expect(
+      await value(`const o = new Intl.NumberFormat("en-US", { style: "percent" }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
+    ).toBe("0,0");
+    expect(
+      await value(`const o = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
+    ).toBe("2,3");
+    expect(await value(`return new Intl.NumberFormat("en-US", { useGrouping: false }).resolvedOptions().useGrouping`)).toBe("false");
+  });
+
+  test("of a collator has the comparison options", async () => {
+    expect(await value(`return JSON.stringify(new Intl.Collator("en-US", { numeric: true, sensitivity: "base" }).resolvedOptions())`)).toBe(
+      `{"locale":"en-US","usage":"sort","sensitivity":"base","ignorePunctuation":false,"collation":"default","numeric":true,"caseFirst":"false"}`,
+    );
+    expect(await value(`return new Intl.Collator().resolvedOptions().sensitivity`)).toBe("variant");
+  });
+});

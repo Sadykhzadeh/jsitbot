@@ -41,6 +41,11 @@ export const guestExtras: Record<string, string> = Object.fromEntries(
   ["clone", "encoding", "url", "crypto", "collate", "date", "number", "intl", "events"].map((name) => [name, read(`./extras/${name}.js`)]),
 );
 
+// The guest's dates are in the time zone of this process, so that is the zone
+// Intl.DateTimeFormat reports. QuickJS cannot tell the name of it.
+const hostTimeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+guestExtras.intl = `(function (hostTimeZone) { return ${guestExtras.intl}; })(${JSON.stringify(hostTimeZone)})`;
+
 // The wrappers add nothing but text on the first line, so line numbers in the
 // user's code are the same inside the wrapper. The newline before the closing
 // bracket keeps a trailing // comment from swallowing it.
