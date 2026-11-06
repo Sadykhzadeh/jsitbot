@@ -58,7 +58,52 @@ describe("Number.prototype.toLocaleString", () => {
 
   test("leaves another language and options it does not know to the engine", async () => {
     expect(await value(`return (1234.5).toLocaleString("de-DE")`)).toBe("1234.5");
-    expect(await value(`return (1234.5).toLocaleString("en-US", { notation: "compact" })`)).toBe("1234.5");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { notation: "scientific" })`)).toBe("1234.5");
+  });
+
+  test("writes a compact number as a smaller one and a letter", async () => {
+    const compact = (n: string, options = "") => value(`return (${n}).toLocaleString("en-US", { notation: "compact"${options} })`);
+
+    expect(await compact("999")).toBe("999");
+    expect(await compact("1000")).toBe("1K");
+    expect(await compact("1234")).toBe("1.2K");
+    expect(await compact("12345")).toBe("12K");
+    expect(await compact("999499")).toBe("999K");
+    expect(await compact("999500")).toBe("1M");
+    expect(await compact("1234567")).toBe("1.2M");
+    expect(await compact("-1500000000")).toBe("-1.5B");
+    expect(await compact("2.5e12")).toBe("2.5T");
+    expect(await compact("2.5e15")).toBe("2500T");
+    expect(await compact("1e19")).toBe("10,000,000T");
+    expect(await compact("0.1234")).toBe("0.12");
+    expect(await compact("999.7")).toBe("1K");
+    expect(await compact("1234", ', style: "currency", currency: "USD"')).toBe("$1.2K");
+    expect(await compact("1234567", ', compactDisplay: "long"')).toBe("1.2 million");
+    expect(await compact("1234567", ', style: "currency", currency: "USD", compactDisplay: "long"')).toBe("$1.2M");
+    expect(await compact("1234", ", maximumFractionDigits: 2")).toBe("1.23K");
+    expect(await compact("1000", ", minimumFractionDigits: 1")).toBe("1.0K");
+    expect(await compact("123456", ", maximumSignificantDigits: 2")).toBe("120K");
+    expect(await compact("1234567890123456789012", ", useGrouping: true")).toBe("1,234,567,890T");
+    expect(await value(`return (1234567n).toLocaleString("en-US", { notation: "compact" })`)).toBe("1.2M");
+  });
+
+  test("rounds to a number of significant digits", async () => {
+    const significant = (n: string, options: string) => value(`return (${n}).toLocaleString("en-US", { ${options} })`);
+
+    expect(await significant("123456", "maximumSignificantDigits: 3")).toBe("123,000");
+    expect(await significant("1.2345", "maximumSignificantDigits: 3")).toBe("1.23");
+    expect(await significant("0.0012345", "maximumSignificantDigits: 2")).toBe("0.0012");
+    expect(await significant("9.99", "maximumSignificantDigits: 2")).toBe("10");
+    expect(await significant("0.999", "maximumSignificantDigits: 2")).toBe("1");
+    expect(await significant("5", "minimumSignificantDigits: 3")).toBe("5.00");
+    expect(await significant("0", "minimumSignificantDigits: 3")).toBe("0.00");
+    expect(await significant("1234.5", "minimumSignificantDigits: 2, maximumSignificantDigits: 4")).toBe("1,235");
+    expect(await significant("0.5", "style: 'percent', maximumSignificantDigits: 1")).toBe("50%");
+    expect(await significant("1234.5", "minimumSignificantDigits: 5, maximumFractionDigits: 1")).toBe("1,234.5");
+    expect(await significant("5", "minimumSignificantDigits: 4, maximumSignificantDigits: 2")).toBe(
+      "error: RangeError: maximumSignificantDigits value is out of range.",
+    );
+    expect(await significant("5", "maximumSignificantDigits: 0")).toBe("error: RangeError: maximumSignificantDigits value is out of range.");
   });
 
   test("throws for a value that is not a number", async () => {
