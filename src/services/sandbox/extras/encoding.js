@@ -85,11 +85,13 @@
 
   // The decoder of the Encoding Standard: an invalid sequence gives one U+FFFD
   // for the bytes that were valid so far, and decoding goes on at the byte that
-  // broke it.
-  function decode(bytes, fatal, keepBom) {
+  // broke it. With `stream`, a sequence that the bytes end in the middle of is
+  // not an error yet: its start is given back as `rest`, for the next chunk.
+  function decode(bytes, fatal, dropBom, stream) {
     const units = [];
     const pieces = [];
     let i = 0;
+    let rest = null;
 
     function flush() {
       pieces.push(String.fromCharCode.apply(null, units));
@@ -101,9 +103,10 @@
       units.push(REPLACEMENT);
     }
 
-    if (!keepBom && bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) i = 3;
+    if (dropBom && bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) i = 3;
 
     while (i < bytes.length) {
+      const start = i;
       const first = bytes[i++];
       if (first < 0x80) {
         units.push(first);
@@ -132,6 +135,10 @@
         } else {
           let complete = true;
           for (let seen = 0; seen < needed; seen++) {
+            if (i >= bytes.length && stream) {
+              rest = bytes.slice(start);
+              break;
+            }
             if (i >= bytes.length || bytes[i] < lower || bytes[i] > upper) {
               complete = false;
               break;
@@ -140,7 +147,9 @@
             lower = 0x80;
             upper = 0xbf;
           }
-          if (!complete) {
+          if (rest) {
+            break;
+          } else if (!complete) {
             invalid();
           } else if (code >= 0x10000) {
             units.push(0xd800 + ((code - 0x10000) >> 10), 0xdc00 + ((code - 0x10000) & 0x3ff));
@@ -153,12 +162,14 @@
     }
     flush();
 
-    return pieces.join("");
+    return { text: pieces.join(""), rest };
   }
 
   class TextDecoder {
     #fatal;
     #ignoreBOM;
+    #pending = null;
+    #started = false;
 
     constructor(label = "utf-8", options = {}) {
       const name = String(label).trim().toLowerCase();
@@ -181,8 +192,29 @@
       return this.#ignoreBOM;
     }
 
-    decode(input) {
-      return decode(bytesOf(input), this.#fatal, this.#ignoreBOM);
+    decode(input, options) {
+      let bytes = bytesOf(input);
+      const stream = Boolean(options && options.stream);
+      if (this.#pending) {
+        const joined = new Uint8Array(this.#pending.length + bytes.length);
+        joined.set(this.#pending);
+        joined.set(bytes, this.#pending.length);
+        bytes = joined;
+      }
+
+      let result;
+      try {
+        result = decode(bytes, this.#fatal, !this.#ignoreBOM && !this.#started, stream);
+      } catch (error) {
+        this.#pending = null;
+        this.#started = false;
+        throw error;
+      }
+
+      this.#pending = result.rest;
+      this.#started = stream && (this.#started || bytes.length > (result.rest ? result.rest.length : 0));
+
+      return result.text;
     }
   }
 

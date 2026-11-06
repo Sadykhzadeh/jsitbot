@@ -175,6 +175,49 @@ describe("TextEncoder and TextDecoder", () => {
     expect(await value(`return new TextDecoder("utf-8", { ignoreBOM: true }).decode(new Uint8Array([0xef, 0xbb, 0xbf, 97])).length`)).toBe("2");
   });
 
+  test("stream keeps the start of a character for the next chunk", async () => {
+    const split = `
+      const decoder = new TextDecoder();
+      const euro = [0xe2, 0x82, 0xac];
+      return JSON.stringify([
+        decoder.decode(new Uint8Array([97, ...euro.slice(0, 2)]), { stream: true }),
+        decoder.decode(new Uint8Array([euro[2], 98]), { stream: true }),
+        decoder.decode(),
+      ]);
+    `;
+    expect(await value(split)).toBe('["a","€b",""]');
+
+    const bytewise = `
+      const decoder = new TextDecoder();
+      const bytes = new TextEncoder().encode("a😀€");
+      let out = "";
+      for (const byte of bytes) out += decoder.decode(new Uint8Array([byte]), { stream: true });
+      return out + decoder.decode();
+    `;
+    expect(await value(bytewise)).toBe("a😀€");
+  });
+
+  test("a sequence that is still open at the end of the stream is replaced, and the decoder starts afresh", async () => {
+    const code = `
+      const decoder = new TextDecoder();
+      const first = decoder.decode(new Uint8Array([0xe2, 0x82]), { stream: true });
+      const last = decoder.decode();
+      return JSON.stringify([first, last, decoder.decode(new Uint8Array([0xac]))]);
+    `;
+    expect(await value(code)).toBe('["","�","�"]');
+  });
+
+  test("a byte order mark split over chunks is dropped once, at the start only", async () => {
+    const code = `
+      const decoder = new TextDecoder();
+      let out = decoder.decode(new Uint8Array([0xef, 0xbb]), { stream: true });
+      out += decoder.decode(new Uint8Array([0xbf, 97, 0xef, 0xbb, 0xbf]), { stream: true });
+      out += decoder.decode();
+      return JSON.stringify(out);
+    `;
+    expect(await value(code)).toBe('"a﻿"');
+  });
+
   test("fatal turns invalid input into an error", async () => {
     expect(await value(`return new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array([0xff]))`)).toBe(
       "error: TypeError: The encoded data was not valid for encoding utf-8",
