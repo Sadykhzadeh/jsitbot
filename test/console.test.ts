@@ -119,6 +119,16 @@ describe("console.assert", () => {
       "Assertion failed",
     ]);
   });
+
+  test("fills the specifiers of its message, and shows a message that is not a string after the words", async () => {
+    expect(
+      await logs(`
+        console.assert(false, "%s is %d", "x", 5);
+        console.assert(false, { a: 1 });
+        console.assert(false, 5, "six");
+      `),
+    ).toEqual(["Assertion failed: x is 5", "Assertion failed { a: 1 }", "Assertion failed 5 six"]);
+  });
 });
 
 describe("console.count", () => {

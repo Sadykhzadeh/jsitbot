@@ -909,8 +909,9 @@
       return;
     }
 
-    const details = ["Assertion failed:"];
-    for (let i = 1; i < arguments.length; i++) details[i] = arguments[i];
+    // A message that is a string continues the words, so its specifiers are filled.
+    const details = typeof arguments[1] === "string" ? ["Assertion failed: " + arguments[1]] : ["Assertion failed", arguments[1]];
+    for (let i = 2; i < arguments.length; i++) details[details.length] = arguments[i];
     reflectApply(write, undefined, details);
   }
 
