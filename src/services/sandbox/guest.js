@@ -1472,6 +1472,26 @@
   });
   defineProperty(Array.fromAsync, "length", { value: 1, configurable: true });
 
+  // The error that Promise.any rejects with has no message in the engine. Only
+  // that method is wrapped, so ordinary promises cost what they did.
+  const promiseAny = Promise.any;
+  const AggregateErrorClass = AggregateError;
+  defineProperty(Promise, "any", {
+    value: {
+      any(values) {
+        return promiseThen(reflectApply(promiseAny, this, [values]), undefined, function (error) {
+          if (error instanceof AggregateErrorClass && !hasOwn(error, "message") && hasOwn(error, "errors")) {
+            defineProperty(error, "message", { value: "All promises were rejected", writable: true, configurable: true, enumerable: false });
+          }
+          throw error;
+        });
+      },
+    }.any,
+    writable: true,
+    configurable: true,
+    enumerable: false,
+  });
+
   lazyMethod("collate", String.prototype, "localeCompare");
   lazyMethod("date", Date.prototype, "toLocaleString");
   lazyMethod("date", Date.prototype, "toLocaleDateString");
