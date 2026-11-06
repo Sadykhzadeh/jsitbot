@@ -30,6 +30,15 @@ describe("running out of stack", () => {
     expect(execution.ok ? "" : execution.error).toBe("RangeError: Maximum call stack size exceeded");
   });
 
+  test("reads the same when it goes through a built-in that calls back", async () => {
+    for (const code of [`function f() { [1].map(f); } f();`, `const o = { toString() { return "" + this; } }; "" + o;`]) {
+      const execution = await sandbox.execute(code);
+
+      expect(execution.ok).toBe(false);
+      expect(execution.ok ? "" : execution.error).toBe("RangeError: Maximum call stack size exceeded");
+    }
+  });
+
   test("reads the same when it is printed", async () => {
     expect(
       await logs(`

@@ -61,6 +61,12 @@ interface Packed {
 }
 
 function normalizeUnknownError(error: unknown): string {
+  // Deep recursion through a built-in, such as map or toString, can use up the
+  // stack of the host before the engine's own check stops it.
+  if (error instanceof RangeError && /call stack/i.test(error.message)) {
+    return "RangeError: Maximum call stack size exceeded";
+  }
+
   if (error instanceof Error) {
     return error.message;
   }
