@@ -161,7 +161,16 @@ function inlineCode(text: string): string {
   return `\`${escapeMarkdownV2Code(text)}\``;
 }
 
-export function formatHelpMessage(botUsername: string): { text: string; parseMode: ParseMode } {
+export interface HelpLimits {
+  timeoutMs: number;
+  memoryLimitBytes: number;
+  maxCodeLength: number;
+}
+
+export function formatHelpMessage(
+  botUsername: string,
+  limits: HelpLimits,
+): { text: string; parseMode: ParseMode } {
   const body = [
     "*JS Sandbox Bot*",
     escapeMarkdownV2(
@@ -183,6 +192,9 @@ export function formatHelpMessage(botUsername: string): { text: string; parseMod
     escapeMarkdownV2("• TypeScript annotations are fine, the types are stripped."),
     escapeMarkdownV2("• Edit your message and the answer updates."),
     escapeMarkdownV2("• A sleep does not use up the time limit: it returns at once."),
+    escapeMarkdownV2(
+      `• Limits: ${limits.timeoutMs} ms per run, ${Math.round(limits.memoryLimitBytes / (1024 * 1024))} MB of memory, ${limits.maxCodeLength} characters of code.`,
+    ),
     `• Inline, in any chat: ${inlineCode(`@${botUsername} 1 + 1`)}`,
     `• In a group: ${inlineCode("/run 6 * 7")}, or reply to a message that has code with /run\\.`,
   ].join("\n");

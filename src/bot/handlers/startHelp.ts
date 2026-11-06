@@ -1,9 +1,9 @@
 import type { Bot } from "grammy";
 
-import { formatHelpMessage } from "../formatters/telegramExecutionMessage";
+import { formatHelpMessage, type HelpLimits } from "../formatters/telegramExecutionMessage";
 
-export function registerStartHelpHandlers(bot: Bot, botUsername: string): void {
-  const help = formatHelpMessage(botUsername);
+export function registerStartHelpHandlers(bot: Bot, botUsername: string, limits: HelpLimits): void {
+  const help = formatHelpMessage(botUsername, limits);
 
   bot.command(["start", "help"], async (ctx) => {
     await ctx.reply(help.text, {

@@ -7,6 +7,7 @@ import {
   formatRejectionMessage,
 } from "../src/bot/formatters/telegramExecutionMessage";
 import type { SandboxExecution } from "../src/services/sandbox/types";
+import { HELP_LIMITS } from "./helpers/botHarness";
 
 const SPECIAL = "_*[]()~`>#+-=|{}.!";
 
@@ -116,7 +117,7 @@ describe("MarkdownV2 output", () => {
 
   test("help and rejection messages are valid, whatever the bot is called", () => {
     for (const username of ["jsitbot", "my_test_bot", "a_b_c_bot"]) {
-      expect(problem(formatHelpMessage(username).text)).toBeUndefined();
+      expect(problem(formatHelpMessage(username, HELP_LIMITS).text)).toBeUndefined();
     }
     expect(problem(formatRejectionMessage("Rate limit exceeded. Try again in 3s.").text)).toBeUndefined();
     expect(problem(formatRejectionMessage("`` \ ```").text)).toBeUndefined();

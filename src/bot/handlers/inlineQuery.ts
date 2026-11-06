@@ -20,6 +20,7 @@ import {
   formatInlineExecutionPreview,
   formatHelpMessage,
   formatRejectionMessage,
+  type HelpLimits,
 } from "../formatters/telegramExecutionMessage";
 
 interface InlineQueryHandlerOptions {
@@ -31,6 +32,7 @@ interface InlineQueryHandlerOptions {
   maxCodeLength: number;
   minCodeLength: number;
   botUsername: string;
+  helpLimits: HelpLimits;
 }
 
 const HELP_CACHE_SECONDS = 600;
@@ -55,7 +57,7 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
     const code = ctx.inlineQuery.query;
 
     if (!isInlineQueryLongEnough(code, options.minCodeLength)) {
-      const help = formatHelpMessage(options.botUsername);
+      const help = formatHelpMessage(options.botUsername, options.helpLimits);
       await ctx.answerInlineQuery(
         [
           buildArticle(

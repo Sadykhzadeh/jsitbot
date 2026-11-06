@@ -34,7 +34,12 @@ export async function createBot(
   const concurrency = handleConcurrently(bot, config.limits.concurrency);
   bot.use(concurrency);
 
-  registerStartHelpHandlers(bot, botUsername);
+  const helpLimits = {
+    timeoutMs: config.sandbox.timeoutMs,
+    memoryLimitBytes: config.sandbox.memoryLimitBytes,
+    maxCodeLength: config.limits.maxCodeLength,
+  };
+  registerStartHelpHandlers(bot, botUsername, helpLimits);
   // Before the private handler, so that "/run" and "@bot" are taken out of the
   // messages it would otherwise run as code.
   registerRunCommandHandler(bot, {
@@ -64,6 +69,7 @@ export async function createBot(
     maxCodeLength: config.limits.maxCodeLength,
     minCodeLength: config.limits.inlineMinLength,
     botUsername,
+    helpLimits,
   });
 
   bot.catch((error) => {

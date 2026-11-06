@@ -9,6 +9,7 @@ import { QuickJsSandboxService } from "../../src/services/sandbox/quickjsSandbox
 import type { SandboxService } from "../../src/services/sandbox/types";
 
 export const BOT_ID = 999;
+export const HELP_LIMITS = { timeoutMs: 700, memoryLimitBytes: 64 * 1024 * 1024, maxCodeLength: 2_000 };
 export const USER_ID = 42;
 
 export interface ApiCall {
@@ -142,6 +143,7 @@ export function createHarness(options: HarnessOptions = {}) {
     maxCodeLength: 2_000,
     minCodeLength: 3,
     botUsername: "jsitbot",
+    helpLimits: HELP_LIMITS,
   });
 
   let nextUpdateId = 1;
