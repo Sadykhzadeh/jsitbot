@@ -15,6 +15,8 @@
   "use strict";
 
   const FILE = "input.js";
+  // What the engine says when the code recurses too deep.
+  const STACK_OVERFLOW = "stack overflow";
   const MAX_DEPTH = 3;
   // What objects are shown down to: MAX_DEPTH, except during console.dir with a depth.
   let depthLimit = MAX_DEPTH;
@@ -260,6 +262,9 @@
       if (typeof n === "string" && n) name = stringSlice(n, 0, 100);
       const m = error.message;
       if (typeof m === "string") message = cut(m, maxResultLength, state);
+      if (name === "RangeError" && message === STACK_OVERFLOW && getPrototypeOf(error) === InternalError.prototype) {
+        message = "Maximum call stack size exceeded";
+      }
     } catch (ignored) {}
     return message ? name + ": " + message : name;
   }
@@ -1400,6 +1405,21 @@
 
     defineProperty(owner, name, { value: stub, writable: true, configurable: true, enumerable: false });
   }
+
+  // The engine reports a stack overflow as an InternalError. Node has a RangeError
+  // for it, which is what programs test for, so the engine's errors are made to
+  // look like one in that case.
+  Object.setPrototypeOf(InternalError.prototype, RangeError.prototype);
+  defineProperty(InternalError.prototype, "name", {
+    get() {
+      return this.message === STACK_OVERFLOW ? "RangeError" : "InternalError";
+    },
+    set(value) {
+      defineProperty(this, "name", { value, writable: true, configurable: true, enumerable: false });
+    },
+    configurable: true,
+    enumerable: false,
+  });
 
   // Custom error classes call this in their constructors. The engine has no
   // call stack to hand over, so what the object gets is the line a stack opens
