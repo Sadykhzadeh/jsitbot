@@ -159,7 +159,7 @@ describe("structures of absurd size", () => {
   test("cycles are named", async () => {
     const { result } = await run(`const a = { name: "a" }; a.self = a; a.list = [a, { a }]; a`);
 
-    expect(text(result)).toContain("self: [Circular]");
+    expect(text(result)).toContain("self: [Circular *1]");
   });
 });
 

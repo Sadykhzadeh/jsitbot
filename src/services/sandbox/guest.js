@@ -339,6 +339,12 @@
   // long array's entries set out in columns. `kind` is ARRAY for the lists
   // that are grouped (`numeric` when all their items are numbers) and BASE
   // when the braces follow a text of their own, as in `[Function: f] { a: 1 }`.
+  // The marker in front of an object that something inside it refers back to.
+  function reference(value, state) {
+    const index = state.circular === undefined ? undefined : mapGet(state.circular, value);
+    return index === undefined ? "" : "<ref *" + index + "> ";
+  }
+
   function layout(prefix, open, parts, close, depth, kind, numeric) {
     if (parts.length === 0) return prefix + open + close;
 
@@ -349,7 +355,7 @@
     // Only an object that does not hold more than three levels of its own fits on one line.
     if (rows === parts && currentDepth - depth < COMPACT) {
       const count = parts.length;
-      let used = count + indentation + prefix.length + open.length - (kind === BASE ? 1 : 0) + 10;
+      let used = count + indentation + prefix.length + open.length - (kind === BASE || stringIndexOf(prefix, "<ref *") === 0 ? 1 : 0) + 10;
       let fits = used + count <= LINE_WIDTH;
       let multiline = false;
       for (let i = 0; fits && i < count; i++) {
@@ -419,7 +425,7 @@
     for (let i = 0; numeric && i < parts.length; i++) {
       numeric = typeof array[i] === "number" || typeof array[i] === "bigint";
     }
-    return layout(subclassPrefix(array, "Array", length), "[", parts, "]", depth, ARRAY, numeric);
+    return layout(reference(array, state) + subclassPrefix(array, "Array", length), "[", parts, "]", depth, ARRAY, numeric);
   }
 
   function formatTypedArray(array, name, depth, state) {
@@ -435,7 +441,7 @@
       state.cut = true;
       parts[parts.length] = more(length - parts.length, "item", "items");
     }
-    return layout(name + "(" + length + ") ", "[", parts, "]", depth, ARRAY, true);
+    return layout(reference(array, state) + name + "(" + length + ") ", "[", parts, "]", depth, ARRAY, true);
   }
 
   function formatMap(map, depth, state) {
@@ -454,7 +460,7 @@
     }
     addProperties(map, parts, depth, state, false);
     if (parts.length === 0) currentDepth = before;
-    return layout(subclassPrefix(map, "Map", size), "{", parts, "}", depth);
+    return layout(reference(map, state) + subclassPrefix(map, "Map", size), "{", parts, "}", depth);
   }
 
   function formatSet(set, depth, state) {
@@ -473,7 +479,7 @@
     }
     addProperties(set, parts, depth, state, false);
     if (parts.length === 0) currentDepth = before;
-    return layout(subclassPrefix(set, "Set", size), "{", parts, "}", depth);
+    return layout(reference(set, state) + subclassPrefix(set, "Set", size), "{", parts, "}", depth);
   }
 
   // Prototype -> function that lists what to show of an instance of a class the
@@ -503,7 +509,7 @@
       parts[parts.length] = more(entries.length - parts.length, "item", "items");
     }
     if (parts.length === 0) currentDepth = before;
-    return layout(name + " ", "{", parts, "}", depth);
+    return layout(reference(value, state) + name + " ", "{", parts, "}", depth);
   }
 
   // An array index such as "0" or "12", which an array already shows as an item.
@@ -564,7 +570,7 @@
     const before = enter(depth);
     addProperties(object, parts, depth, state, false);
     if (parts.length === 0) currentDepth = before;
-    return layout(prefix, "{", parts, "}", depth);
+    return layout(reference(object, state) + prefix, "{", parts, "}", depth);
   }
 
   // Text that stands for the whole value, followed by the properties that were
@@ -574,7 +580,7 @@
     const before = enter(depth);
     addProperties(object, parts, depth, state, false);
     if (parts.length === 0) currentDepth = before;
-    return parts.length === 0 ? text : layout(text + " ", "{", parts, "}", depth, BASE);
+    return parts.length === 0 ? text : layout(reference(object, state) + text + " ", "{", parts, "}", depth, BASE);
   }
 
   // An error shows as its name and message, and the properties added to it,
@@ -590,7 +596,7 @@
 
     if (parts.length === 0) currentDepth = before;
     const shown = depth === 0 ? text : "[" + text + "]";
-    return parts.length === 0 ? shown : layout(shown + " ", "{", parts, "}", depth, BASE);
+    return parts.length === 0 ? shown : layout(reference(error, state) + shown + " ", "{", parts, "}", depth, BASE);
   }
 
   // A promise shows what it was settled with, or that it has not been. The
@@ -608,7 +614,7 @@
     } else {
       currentDepth = before;
     }
-    return layout(prefix, "{", [part], "}", depth);
+    return layout(reference(promise, state) + prefix, "{", [part], "}", depth);
   }
 
   function formatObject(value, depth, state) {
@@ -658,6 +664,7 @@
   // The one entry point for turning any value into text. state.left is the
   // remaining character budget; state.cut records that something was dropped.
   function format(value, depth, state) {
+    if (depth === 0) state.circular = undefined;
     switch (typeof value) {
       case "string": return quote(value, state);
       case "number": return formatNumber(value);
@@ -669,7 +676,15 @@
     if (value === null) return "null";
 
     for (let i = 0; i < state.stack.length; i++) {
-      if (state.stack[i] === value) return "[Circular]";
+      if (state.stack[i] === value) {
+        if (state.circular === undefined) state.circular = new Map();
+        let index = mapGet(state.circular, value);
+        if (index === undefined) {
+          index = mapSize(state.circular) + 1;
+          mapSet(state.circular, value, index);
+        }
+        return "[Circular *" + index + "]";
+      }
     }
     state.stack[state.stack.length] = value;
     try {

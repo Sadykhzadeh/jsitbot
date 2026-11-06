@@ -55,8 +55,10 @@ describe("result formatting", () => {
     ["the name of an error set by its class is not repeated", `new (class HttpError extends Error { constructor(m) { super(m); this.name = "HttpError"; this.status = 404 } })("gone")`, "HttpError: gone { status: 404 }"],
     ["the cause of an error", `[new Error("outer", { cause: "inner" })]`, "[ [Error: outer] { [cause]: 'inner' } ]"],
     ["a thenable is awaited", `({ then(resolve) { resolve("from thenable") } })`, "from thenable"],
-    ["self references", `const o = { name: "o" }; o.self = o; return o`, "{ name: 'o', self: [Circular] }"],
-    ["self references in arrays and maps", `const a = [1]; a.push(a); const m = new Map(); m.set("k", m); return [a, m]`, "[ [ 1, [Circular] ], Map(1) { 'k' => [Circular] } ]"],
+    ["self references", `const o = { name: "o" }; o.self = o; return o`, "<ref *1> { name: 'o', self: [Circular *1] }"],
+    ["each cycle gets its own number", `const a = {}; a.a = a; const b = {}; b.b = b; return { a, b }`, "{ a: <ref *1> { a: [Circular *1] }, b: <ref *2> { b: [Circular *2] } }"],
+    ["the marker goes on the object that is looped back to", `const a = { n: 1 }; a.b = { a }; return a`, "<ref *1> { n: 1, b: { a: [Circular *1] } }"],
+    ["self references in arrays and maps", `const a = [1]; a.push(a); const m = new Map(); m.set("k", m); return [a, m]`, "[\n  <ref *1> [ 1, [Circular *1] ],\n  <ref *2> Map(1) { 'k' => [Circular *2] }\n]"],
     ["depth is limited", `({ a: { b: { c: { d: { e: 1 } } } } })`, "{\n  a: { b: { c: { d: [Object] } } }\n}"],
     ["deep arrays are limited too", `[[[[[1]]]]]`, "[\n  [ [ [ [Array] ] ] ]\n]"],
     ["a long list of numbers is set out in columns, lined up on the right", `Array.from({ length: 30 }, (_, i) => i * 1000)`, [
@@ -92,7 +94,7 @@ describe("result formatting", () => {
     ["a subclass of Array", `class Stack extends Array {} Stack.from([1, 2])`, "Stack(2) [ 1, 2 ]"],
     ["an empty subclass of Array", `class Stack extends Array {} new Stack()`, "Stack(0) []"],
     ["subclasses of Map and Set", `class Registry extends Map {} class Tags extends Set {} [new Registry([[1, 2]]), new Tags([3])]`, "[ Registry(1) [Map] { 1 => 2 }, Tags(1) [Set] { 3 } ]"],
-    ["a function that holds itself", `const f = () => {}; f.self = f; f`, "[Function: f] { self: [Circular] }"],
+    ["a function that holds itself", `const f = () => {}; f.self = f; f`, "<ref *1> [Function: f] { self: [Circular *1] }"],
   ];
 
   for (const [name, code, expected] of cases) {

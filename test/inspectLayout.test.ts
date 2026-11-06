@@ -34,6 +34,8 @@ describe("how entries are laid out", () => {
     ["only the last entry counts for the levels", "{a:1,b:2,c:[1,2,3],d:{e:{f:{g:1}}}}", "{\n  a: 1,\n  b: 2,\n  c: [ 1, 2, 3 ],\n  d: { e: { f: { g: 1 } } }\n}"],
     ["a function with properties is laid out after its name", "Object.assign(function f(){}, {aaaaaaaaaaaaaaa:1,bbbbbbbbbbbbbbb:2,cccccccccccccc:3,ddddddddddd:4})", "[Function: f] {\n  aaaaaaaaaaaaaaa: 1,\n  bbbbbbbbbbbbbbb: 2,\n  cccccccccccccc: 3,\n  ddddddddddd: 4\n}"],
     ["a class instance keeps its name in front of the lines", "new (class Foo { constructor(){ this.aaaaaaaaaaaaaaa=1; this.bbbbbbbbbbbbbbb=2; this.cccccccccccccc=3; this.dddddddddd=4 } })", "Foo {\n  aaaaaaaaaaaaaaa: 1,\n  bbbbbbbbbbbbbbb: 2,\n  cccccccccccccc: 3,\n  dddddddddd: 4\n}"],
+    ["the marker of a cycle counts towards the width of the line", "(()=>{const a={name:'aaaaaa',other:'bbbbb',third:''};a.s=a;return a})()", "<ref *1> { name: 'aaaaaa', other: 'bbbbb', third: '', s: [Circular *1] }"],
+    ["one more character puts a marked object on lines", "(()=>{const a={name:'aaaaaa',other:'bbbbb',third:'c'};a.s=a;return a})()", "<ref *1> {\n  name: 'aaaaaa',\n  other: 'bbbbb',\n  third: 'c',\n  s: [Circular *1]\n}"],
     ["a map in an object", "new Map([['k',{a:{b:{c:1}}}]])", "Map(1) {\n  'k' => { a: { b: { c: 1 } } }\n}"],
   ];
 
