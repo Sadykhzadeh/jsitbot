@@ -85,6 +85,14 @@ describe("structuredClone", () => {
     expect(await value(`return structuredClone(new Date(5)) instanceof Date`)).toBe("true");
   });
 
+  test("copies a property named __proto__ as a property, not as a prototype", async () => {
+    const code = `
+      const copy = structuredClone(JSON.parse('{"__proto__": {"polluted": true}, "n": 1}'));
+      return JSON.stringify([copy.polluted, Object.keys(copy), Object.getPrototypeOf(copy) === Object.prototype]);
+    `;
+    expect(await value(code)).toBe('[null,["__proto__","n"],true]');
+  });
+
   test("copies errors with their type, message and cause", async () => {
     expect(
       await value(`

@@ -122,7 +122,12 @@
     function copyProperties(source, out) {
       const keys = Object.keys(source);
       for (let i = 0; i < keys.length; i++) {
-        out[keys[i]] = copy(source[keys[i]]);
+        const key = keys[i];
+        if (key === "__proto__") {
+          Object.defineProperty(out, key, { value: copy(source[key]), writable: true, enumerable: true, configurable: true });
+        } else {
+          out[key] = copy(source[key]);
+        }
       }
     }
 
