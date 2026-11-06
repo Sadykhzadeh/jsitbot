@@ -807,8 +807,19 @@
   // converted, so no code of the user's runs to make the number or the string.
   function substitute(code, argument, state) {
     switch (code) {
-      case "s":
-        return typeof argument === "string" ? argument : format(argument, 0, state);
+      case "s": {
+        if (typeof argument === "string") return argument;
+        if (typeof argument !== "object" || argument === null) return format(argument, 0, state);
+
+        // Node shows an object one level deep here, whatever it would be shown to otherwise.
+        const limit = depthLimit;
+        depthLimit = 0;
+        try {
+          return format(argument, 0, state);
+        } finally {
+          depthLimit = limit;
+        }
+      }
       case "d":
       case "i":
       case "f":

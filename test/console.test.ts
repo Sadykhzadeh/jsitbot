@@ -252,6 +252,22 @@ describe("console.log format specifiers", () => {
     ]);
   });
 
+  test("%s shows an object one level deep, as Node does", async () => {
+    expect(
+      await logs(`
+        console.log("%s", { a: { b: 1 }, c: [1, [2]] });
+        console.log("%s|%s", [[1, [2]]], new Map([[1, { a: 1 }]]));
+        console.log("%s", { a: 1 }, { d: { e: 1 } });
+        console.log("%o", { a: { b: { c: 1 } } });
+      `),
+    ).toEqual([
+      "{ a: [Object], c: [Array] }",
+      "[ [Array] ]|Map(1) { 1 => [Object] }",
+      "{ a: 1 } { d: { e: 1 } }",
+      "{ a: { b: { c: 1 } } }",
+    ]);
+  });
+
   test("does not look for specifiers when the first argument is not a string", async () => {
     expect(await logs(`console.log(1, "%s", "x"); console.log(["%s"], "x")`)).toEqual(["1 %s x", "[ '%s' ] x"]);
   });
