@@ -42,6 +42,30 @@ describe("console.table", () => {
     expect(await logs(`console.table("text"); console.table(null); console.table(3)`)).toEqual(["text", "null", "3"]);
   });
 
+  test("counts wide characters as two columns and combining marks as none", async () => {
+    const [wide, narrow] = await Promise.all([
+      logs(`console.table([{ name: "日本語", mood: "😀" }, { name: "Ada", mood: "e\u0301" }, { name: "Хасан", mood: "🇦🇿" }])`),
+      logs(`console.table([["한글", "✅", "👍🏽"]])`),
+    ]);
+
+    expect(wide[0].split("\n")).toEqual([
+      "┌─────────┬──────────┬────────┐",
+      "│ (index) │ name     │ mood   │",
+      "├─────────┼──────────┼────────┤",
+      "│ 0       │ '日本語' │ '😀'   │",
+      "│ 1       │ 'Ada'    │ 'é'    │",
+      "│ 2       │ 'Хасан'  │ '🇦🇿' │",
+      "└─────────┴──────────┴────────┘",
+    ]);
+    expect(narrow[0].split("\n")).toEqual([
+      "┌─────────┬────────┬──────┬────────┐",
+      "│ (index) │ 0      │ 1    │ 2      │",
+      "├─────────┼────────┼──────┼────────┤",
+      "│ 0       │ '한글' │ '✅' │ '👍🏽' │",
+      "└─────────┴────────┴──────┴────────┘",
+    ]);
+  });
+
   test("keeps cells short and says when rows or columns were left out", async () => {
     const wide = await sandbox.execute(`console.table([{ text: "x".repeat(100) }])`);
     expect(wide.logs[0]).toContain("'xxxxxxxxxxxxxxxxxxxx...");

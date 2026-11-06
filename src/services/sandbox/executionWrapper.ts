@@ -38,7 +38,7 @@ export const guestRuntimeSource = read("./guest.js");
  * that does not use them does not pay for parsing them.
  */
 export const guestExtras: Record<string, string> = Object.fromEntries(
-  ["clone", "encoding", "url", "crypto", "collate", "date", "number", "intl", "events"].map((name) => [name, read(`./extras/${name}.js`)]),
+  ["clone", "encoding", "url", "crypto", "collate", "date", "number", "intl", "events", "width"].map((name) => [name, read(`./extras/${name}.js`)]),
 );
 
 // The guest's dates are in the time zone of this process, so that is the zone

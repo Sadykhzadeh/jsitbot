@@ -1045,11 +1045,31 @@
     drawTable(headers, body);
   }
 
+  let measure;
+
+  // How many columns text takes in a monospace font, which is not always its
+  // length. The table of wide characters is only read when the text needs it.
+  function columns(text) {
+    let width = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = stringCharCodeAt(text, i);
+      if (code >= 0x300) {
+        if (measure === undefined) measure = indirectEval(loadExtra("width"))();
+        return measure(text);
+      }
+      if (code >= 0x20 && (code < 0x7f || code > 0x9f)) width++;
+    }
+    return width;
+  }
+
   function drawTable(headers, body) {
     const widths = [];
     for (let i = 0; i < headers.length; i++) {
-      let width = headers[i].length;
-      for (let j = 0; j < body.length; j++) if (body[j][i].length > width) width = body[j][i].length;
+      let width = columns(headers[i]);
+      for (let j = 0; j < body.length; j++) {
+        const own = columns(body[j][i]);
+        if (own > width) width = own;
+      }
       widths[i] = width + 2;
     }
 
@@ -1066,7 +1086,7 @@
       let out = "│";
       for (let i = 0; i < parts.length; i++) {
         out += " " + parts[i];
-        for (let j = parts[i].length + 1; j < widths[i]; j++) out += " ";
+        for (let j = columns(parts[i]) + 1; j < widths[i]; j++) out += " ";
         out += "│";
       }
       return out;
