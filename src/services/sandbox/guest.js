@@ -659,10 +659,11 @@
       if (tag === "[object " + TYPED_ARRAYS[i] + "]") return formatTypedArray(value, TYPED_ARRAYS[i], depth, state);
     }
 
-    let prefix = "";
-    if (name === null) prefix = label + " ";
-    else if (name !== "Object") prefix = name + " ";
-    else if (tag !== "[object Object]") prefix = "Object [" + stringSlice(tag, 8, tag.length - 1) + "] ";
+    // A tag the object has as an own property is shown as a property already.
+    const tagName = tag === "[object Object]" || isEnumerable(value, Symbol.toStringTag) ? "" : stringSlice(tag, 8, tag.length - 1);
+    let prefix = (name === null ? label : name) + " ";
+    if (tagName !== "" && tagName !== name) prefix += "[" + tagName + "] ";
+    else if (name === "Object") prefix = "";
     return formatProperties(value, prefix, depth, state);
   }
 
