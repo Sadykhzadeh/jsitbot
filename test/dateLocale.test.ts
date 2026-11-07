@@ -301,16 +301,22 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
   });
 
   test("name the zone as the host's time zone data does", async () => {
-    const named = (zone: string, style: string) =>
-      value(`return new Date("2024-01-01T12:00:00Z").toLocaleString("en-US", { timeZone: "${zone}", hour: "numeric", timeZoneName: "${style}" })`);
-
-    expect(await named("America/New_York", "long")).toBe("7 AM Eastern Standard Time");
-    expect(await named("Asia/Tokyo", "shortOffset")).toBe("9 PM GMT+9");
-    expect(await named("Asia/Tokyo", "longOffset")).toBe("9 PM GMT+09:00");
-    expect(await named("UTC", "shortOffset")).toBe("12 PM GMT");
-    expect(
-      await value(`return new Date("2024-01-01T12:00:00Z").toLocaleString("en-US", { timeZone: "Asia/Kolkata", dateStyle: "full", timeStyle: "full" })`),
-    ).toBe("Monday, January 1, 2024 at 5:30:00 PM India Standard Time");
+    // Against the host itself, not literals: zone names come from its ICU, and
+    // one ICU says "GMT" for UTC's short offset where the next says "GMT+0".
+    const noon = new Date("2024-01-01T12:00:00Z");
+    const cases: Intl.DateTimeFormatOptions[] = [
+      { timeZone: "America/New_York", hour: "numeric", timeZoneName: "long" },
+      { timeZone: "Asia/Tokyo", hour: "numeric", timeZoneName: "shortOffset" },
+      { timeZone: "Asia/Tokyo", hour: "numeric", timeZoneName: "longOffset" },
+      { timeZone: "UTC", hour: "numeric", timeZoneName: "shortOffset" },
+      { timeZone: "Asia/Kolkata", dateStyle: "full", timeStyle: "full" },
+    ];
+    for (const options of cases) {
+      expect(await value(`return new Date("2024-01-01T12:00:00Z").toLocaleString("en-US", ${JSON.stringify(options)})`)).toBe(
+        noon.toLocaleString("en-US", options),
+      );
+    }
+    expect(noon.toLocaleString("en-US", cases[0])).toBe("7 AM Eastern Standard Time");
   });
 
   test("name the zone of local time when asked to", async () => {
