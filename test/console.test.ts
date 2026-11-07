@@ -302,6 +302,31 @@ describe("console.log format specifiers", () => {
     ]);
   });
 
+  test("%s calls the toString that the program wrote, and shows everything else", async () => {
+    expect(
+      await logs(`
+        class Point { constructor(x) { this.x = x } toString() { return "Point(" + this.x + ")" } }
+        console.log("%s", new Point(3));
+        console.log("%s|%s", { toString() { return "own" } }, { [Symbol.toPrimitive]() { return "prim" } });
+        console.log("%s", Object.assign(Object.create({ toString() { return "inherited" } }), { a: 1 }));
+        console.log("%s", { toString() { throw new Error("no") }, a: 1 });
+        console.log("%s", { toString() { return Symbol("s") }, a: 1 });
+        console.log("%s", new Date(0), new Error("e").message);
+        console.log("%s", [1, 2], new Map([[1, 2]]), { a: 1 });
+        console.log("%s", Object.create(null));
+      `),
+    ).toEqual([
+      "Point(3)",
+      "own|prim",
+      "inherited",
+      "{ toString: [Function: toString], a: 1 }",
+      "{ toString: [Function: toString], a: 1 }",
+      "1970-01-01T00:00:00.000Z e",
+      "[ 1, 2 ] Map(1) { 1 => 2 } { a: 1 }",
+      "[Object: null prototype] {}",
+    ]);
+  });
+
   test("does not look for specifiers when the first argument is not a string", async () => {
     expect(await logs(`console.log(1, "%s", "x"); console.log(["%s"], "x")`)).toEqual(["1 %s x", "[ '%s' ] x"]);
   });

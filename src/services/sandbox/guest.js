@@ -804,13 +804,59 @@
   const parseDecimal = parseFloat;
   const toJson = JSON.stringify;
 
-  // What a % specifier of console.log stands for. Objects are shown, never
-  // converted, so no code of the user's runs to make the number or the string.
+  // The names of the constructors the engine and this runtime put on the
+  // global object, which are the ones Node counts as built in: a name that
+  // starts with a capital letter, then letters and digits.
+  const builtInNames = new Map();
+  function collectBuiltInNames() {
+    const names = getOwnPropertyNames(globalThis);
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      let plain = name.length > 1 && name[0] >= "A" && name[0] <= "Z";
+      for (let j = 1; plain && j < name.length; j++) {
+        const c = name[j];
+        plain = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || (c >= "0" && c <= "9");
+      }
+      if (plain) mapSet(builtInNames, name, true);
+    }
+  }
+
+  // Whether the program, rather than the engine, gave `value` the property
+  // `key`: on the object itself, or on a prototype of a class of its own.
+  function programDefined(value, key) {
+    let holder = value;
+    while (holder !== null && !hasOwn(holder, key)) holder = getPrototypeOf(holder);
+    if (holder === null) return false;
+    if (holder === value) return true;
+    const descriptor = getOwnPropertyDescriptor(holder, "constructor");
+    return !(descriptor !== undefined && typeof descriptor.value === "function" && mapGet(builtInNames, descriptor.value.name) === true);
+  }
+
+  // Whether %s should show an object as it would be printed rather than turn
+  // it into text, which is so unless the program wrote its toString or
+  // Symbol.toPrimitive (Node's rule).
+  function hasBuiltInToString(value) {
+    try {
+      if (typeof value[Symbol.toPrimitive] === "function" && programDefined(value, Symbol.toPrimitive)) return false;
+      return typeof value.toString !== "function" || !programDefined(value, "toString");
+    } catch (ignored) {
+      return true;
+    }
+  }
+
+  // What a % specifier of console.log stands for. Objects are shown, and only
+  // those with a toString of the program's own are converted by it.
   function substitute(code, argument, state) {
     switch (code) {
       case "s": {
         if (typeof argument === "string") return argument;
         if (typeof argument !== "object" || argument === null) return format(argument, 0, state);
+
+        if (!hasBuiltInToString(argument)) {
+          try {
+            return toText(argument);
+          } catch (ignored) {}
+        }
 
         // Node shows an object one level deep here, whatever it would be shown to otherwise.
         const limit = depthLimit;
@@ -1560,6 +1606,8 @@
   ]) {
     Object.defineProperty(globalThis, name, { value, writable: true, configurable: true, enumerable: false });
   }
+
+  collectBuiltInNames();
 
   return { finish, fail, tick };
 })
