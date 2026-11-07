@@ -589,7 +589,8 @@
   }
 
   // An error shows as its name and message, and the properties added to it,
-  // such as a code or the error that caused it, follow.
+  // such as a code, the error that caused it or the errors an AggregateError
+  // holds, follow.
   function formatError(error, depth, state) {
     const text = errorText(error, state);
     const parts = [];
@@ -597,6 +598,9 @@
     addProperties(error, parts, depth, state, false, true);
     if (hasOwn(error, "cause") && !isEnumerable(error, "cause")) {
       parts[parts.length] = "[cause]: " + format(error.cause, depth + 1, state);
+    }
+    if (hasOwn(error, "errors") && !isEnumerable(error, "errors") && isArray(error.errors)) {
+      parts[parts.length] = "[errors]: " + format(error.errors, depth + 1, state);
     }
 
     if (parts.length === 0) currentDepth = before;
