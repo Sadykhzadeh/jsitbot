@@ -6,11 +6,13 @@
 // Writes dates and times the way English (United States) does, for the options
 // weekday, year, month, day, hour, minute, second, fractionalSecondDigits,
 // hour12, hourCycle, dateStyle, timeStyle and timeZoneName, in the local time
-// zone or in UTC. Anything else, another language, another time zone, an era,
-// a day period, a calendar or a numbering system, a zone name for local time,
-// or a year outside 1 to 9999, is left to the engine's own method, which is the
-// `original` it is given.
-(function (original) {
+// zone, in UTC or in any zone by name. The engine only has the first two, so a
+// named zone is looked up with `zoneInfo`, which the host answers from its own
+// time zone data: how far the zone is from UTC at a moment, and what it is
+// called then. Anything else, another language, an era, a day period, a
+// calendar or a numbering system, or a year outside 1 to 9999, is left to the
+// engine's own method, which is the `original` it is given.
+(function (original, owner, zoneInfo) {
   "use strict";
 
   const ENGLISH = /^en(-US)?$/i;
@@ -80,14 +82,24 @@
     const timeStyle = choice(options, "timeStyle", STYLES);
 
     let utc = false;
+    let zone;
     if (options.timeZone !== undefined) {
-      if (UTC_ZONES.indexOf(String(options.timeZone).toLowerCase()) === -1) return null;
-      utc = true;
+      const given = String(options.timeZone);
+      if (UTC_ZONES.indexOf(given.toLowerCase()) !== -1) {
+        utc = true;
+      } else {
+        if (zoneInfo(given, 0, "") === "") throw new RangeError("Invalid time zone specified: " + given);
+        zone = given;
+      }
     }
     if (options.era !== undefined || options.dayPeriod !== undefined || options.calendar !== undefined || options.numberingSystem !== undefined) {
       return null;
     }
-    if (f.timeZoneName !== undefined && (f.timeZoneName !== "short" && f.timeZoneName !== "long" || !utc)) return null;
+    // The names that are not "UTC" or its long form are the host's to give, even for UTC.
+    if (utc && f.timeZoneName !== undefined && f.timeZoneName !== "short" && f.timeZoneName !== "long") {
+      utc = false;
+      zone = "UTC";
+    }
 
     let cycle = hourCycle === undefined ? "h12" : hourCycle;
     if (options.hour12 !== undefined) cycle = options.hour12 ? "h12" : "h23";
@@ -111,7 +123,6 @@
         f.minute = "2-digit";
         if (timeStyle !== "short") f.second = "2-digit";
         if (timeStyle === "full" || timeStyle === "long") {
-          if (!utc) return null;
           f.timeZoneName = timeStyle === "full" ? "long" : "short";
         }
       }
@@ -135,7 +146,7 @@
     if (f.day !== undefined && f.month === undefined && f.year !== undefined) return null;
     if (f.month === "narrow" && (f.weekday !== undefined || f.day !== undefined || f.year !== undefined)) return null;
 
-    return { f, utc, cycle, glue };
+    return { f, utc, zone, cycle, glue };
   }
 
   function name(full, width) {
@@ -174,7 +185,7 @@
     return text;
   }
 
-  function timePart(f, c, cycle) {
+  function timePart(f, c, cycle, zoneText) {
     const parts = [];
     const twelve = cycle === "h12";
     if (f.hour !== undefined) {
@@ -196,7 +207,7 @@
 
     let text = parts.join(":");
     if (twelve && f.hour !== undefined) text += c.hours < 12 ? " AM" : " PM";
-    if (f.timeZoneName !== undefined) text += f.timeZoneName === "long" ? " Coordinated Universal Time" : " UTC";
+    if (f.timeZoneName !== undefined) text += " " + zoneText;
     return text;
   }
 
@@ -209,11 +220,25 @@
     if (resolved === null) return original.call(date, locales, options);
     if (time !== time) return "Invalid Date";
 
-    const { f, utc, cycle } = resolved;
-    const c = utc
+    const { f, utc, zone, cycle } = resolved;
+    let zoneText = f.timeZoneName === "long" ? "Coordinated Universal Time" : "UTC";
+    // A named zone is read as UTC on a date moved by its offset. The name of the
+    // zone local time is in comes from the host as well.
+    let moved = date;
+    if (!utc) {
+      const info = zoneInfo(zone === undefined ? "" : zone, time, f.timeZoneName === undefined ? "" : f.timeZoneName);
+      const bar = info.indexOf("|");
+      if (info === "" || (f.timeZoneName !== undefined && bar === -1)) return original.call(date, locales, options);
+      if (zone !== undefined) {
+        moved = new Date(time + Number(bar === -1 ? info : info.slice(0, bar)));
+        if (Date.prototype.getTime.call(moved) !== Date.prototype.getTime.call(moved)) return original.call(date, locales, options);
+      }
+      if (bar !== -1) zoneText = info.slice(bar + 1);
+    }
+    const c = utc || zone !== undefined
       ? {
-          year: date.getUTCFullYear(), month: date.getUTCMonth(), day: date.getUTCDate(), weekday: date.getUTCDay(),
-          hours: date.getUTCHours(), minutes: date.getUTCMinutes(), seconds: date.getUTCSeconds(), milliseconds: date.getUTCMilliseconds(),
+          year: moved.getUTCFullYear(), month: moved.getUTCMonth(), day: moved.getUTCDate(), weekday: moved.getUTCDay(),
+          hours: moved.getUTCHours(), minutes: moved.getUTCMinutes(), seconds: moved.getUTCSeconds(), milliseconds: moved.getUTCMilliseconds(),
         }
       : {
           year: date.getFullYear(), month: date.getMonth(), day: date.getDate(), weekday: date.getDay(),
@@ -222,7 +247,7 @@
     if (c.year < 1 || c.year > 9999) return original.call(date, locales, options);
 
     const dateText = has(f, DATE_FIELDS) ? datePart(f, c) : "";
-    const timeText = has(f, ["hour", "minute", "second"]) ? timePart(f, c, cycle) : "";
+    const timeText = has(f, ["hour", "minute", "second"]) ? timePart(f, c, cycle, zoneText) : "";
     if (dateText === "" || timeText === "") return dateText + timeText;
 
     let glue = resolved.glue;

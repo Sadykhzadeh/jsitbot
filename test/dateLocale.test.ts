@@ -269,6 +269,66 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
     }
   });
 
+  test("tell the time in a named zone, summer and winter", async () => {
+    const at = (iso: string, zone: string, options = "") =>
+      value(`return new Date("${iso}").toLocaleString("en-US", { timeZone: "${zone}"${options} })`);
+
+    expect(await at("2024-01-01T00:00:00Z", "Asia/Tokyo")).toBe("1/1/2024, 9:00:00 AM");
+    expect(await at("2024-01-01T00:00:00Z", "America/New_York")).toBe("12/31/2023, 7:00:00 PM");
+    expect(await at("2024-07-01T12:00:00Z", "America/New_York")).toBe("7/1/2024, 8:00:00 AM");
+    expect(await at("2024-01-01T12:00:00Z", "Asia/Kathmandu", ', hour: "numeric", minute: "2-digit"')).toBe("5:45 PM");
+    expect(await at("2024-01-01T12:00:00Z", "Pacific/Kiritimati", ', dateStyle: "medium", timeStyle: "short"')).toBe(
+      "Jan 2, 2024, 2:00 AM",
+    );
+    // the offset changes at 07:00 UTC on 10 March 2024
+    const clock = ', hour: "numeric", minute: "numeric", timeZoneName: "short"';
+    expect(await at("2024-03-10T06:59:00Z", "America/New_York", clock)).toBe("1:59 AM EST");
+    expect(await at("2024-03-10T07:00:00Z", "America/New_York", clock)).toBe("3:00 AM EDT");
+  });
+
+  test("tell the time in a named zone with the other methods and Intl.DateTimeFormat", async () => {
+    expect(
+      await value(`return new Date("2024-01-01T23:30:00Z").toLocaleDateString("en-US", { timeZone: "Asia/Tokyo", weekday: "long", day: "numeric" })`),
+    ).toBe("2 Tuesday");
+    expect(await value(`return new Date("2024-01-01T12:00:00Z").toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles" })`)).toBe(
+      "4:00:00 AM",
+    );
+    expect(
+      await value(
+        `return new Intl.DateTimeFormat("en-US", { timeZone: "Europe/London", hour: "numeric", minute: "numeric" }).format(new Date("2024-07-01T12:00:00Z"))`,
+      ),
+    ).toBe("1:00 PM");
+  });
+
+  test("name the zone as the host's time zone data does", async () => {
+    const named = (zone: string, style: string) =>
+      value(`return new Date("2024-01-01T12:00:00Z").toLocaleString("en-US", { timeZone: "${zone}", hour: "numeric", timeZoneName: "${style}" })`);
+
+    expect(await named("America/New_York", "long")).toBe("7 AM Eastern Standard Time");
+    expect(await named("Asia/Tokyo", "shortOffset")).toBe("9 PM GMT+9");
+    expect(await named("Asia/Tokyo", "longOffset")).toBe("9 PM GMT+09:00");
+    expect(await named("UTC", "shortOffset")).toBe("12 PM GMT");
+    expect(
+      await value(`return new Date("2024-01-01T12:00:00Z").toLocaleString("en-US", { timeZone: "Asia/Kolkata", dateStyle: "full", timeStyle: "full" })`),
+    ).toBe("Monday, January 1, 2024 at 5:30:00 PM India Standard Time");
+  });
+
+  test("name the zone of local time when asked to", async () => {
+    const host = new Intl.DateTimeFormat("en-US", { hour: "numeric", timeZoneName: "short" });
+    const expected = host.format(new Date(2024, 0, 1, 12)).replace(/^12 PM /, "");
+
+    expect(await value(`return new Date(2024, 0, 1, 12).toLocaleTimeString("en-US", { hour: "numeric", timeZoneName: "short" })`)).toBe(
+      `12 PM ${expected}`,
+    );
+  });
+
+  test("refuse a time zone that does not exist, as a browser does", async () => {
+    expect(await value(`new Date(0).toLocaleString("en-US", { timeZone: "Nope/Zone" })`)).toBe(
+      "error: RangeError: Invalid time zone specified: Nope/Zone",
+    );
+    expect(await value(`new Intl.DateTimeFormat("en-US", { timeZone: "Nope/Zone" })`)).toMatch(/^error: RangeError: Invalid time zone/);
+  });
+
   test("write an invalid date as Invalid Date", async () => {
     expect(await value(`return new Date(NaN).toLocaleString("en-US", { month: "long" })`)).toBe("Invalid Date");
   });
@@ -285,12 +345,10 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
   });
 
   test("leave what they cannot do to the engine, as before", async () => {
-    // another language, another time zone, era, and a zone name for local time
+    // another language and an era
     for (const call of [
       `new Date(0).toLocaleDateString("de-DE")`,
-      `new Date(0).toLocaleDateString("en-US", { timeZone: "America/New_York" })`,
       `new Date(0).toLocaleDateString("en-US", { era: "short" })`,
-      `new Date(0).toLocaleTimeString("en-US", { timeZoneName: "short" })`,
       `new Date(0).toLocaleTimeString("en-US", { hourCycle: "h11" })`,
     ]) {
       expect(await value(`return typeof ${call}`)).toBe("string");

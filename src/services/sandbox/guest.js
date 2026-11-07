@@ -11,7 +11,7 @@
 //   <status: o|e> \n <line> \n <flags> \n <text>
 // where line is the line of the user's code an error came from (0 if unknown)
 // and flags is a bit set: 1 = result was cut short, 2 = console output was.
-(function setup(hostLog, loadExtra, maxLogs, maxLogLength, maxResultLength, seed0, seed1, seed2, seed3, promiseState) {
+(function setup(hostLog, loadExtra, maxLogs, maxLogLength, maxResultLength, seed0, seed1, seed2, seed3, promiseState, zoneInfo) {
   "use strict";
 
   const FILE = "input.js";
@@ -1430,7 +1430,7 @@
     let exported;
     const stub = {
       [name]() {
-        if (exported === undefined) exported = indirectEval(loadExtra(module))(original, owner)[name];
+        if (exported === undefined) exported = indirectEval(loadExtra(module))(original, owner, zoneInfo)[name];
         return reflectApply(exported, this, arguments);
       },
     }[name];

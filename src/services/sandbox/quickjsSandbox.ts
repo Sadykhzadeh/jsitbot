@@ -20,6 +20,7 @@ import {
   type SandboxService,
 } from "./types";
 import { truncateText } from "../../utils/markdownV2";
+import { zoneInfo } from "./timeZone";
 import { stripTypes } from "./typescript";
 import { createCappedModule, isHeapExhausted, isHeapGrown, isHeapNearlyFull } from "./wasmHeap";
 
@@ -469,6 +470,11 @@ export class QuickJsSandboxService implements SandboxService {
       }
       return out;
     });
+    // How far a time zone is from UTC at a moment, and what it is called there:
+    // [zone, milliseconds, name style] in, a short string out.
+    const zoneInfoFunction = context.newFunction("zoneInfo", (zone, moment, style) =>
+      context.newString(zoneInfo(readString(context, zone) ?? "", context.getNumber(moment), readString(context, style) ?? "")),
+    );
     const api = context.unwrapResult(
       context.callFunction(
         setup,
@@ -480,6 +486,7 @@ export class QuickJsSandboxService implements SandboxService {
         context.newNumber(maxResultLength),
         ...seed.map((word) => context.newNumber(word)),
         promiseState,
+        zoneInfoFunction,
       ),
     );
 
