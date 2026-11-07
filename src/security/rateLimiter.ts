@@ -40,7 +40,10 @@ export class SlidingWindowRateLimiter {
     existing.windowMs = policy.windowMs;
 
     if (existing.timestamps.length >= policy.maxRequests) {
-      const retryAfterMs = Math.max(0, policy.windowMs - (now - existing.timestamps[0]));
+      // Charges can leave more entries than the limit allows, and then it is not
+      // the oldest one that has to leave but the one that brings the count back under.
+      const blocking = existing.timestamps[existing.timestamps.length - policy.maxRequests];
+      const retryAfterMs = Math.max(0, policy.windowMs - (now - blocking));
       this.buckets.set(key, existing);
       return { allowed: false, retryAfterMs };
     }

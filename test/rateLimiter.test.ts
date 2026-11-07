@@ -95,6 +95,19 @@ describe("SlidingWindowRateLimiter charges", () => {
 
     expect(limiter.consume("user", policy, 10).allowed).toBe(false);
   });
+
+  test("tell a blocked key to wait until it is under the limit again, not until the oldest request leaves", () => {
+    const limiter = new SlidingWindowRateLimiter();
+    const policy = { windowMs: 1_000, maxRequests: 2 };
+
+    limiter.consume("user", policy, 0);
+    limiter.charge("user", policy, 2, 500);
+
+    // At 1000 the first request is gone, but the two charges still fill the limit until 1500.
+    const blocked = limiter.consume("user", policy, 600);
+    expect(blocked).toEqual({ allowed: false, retryAfterMs: 900 });
+    expect(limiter.consume("user", policy, 600 + blocked.retryAfterMs).allowed).toBe(true);
+  });
 });
 
 describe("SandboxTimeBudget", () => {
