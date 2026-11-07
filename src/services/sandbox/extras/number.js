@@ -6,8 +6,8 @@
 // Formats the way English does (a comma between thousands, a point before the
 // decimals) for the style decimal, percent and currency, with the options
 // minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,
-// minimumSignificantDigits, maximumSignificantDigits, useGrouping and
-// notation "compact" (with compactDisplay). The number is rounded on the
+// minimumSignificantDigits, maximumSignificantDigits, useGrouping, signDisplay
+// and notation "compact" (with compactDisplay). The number is rounded on the
 // digits it is written with, half away from zero, so 1.005 gives 1.01.
 // Anything else, another language or an option that is not listed, is left to
 // the engine's own method, which is the `original` it is given, together with
@@ -19,7 +19,7 @@
   const SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "CN¥", CAD: "CA$", AUD: "A$" };
   const WHOLE_CURRENCIES = ["JPY", "KRW"];
   const UNSUPPORTED = [
-    "signDisplay", "unit", "unitDisplay", "currencyDisplay", "currencySign", "roundingMode", "roundingIncrement",
+    "unit", "unitDisplay", "currencyDisplay", "currencySign", "roundingMode", "roundingIncrement",
   ];
   const SHORT_UNITS = ["", "K", "M", "B", "T"];
   const LONG_UNITS = ["", " thousand", " million", " billion", " trillion"];
@@ -177,6 +177,26 @@
     return compact ? written + (options.compactDisplay === "long" && style !== "currency" ? LONG_UNITS : SHORT_UNITS)[exponent] : written;
   }
 
+  // The sign in front of a number, as signDisplay asks for it. A number that is
+  // written as zero counts as zero, whatever it was before it was rounded.
+  function signOf(negative, text, options) {
+    const mode = options.signDisplay === undefined ? "auto" : String(options.signDisplay);
+    const zero = !/[1-9∞N]/.test(text);
+    switch (mode) {
+      case "auto":
+        return negative ? "-" : "";
+      case "always":
+        return negative ? "-" : "+";
+      case "exceptZero":
+        return zero || text === "NaN" ? "" : negative ? "-" : "+";
+      case "negative":
+        return negative && !zero ? "-" : "";
+      case "never":
+        return "";
+    }
+    throw new RangeError("Value " + mode + " out of range for Intl.NumberFormat options property signDisplay");
+  }
+
   function format(negative, magnitude, options) {
     const style = options.style === undefined ? "decimal" : String(options.style);
     let currency;
@@ -196,12 +216,13 @@
     if (magnitude !== magnitude) text = "NaN";
     else if (magnitude === Infinity) text = "∞";
     else text = digits(magnitude, style, options, defaultMin, defaultMax, options.notation === "compact");
+    const sign = signOf(negative, text, options);
     if (style === "percent") text += "%";
     if (style === "currency") {
       const symbol = SYMBOLS[currency];
       text = (symbol === undefined ? currency + (/^\d/.test(text) ? " " : "") : symbol) + text;
     }
-    return (negative ? "-" : "") + text;
+    return sign + text;
   }
 
   function handled(locales, options) {

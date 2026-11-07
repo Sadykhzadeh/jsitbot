@@ -106,6 +106,35 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await significant("5", "maximumSignificantDigits: 0")).toBe("error: RangeError: maximumSignificantDigits value is out of range.");
   });
 
+  test("writes the sign the way signDisplay asks", async () => {
+    const row = (mode: string) =>
+      value(
+        `return [5, -5, 0, -0, 0.0004, -0.0004, NaN, Infinity, -Infinity, 1234.5]` +
+          `.map((n) => n.toLocaleString("en-US", { signDisplay: "${mode}" })).join(" ")`,
+      );
+
+    expect(await row("auto")).toBe("5 -5 0 -0 0 -0 NaN ∞ -∞ 1,234.5");
+    expect(await row("always")).toBe("+5 -5 +0 -0 +0 -0 +NaN +∞ -∞ +1,234.5");
+    expect(await row("exceptZero")).toBe("+5 -5 0 0 0 0 NaN +∞ -∞ +1,234.5");
+    expect(await row("negative")).toBe("5 -5 0 0 0 0 NaN ∞ -∞ 1,234.5");
+    expect(await row("never")).toBe("5 5 0 0 0 0 NaN ∞ ∞ 1,234.5");
+  });
+
+  test("puts the sign before a currency symbol, and judges zero by what is written", async () => {
+    const sign = (n: string, options: string) => value(`return (${n}).toLocaleString("en-US", { ${options} })`);
+
+    expect(await sign("5", "signDisplay: 'always', style: 'percent'")).toBe("+500%");
+    expect(await sign("5", "signDisplay: 'always', style: 'currency', currency: 'USD'")).toBe("+$5.00");
+    expect(await sign("1234567", "signDisplay: 'always', notation: 'compact'")).toBe("+1.2M");
+    expect(await sign("0.001", "signDisplay: 'exceptZero', maximumFractionDigits: 0")).toBe("0");
+    expect(await sign("-0.4", "signDisplay: 'negative', maximumFractionDigits: 0")).toBe("0");
+    expect(await sign("-0.4", "signDisplay: 'auto', maximumFractionDigits: 0")).toBe("-0");
+    expect(await value(`return (5n).toLocaleString("en-US", { signDisplay: "always" })`)).toBe("+5");
+    expect(await sign("1", "signDisplay: 'bogus'")).toBe(
+      "error: RangeError: Value bogus out of range for Intl.NumberFormat options property signDisplay",
+    );
+  });
+
   test("throws for a value that is not a number", async () => {
     expect(await value(`return Number.prototype.toLocaleString.call("x")`)).toContain("TypeError");
   });
