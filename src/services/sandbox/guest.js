@@ -1529,6 +1529,8 @@
   lazyMethod("date", Date.prototype, "toLocaleString");
   lazyMethod("date", Date.prototype, "toLocaleDateString");
   lazyMethod("date", Date.prototype, "toLocaleTimeString");
+  lazyMethod("datestring", Date.prototype, "toString");
+  lazyMethod("datestring", Date.prototype, "toTimeString");
   lazyMethod("number", Number.prototype, "toLocaleString");
   lazyMethod("number", BigInt.prototype, "toLocaleString");
   lazyGlobals("clone", ["structuredClone"]);
