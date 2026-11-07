@@ -282,6 +282,33 @@ describe("curly quotes", () => {
   });
 });
 
+describe("import and export", () => {
+  const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
+
+  test("a program that uses either is told it is not a module", async () => {
+    for (const code of [
+      'import fs from "fs";\nconsole.log(fs)',
+      'import { a } from "b"',
+      'import * as x from "x"',
+      'import "side-effect"',
+      "const a = 1\nexport default a",
+      "export function f() {}",
+    ]) {
+      const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+      expect(message.text).toContain("Hint: this runs as a script");
+    }
+  });
+
+  test("a dynamic import and other errors get no hint", async () => {
+    for (const code of ['await import("x")', "if (1 {", "const s = 'import a from b'; s.x.y"]) {
+      const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+      expect(message.text).not.toContain("Hint");
+    }
+  });
+});
+
 describe("output that needs a file", () => {
   const run = (logs: string[], result = "1") => ({
     ok: true as const,

@@ -18,15 +18,27 @@ const ERROR_SOURCE_EXCERPT_LIMIT = 60;
 const CURLY_QUOTES = /[\u2018\u2019\u201C\u201D]/;
 const CURLY_QUOTES_HINT = "Hint: the code has curly quotes (\u201C \u201D \u2018 \u2019), JavaScript needs straight ones (\" ').";
 
+// Code copied from a tutorial often starts with an import. A script has none of
+// them, and the engine reports the first as "expecting '('" and the second as an
+// unsupported keyword, neither of which says what is wrong.
+const MODULE_ERROR = /^SyntaxError: (?:expecting '\('|unsupported keyword: export)/;
+const MODULE_STATEMENT = /^\s*(?:import\s*[\w${*"']|export\b)/m;
+const MODULE_HINT = "Hint: this runs as a script, not a module, so import and export do not work.";
+
 function describeError(execution: SandboxExecution, code: string): string {
   if (execution.ok) {
     return execution.result;
   }
 
   const located = locateError(execution, code);
-  const curlyQuotes = /^SyntaxError: unexpected character/.test(execution.error) && CURLY_QUOTES.test(code);
+  if (/^SyntaxError: unexpected character/.test(execution.error) && CURLY_QUOTES.test(code)) {
+    return located + "\n" + CURLY_QUOTES_HINT;
+  }
+  if (MODULE_ERROR.test(execution.error) && MODULE_STATEMENT.test(code)) {
+    return located + "\n" + MODULE_HINT;
+  }
 
-  return curlyQuotes ? located + "\n" + CURLY_QUOTES_HINT : located;
+  return located;
 }
 
 /**
