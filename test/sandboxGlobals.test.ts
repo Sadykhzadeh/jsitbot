@@ -233,8 +233,8 @@ describe("TextEncoder and TextDecoder", () => {
     expect(await value(`return new TextDecoder("utf8", { fatal: true }).fatal`)).toBe("true");
   });
 
-  test("only UTF-8 is there, and a wrong input says so", async () => {
-    expect(await value(`return new TextDecoder("latin1")`)).toBe('error: RangeError: The "latin1" encoding is not supported');
+  test("an encoding that is not there is refused, and a wrong input says so", async () => {
+    expect(await value(`return new TextDecoder("shift_jis")`)).toBe('error: RangeError: The "shift_jis" encoding is not supported');
     expect(await value(`return new TextDecoder().decode("text")`)).toContain("TypeError");
   });
 

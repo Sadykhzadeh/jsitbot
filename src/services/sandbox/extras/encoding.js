@@ -87,7 +87,7 @@
   // for the bytes that were valid so far, and decoding goes on at the byte that
   // broke it. With `stream`, a sequence that the bytes end in the middle of is
   // not an error yet: its start is given back as `rest`, for the next chunk.
-  function decode(bytes, fatal, dropBom, stream) {
+  function decode(bytes, fatal, dropBom, stream, label = "utf-8") {
     const units = [];
     const pieces = [];
     let i = 0;
@@ -99,7 +99,7 @@
     }
 
     function invalid() {
-      if (fatal) throw new TypeError("The encoded data was not valid for encoding utf-8");
+      if (fatal) throw new TypeError("The encoded data was not valid for encoding " + label);
       units.push(REPLACEMENT);
     }
 
@@ -165,23 +165,112 @@
     return { text: pieces.join(""), rest };
   }
 
+  // UTF-16 little endian. A lone surrogate is an error, and so is a last byte
+  // without its pair; with `stream` they are kept for the next chunk instead.
+  function decodeUtf16(bytes, fatal, dropBom, stream) {
+    const units = [];
+    let i = 0;
+    let rest = null;
+
+    function invalid() {
+      if (fatal) throw new TypeError("The encoded data was not valid for encoding utf-16le");
+      units.push(REPLACEMENT);
+    }
+
+    if (dropBom && bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) i = 2;
+
+    while (i + 1 < bytes.length) {
+      const unit = bytes[i] | (bytes[i + 1] << 8);
+      if (unit >= 0xd800 && unit <= 0xdbff) {
+        if (i + 3 >= bytes.length) {
+          if (stream) {
+            rest = bytes.slice(i);
+            break;
+          }
+          i += 2;
+          invalid();
+          continue;
+        }
+        const next = bytes[i + 2] | (bytes[i + 3] << 8);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          units.push(unit, next);
+          i += 4;
+        } else {
+          i += 2;
+          invalid();
+        }
+      } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+        i += 2;
+        invalid();
+      } else {
+        units.push(unit);
+        i += 2;
+      }
+    }
+
+    if (!rest && i < bytes.length) {
+      if (stream) rest = bytes.slice(i);
+      else invalid();
+    }
+
+    const pieces = [];
+    for (let k = 0; k < units.length; k += 8192) pieces.push(String.fromCharCode.apply(null, units.slice(k, k + 8192)));
+
+    return { text: pieces.join(""), rest };
+  }
+
+  // What windows-1252 has in place of the control characters 0x80 to 0x9f.
+  const WINDOWS_1252 = [
+    0x20ac, 0x81, 0x201a, 0x192, 0x201e, 0x2026, 0x2020, 0x2021, 0x2c6, 0x2030, 0x160, 0x2039, 0x152, 0x8d, 0x17d, 0x8f,
+    0x90, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x2dc, 0x2122, 0x161, 0x203a, 0x153, 0x9d, 0x17e, 0x178,
+  ];
+
+  function decodeWindows1252(bytes) {
+    const pieces = [];
+    for (let k = 0; k < bytes.length; k += 8192) {
+      const chunk = Array.prototype.slice.call(bytes, k, k + 8192);
+      for (let j = 0; j < chunk.length; j++) {
+        if (chunk[j] >= 0x80 && chunk[j] <= 0x9f) chunk[j] = WINDOWS_1252[chunk[j] - 0x80];
+      }
+      pieces.push(String.fromCharCode.apply(null, chunk));
+    }
+
+    return { text: pieces.join(""), rest: null };
+  }
+
+  // The labels of the Encoding Standard for the encodings that are there.
+  const LABELS = {
+    "utf-8": ["unicode-1-1-utf-8", "unicode11utf8", "unicode20utf8", "utf-8", "utf8", "x-unicode20utf8"],
+    "utf-16le": ["csunicode", "iso-10646-ucs-2", "ucs-2", "unicode", "unicodefeff", "utf-16", "utf-16le"],
+    "windows-1252": [
+      "ansi_x3.4-1968", "ascii", "cp1252", "cp819", "csisolatin1", "ibm819", "iso-8859-1", "iso-ir-100", "iso8859-1",
+      "iso88591", "iso_8859-1", "iso_8859-1:1987", "l1", "latin1", "us-ascii", "windows-1252", "x-cp1252",
+    ],
+  };
+
+  function encodingOf(label) {
+    const name = String(label).trim().toLowerCase();
+    for (const encoding in LABELS) {
+      if (LABELS[encoding].indexOf(name) !== -1) return encoding;
+    }
+    throw new RangeError('The "' + label + '" encoding is not supported');
+  }
+
   class TextDecoder {
+    #encoding;
     #fatal;
     #ignoreBOM;
     #pending = null;
     #started = false;
 
     constructor(label = "utf-8", options = {}) {
-      const name = String(label).trim().toLowerCase();
-      if (name !== "utf-8" && name !== "utf8" && name !== "unicode-1-1-utf-8") {
-        throw new RangeError('The "' + label + '" encoding is not supported');
-      }
+      this.#encoding = encodingOf(label);
       this.#fatal = Boolean(options && options.fatal);
       this.#ignoreBOM = Boolean(options && options.ignoreBOM);
     }
 
     get encoding() {
-      return "utf-8";
+      return this.#encoding;
     }
 
     get fatal() {
@@ -204,7 +293,13 @@
 
       let result;
       try {
-        result = decode(bytes, this.#fatal, !this.#ignoreBOM && !this.#started, stream);
+        const dropBom = !this.#ignoreBOM && !this.#started;
+        result =
+          this.#encoding === "utf-16le"
+            ? decodeUtf16(bytes, this.#fatal, dropBom, stream)
+            : this.#encoding === "windows-1252"
+              ? decodeWindows1252(bytes)
+              : decode(bytes, this.#fatal, dropBom, stream);
       } catch (error) {
         this.#pending = null;
         this.#started = false;
