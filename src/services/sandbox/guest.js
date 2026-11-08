@@ -1555,6 +1555,31 @@
   });
   defineProperty(Array.fromAsync, "length", { value: 1, configurable: true });
 
+  // Closing an iterator helper (map, filter, drop and the others) whose source is
+  // an Array, Map, Set or String iterator throws "not a function" in the engine,
+  // because those have no return method. some, find, every, break and
+  // destructuring all close the helper, so they failed unless the whole iterator
+  // was read. A source without return has nothing to close.
+  {
+    const helperPrototype = getPrototypeOf([].values().map((value) => value));
+    const helperReturn = helperPrototype.return;
+    defineProperty(helperPrototype, "return", {
+      value: {
+        return() {
+          try {
+            return reflectApply(helperReturn, this, []);
+          } catch (error) {
+            if (error instanceof TypeError && error.message === "not a function") return { value: undefined, done: true };
+            throw error;
+          }
+        },
+      }.return,
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+  }
+
   // The error that Promise.any rejects with has no message in the engine. Only
   // that method is wrapped, so ordinary promises cost what they did.
   const promiseAny = Promise.any;
