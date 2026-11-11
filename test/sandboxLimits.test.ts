@@ -164,6 +164,32 @@ describe("giving memory back", () => {
     expect(await collections(`[1, 2, 3].map((n) => n * 2)`)).toBe(0);
     expect(await collections(`const text = "x".repeat(1000); text.length`)).toBe(0);
   });
+
+  // Bun throws from the read when it cannot get the number, which it was seen
+  // to do on a machine short of memory.
+  test("runs the code and collects when the size of the process cannot be read", async () => {
+    // The read before the run, then the one after it.
+    for (const unreadable of [0, 1]) {
+      let reads = 0;
+      const resident = spyOn(process.memoryUsage, "rss").mockImplementation(() => {
+        if (reads++ >= unreadable) {
+          throw new Error("Failed to get memory usage");
+        }
+        return 0;
+      });
+      const collect = spyOn(Bun, "gc");
+      try {
+        const result = await sandbox.execute(`[1, 2, 3].map((n) => n * 2)`);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(result.ok && result.result).toBe("[ 2, 4, 6 ]");
+        expect(collect.mock.calls.length).toBeGreaterThan(0);
+      } finally {
+        collect.mockRestore();
+        resident.mockRestore();
+      }
+    }
+  });
 });
 
 describe("time limits", () => {
