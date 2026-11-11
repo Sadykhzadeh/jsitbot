@@ -132,6 +132,15 @@ function readString(context: QuickJSContext, handle: QuickJSHandle): string | un
   return context.typeof(handle) === "string" ? context.getString(handle) : undefined;
 }
 
+/** How much of the process is resident, or undefined when Bun cannot tell, which it reports by throwing. */
+function residentBytes(): number | undefined {
+  try {
+    return process.memoryUsage.rss();
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * A promise job turns what its callback throws into a rejection, so a job that
  * fails is the callback of a FinalizationRegistry, or one that was interrupted.
@@ -256,8 +265,18 @@ export class QuickJsSandboxService implements SandboxService {
       logs = sink;
       heapExhausted = () => isHeapExhausted(module, this.options.memoryLimitBytes);
       heapNearlyFull = () => isHeapNearlyFull(module, this.options.memoryLimitBytes);
-      const residentBefore = process.memoryUsage.rss();
-      heavy = () => isHeapGrown(module) || process.memoryUsage.rss() - residentBefore > HEAVY_RUN_BYTES;
+      const residentBefore = residentBytes();
+      heavy = () => {
+        // A size that cannot be read counts as heavy: the read was seen to fail
+        // when memory was short, and a collection too many costs a few
+        // milliseconds after the reply, where one too few lets instances pile up.
+        if (isHeapGrown(module) || residentBefore === undefined) {
+          return true;
+        }
+
+        const residentAfter = residentBytes();
+        return residentAfter === undefined || residentAfter - residentBefore > HEAVY_RUN_BYTES;
+      };
 
       // The clock starts when the guest does: time spent waiting for an
       // instance or behind another run is not the guest's to pay for.
