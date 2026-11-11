@@ -7,6 +7,7 @@ import type {
 
 import {
   GUEST_FILE,
+  awaitsAtTopLevel,
   guestExtras,
   guestRuntimeSource,
   wrapAsExpression,
@@ -343,6 +344,7 @@ export class QuickJsSandboxService implements SandboxService {
    * Finds the reading of the code that parses, in this order: one expression
    * (`1 + 1`, `{ a: 1 }`), a script whose last statement is the result
    * (`const a = 1; a + 1`), the body of a function (`return`, top-level `await`).
+   * A script that awaits at its top level is read as the body of a function.
    *
    * The first and last are wrapped in an async function, so evaluating them can
    * only throw a parse error. A script can throw anything, so it is compiled
@@ -417,6 +419,15 @@ export class QuickJsSandboxService implements SandboxService {
       return this.afterParseFailure(this.packFailure(context, guest.fail, compiled.error));
     }
     compiled.value.dispose();
+
+    // `x = await (y)` parses as a script too, as a call of something named
+    // await. When the function body does not parse, the script is still there.
+    if (awaitsAtTopLevel(code)) {
+      const awaited = this.attemptStatements(context, runtime, guest, code, expired);
+      if (awaited.settled) {
+        return awaited;
+      }
+    }
 
     // It parses, so whatever happens from here on is the code's own doing.
     const evaluated = context.evalCode(code, GUEST_FILE);

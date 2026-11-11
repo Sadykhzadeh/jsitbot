@@ -74,6 +74,22 @@ function readAsRepl(code: string): string | undefined {
   }
 }
 
+// The wrapper the REPL mode puts the code in, after the declarations it lifts
+// out of it, is an async function only when the code awaits outside a function.
+const AWAITS_AT_TOP_LEVEL = /^(?:var .*\n)*\(async /;
+
+/**
+ * Whether the code awaits at its top level. `x = await (y)` is also a script
+ * that calls something named await, and code with an await in it means the
+ * await. The word is looked for first, so code without it costs nothing more;
+ * finding it in a string, a comment or an async function costs one reading by
+ * the transpiler, which says no. So does code the transpiler cannot read, which
+ * is what it makes of code that declares an `await` of its own.
+ */
+export function awaitsAtTopLevel(code: string): boolean {
+  return /\bawait\b/.test(code) && AWAITS_AT_TOP_LEVEL.test(readAsRepl(code) ?? "");
+}
+
 // Only the mode that returns the value of the last expression writes this.
 const RETURNS_LAST_VALUE = "__proto__: null";
 // How far back from the end to look for where the last statement begins.
