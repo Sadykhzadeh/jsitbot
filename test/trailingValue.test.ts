@@ -81,6 +81,40 @@ describe("the value of the last statement of code that awaits", () => {
     expect(execution.logs).toEqual(["once"]);
   });
 
+  // `await (x)` is also a call of something named await, which a script allows.
+  test("an await in front of a bracket or a template is not a call of await", async () => {
+    expect(await show(`const x = await (Promise.resolve(1)); x`)).toBe("1");
+    expect(await show(`const [a] = await [1]; a`)).toBe("1");
+    expect(await show("var s = await `x`; s")).toBe("x");
+    expect(await show(`const x: number = await (Promise.resolve(1)); x`)).toBe("1");
+
+    const execution = await run(`const r = await (async () => 5)();\nconsole.log(r)`);
+    expect(execution.ok).toBe(true);
+    expect(execution.logs).toEqual(["5"]);
+  });
+
+  test("such code runs once, and an error in it keeps its line", async () => {
+    const execution = await run(`console.log("once");\nconst x = await (Promise.resolve(1));\nnull.x`);
+
+    expect(execution.logs).toEqual(["once"]);
+    expect(execution.ok).toBe(false);
+    if (!execution.ok) {
+      expect(execution.error).toStartWith("TypeError");
+      expect(execution.line).toBe(3);
+    }
+  });
+
+  test("code that names something of its own await still calls it", async () => {
+    expect(await show(`var await = (x) => x * 2; await(3)`)).toBe("6");
+    expect(await show(`function await(x) { return x * 2 }\nawait(3)`)).toBe("6");
+  });
+
+  test("the word in a string, a comment or an async function leaves a script a script", async () => {
+    expect(await show(`const s = "await (1)"; if (s) { 2 }`)).toBe("2");
+    expect(await show(`// await (1)\nif (true) { 2 }`)).toBe("2");
+    expect(await show(`async function f() { return await (1) }\nif (f) { 2 }`)).toBe("2");
+  });
+
   test("it works on TypeScript too", async () => {
     expect(await show(`const n: number = await Promise.resolve(2);\nn * 3`)).toBe("6");
   });
