@@ -239,6 +239,37 @@ describe("queueMicrotask", () => {
   });
 });
 
+// The engine runs the callback of a FinalizationRegistry as a job of its own,
+// between the promise jobs, once the collector has found the object gone.
+describe("a FinalizationRegistry callback that throws", () => {
+  const collected = (callback: string) => `
+    const registry = new FinalizationRegistry(${callback});
+    (() => { const gone = {}; gone.self = gone; registry.register(gone, 1); })();
+    const junk = [];
+    for (let i = 0; i < 200000; i++) junk.push({ i });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    5
+  `;
+
+  test("is logged and leaves the result of the code alone", async () => {
+    const result = await sandbox.execute(collected(`(held) => { console.log("gone", held); throw new Error("boom") }`));
+
+    expect(result.ok && result.result).toBe("5");
+    expect(result.logs).toEqual(["gone 1", "Uncaught Error: boom"]);
+  });
+
+  test("does not keep the host busy past the time limit with what it throws", async () => {
+    const result = await quickSandbox.execute(`
+      const big = [];
+      for (let i = 0; i < 300000; i++) big.push(i);
+      ${collected(`() => { throw { name: "N", message: "M", a: big, b: big, c: big, d: big, e: big, f: big } }`)}
+    `);
+
+    // Either it was over in time or it was stopped for taking too long.
+    expect(result.timedOut || result.durationMs <= 250).toBe(true);
+  });
+});
+
 describe("performance.now", () => {
   test("includes the time a sleep skipped", async () => {
     const elapsed = Number(await value(`

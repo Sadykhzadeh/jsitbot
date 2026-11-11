@@ -1335,8 +1335,12 @@
   const resolved = Promise.resolve();
   const promiseThen = uncurry(Promise.prototype.then);
 
-  // An error in the callback is not the run's result, since by then the code
-  // has moved on; it is logged the way a browser logs it.
+  // An error in a callback that runs as a job is not the run's result, since by
+  // then the code has moved on; it is logged the way a browser logs it.
+  function uncaught(error) {
+    write("Uncaught " + (isErrorLike(error) ? errorText(error, { cut: false }) : render(error, maxLogLength, false).text));
+  }
+
   function queueMicrotask(callback) {
     if (typeof callback !== "function") {
       throw new TypeError("The callback must be a function");
@@ -1346,7 +1350,7 @@
       try {
         callback();
       } catch (error) {
-        write("Uncaught " + (isErrorLike(error) ? errorText(error, { cut: false }) : render(error, maxLogLength, false).text));
+        uncaught(error);
       }
     });
   }
@@ -1638,5 +1642,5 @@
 
   collectBuiltInNames();
 
-  return { finish, fail, tick };
+  return { finish, fail, tick, uncaught };
 })

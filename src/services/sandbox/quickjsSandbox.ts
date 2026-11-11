@@ -107,6 +107,7 @@ interface Guest {
   finish: QuickJSHandle;
   tick: QuickJSHandle;
   fail: QuickJSHandle;
+  uncaught: QuickJSHandle;
 }
 
 /**
@@ -131,7 +132,13 @@ function readString(context: QuickJSContext, handle: QuickJSHandle): string | un
   return context.typeof(handle) === "string" ? context.getString(handle) : undefined;
 }
 
-function drainPendingJobs(runtime: QuickJSRuntime, expired: () => boolean): void {
+/**
+ * A promise job turns what its callback throws into a rejection, so a job that
+ * fails is the callback of a FinalizationRegistry, or one that was interrupted.
+ * The first is not the run's result, in a browser either: the guest logs it,
+ * and the host does not look at what was thrown.
+ */
+function drainPendingJobs(context: QuickJSContext, runtime: QuickJSRuntime, guest: Guest, expired: () => boolean): void {
   while (runtime.hasPendingJob()) {
     if (expired()) {
       throw new Error("InternalError: interrupted");
@@ -139,9 +146,10 @@ function drainPendingJobs(runtime: QuickJSRuntime, expired: () => boolean): void
 
     const result = runtime.executePendingJobs(JOB_BATCH_SIZE);
     if (result.error) {
-      const dumped = result.error.context.dump(result.error) as { name?: unknown; message?: unknown } | null;
+      if (!expired()) {
+        context.callFunction(guest.uncaught, context.undefined, result.error).dispose();
+      }
       result.error.dispose();
-      throw new Error(`${dumped?.name ?? "Error"}: ${dumped?.message ?? "unknown error"}`);
     }
   }
 }
@@ -505,6 +513,7 @@ export class QuickJsSandboxService implements SandboxService {
       finish: context.getProp(api, "finish"),
       tick: context.getProp(api, "tick"),
       fail: context.getProp(api, "fail"),
+      uncaught: context.getProp(api, "uncaught"),
     };
   }
 
@@ -539,7 +548,7 @@ export class QuickJsSandboxService implements SandboxService {
     expired: () => boolean,
   ): Packed | undefined {
     for (;;) {
-      drainPendingJobs(runtime, expired);
+      drainPendingJobs(context, runtime, guest, expired);
       if (expired()) {
         throw new Error("InternalError: interrupted");
       }
