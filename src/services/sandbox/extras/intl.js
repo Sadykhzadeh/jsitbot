@@ -6,7 +6,7 @@
 // toLocaleString of dates under another name, with the same formatting and the
 // same limits (see number.js, collate.js and date.js). PluralRules,
 // ListFormat and RelativeTimeFormat are written out here and know English only.
-// There is no formatToParts. `hostTimeZone` is the zone of the process, which
+// Only NumberFormat has formatToParts. `hostTimeZone` is the zone of the process, which
 // executionWrapper puts around this source.
 (function () {
   "use strict";
@@ -25,6 +25,63 @@
     return out;
   }
 
+  const COMPACT_WORDS = ["K", "M", "B", "T", "thousand", "million", "billion", "trillion"];
+
+  // Cuts what the number formatter wrote into the parts formatToParts names.
+  // Its output has one shape, so each piece is told by what it is made of.
+  function numberParts(text) {
+    const parts = [];
+    let point = false;
+    let exponent = false;
+    let i = 0;
+
+    function add(type, value) {
+      parts.push({ type, value });
+    }
+
+    while (i < text.length) {
+      const c = text[i];
+      if (c >= "0" && c <= "9") {
+        let end = i;
+        while (end < text.length && text[end] >= "0" && text[end] <= "9") end++;
+        add(exponent ? "exponentInteger" : point ? "fraction" : "integer", text.slice(i, end));
+        i = end;
+        continue;
+      }
+
+      const last = parts.length === 0 ? "" : parts[parts.length - 1].type;
+      if (c === "," || c === ".") {
+        if (c === ".") point = true;
+        add(c === "," ? "group" : "decimal", c);
+      } else if (c === "-" || c === "+") {
+        add(c === "+" ? "plusSign" : exponent ? "exponentMinusSign" : "minusSign", c);
+      } else if (c === "%") {
+        add("percentSign", c);
+      } else if (c === "\u221e") {
+        add("infinity", c);
+      } else if (c === "(" || c === ")" || c === " " || c === "\u00a0") {
+        add("literal", c);
+      } else if (text.startsWith("NaN", i)) {
+        add("nan", "NaN");
+        i += 3;
+        continue;
+      } else if (c === "E" && (last === "integer" || last === "fraction")) {
+        exponent = true;
+        add("exponentSeparator", c);
+      } else {
+        let end = i;
+        while (end < text.length && !/[\d\s\u00a0()+\-.,%\u221e]/.test(text[end]) && !text.startsWith("NaN", end)) end++;
+        const run = text.slice(i, end);
+        const afterNumber = last === "integer" || last === "fraction" || (last === "literal" && parts.length > 1 && parts[parts.length - 2].type !== "currency");
+        add(afterNumber && COMPACT_WORDS.indexOf(run) !== -1 ? "compact" : "currency", run);
+        i = end;
+        continue;
+      }
+      i++;
+    }
+    return parts;
+  }
+
   class NumberFormat {
     constructor(locales, options) {
       // the arguments are checked now, as a constructor does, not at the first format
@@ -35,6 +92,7 @@
           ? BigInt.prototype.toLocaleString.call(value, locales, options)
           : Number.prototype.toLocaleString.call(Number(value), locales, options);
       define(this, "format", format);
+      define(this, "formatToParts", (value) => numberParts(format(value)));
       define(this, "resolvedOptions", () => {
         const asked = given(options, [
           "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",
