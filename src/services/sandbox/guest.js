@@ -654,7 +654,7 @@
         }
 
         const descriptor = getOwnPropertyDescriptor(object, key);
-        const label = pass === 1 ? "[" + symbolToString(key) + "]"
+        const label = pass === 1 ? symbolToString(key)
           : isIdentifier(key) ? key
           : quote(key, state);
         let value;
