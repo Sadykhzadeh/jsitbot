@@ -204,7 +204,13 @@
       else if (c === "\b") out += "\\b";
       else if (c === "\f") out += "\\f";
       else if (c < " " || (c >= "\x7f" && c <= "\x9f")) out += "\\x" + (stringCharCodeAt(c, 0) < 16 ? "0" : "") + stringToUpper(numberToString(stringCharCodeAt(c, 0), 16));
-      else out += c;
+      else if (c >= "\ud800" && c <= "\udfff") {
+        // A pair stays whole; a half has no UTF-8 form, so Node writes its code unit.
+        const code = stringCharCodeAt(c, 0);
+        const next = i + 1 < source.length ? stringCharCodeAt(source, i + 1) : 0;
+        if (code <= 0xdbff && next >= 0xdc00 && next <= 0xdfff) out += c + source[++i];
+        else out += "\\u" + numberToString(code, 16);
+      } else out += c;
     }
     return out + mark + (clipped ? "..." : "");
   }

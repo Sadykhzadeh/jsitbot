@@ -113,11 +113,11 @@ describe("Number.prototype.toLocaleString", () => {
           `.map((n) => n.toLocaleString("en-US", { signDisplay: "${mode}" })).join(" ")`,
       );
 
-    expect(await row("auto")).toBe("5 -5 0 -0 0 -0 NaN ∞ -∞ 1,234.5");
-    expect(await row("always")).toBe("+5 -5 +0 -0 +0 -0 +NaN +∞ -∞ +1,234.5");
-    expect(await row("exceptZero")).toBe("+5 -5 0 0 0 0 NaN +∞ -∞ +1,234.5");
-    expect(await row("negative")).toBe("5 -5 0 0 0 0 NaN ∞ -∞ 1,234.5");
-    expect(await row("never")).toBe("5 5 0 0 0 0 NaN ∞ ∞ 1,234.5");
+    expect(await row("auto")).toBe("5 -5 0 -0 0 -0 NaN \u221e -\u221e 1,234.5");
+    expect(await row("always")).toBe("+5 -5 +0 -0 +0 -0 +NaN +\u221e -\u221e +1,234.5");
+    expect(await row("exceptZero")).toBe("+5 -5 0 0 0 0 NaN +\u221e -\u221e +1,234.5");
+    expect(await row("negative")).toBe("5 -5 0 0 0 0 NaN \u221e -\u221e 1,234.5");
+    expect(await row("never")).toBe("5 5 0 0 0 0 NaN \u221e \u221e 1,234.5");
   });
 
   test("puts the sign before a currency symbol, and judges zero by what is written", async () => {

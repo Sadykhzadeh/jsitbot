@@ -180,4 +180,14 @@ describe("escapes in quoted strings", () => {
     expect(await show(String.raw`["\b", "\f", "\v", "\x01", "\x1f"]`)).toBe(String.raw`[ '\b', '\f', '\x0B', '\x01', '\x1F' ]`);
     expect(await show(String.raw`["\x7f", "\x85", "\x9f"]`)).toBe(String.raw`[ '\x7F', '\x85', '\x9F' ]`);
   });
+
+  test("show half of a surrogate pair as its code unit", async () => {
+    expect(await show(String.raw`["\ud83d", "\ude00x", "a\udc00"]`)).toBe(String.raw`[ '\ud83d', '\ude00x', 'a\udc00' ]`);
+    expect(await show(String.raw`"😀".split("")`)).toBe(String.raw`[ '\ud83d', '\ude00' ]`);
+    expect(await show(String.raw`({ "\ud83d": 1 })`)).toBe(String.raw`{ '\ud83d': 1 }`);
+  });
+
+  test("leave a whole pair alone", async () => {
+    expect(await show(`["😀", "a😀b"]`)).toBe("[ '😀', 'a😀b' ]");
+  });
 });
