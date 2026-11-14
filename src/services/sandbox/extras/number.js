@@ -7,8 +7,9 @@
 // decimals) for the style decimal, percent and currency, with the options
 // minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,
 // minimumSignificantDigits, maximumSignificantDigits, useGrouping, signDisplay
-// and notation "compact" (with compactDisplay), "scientific" and "engineering". The number is rounded on the
-// digits it is written with, half away from zero, so 1.005 gives 1.01.
+// and notation "compact" (with compactDisplay), "scientific" and "engineering",
+// and for currencies currencyDisplay "symbol" and "code". The number is rounded
+// on the digits it is written with, half away from zero, so 1.005 gives 1.01.
 // Anything else, another language or an option that is not listed, is left to
 // the engine's own method, which is the `original` it is given, together with
 // the prototype it belongs to.
@@ -19,7 +20,7 @@
   const SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "CN¥", CAD: "CA$", AUD: "A$" };
   const WHOLE_CURRENCIES = ["JPY", "KRW"];
   const UNSUPPORTED = [
-    "unit", "unitDisplay", "currencyDisplay", "currencySign", "roundingMode", "roundingIncrement",
+    "unit", "unitDisplay", "currencySign", "roundingMode", "roundingIncrement",
   ];
   const SHORT_UNITS = ["", "K", "M", "B", "T"];
   const LONG_UNITS = ["", " thousand", " million", " billion", " trillion"];
@@ -247,7 +248,7 @@
     const sign = signOf(negative, text, options);
     if (style === "percent") text += "%";
     if (style === "currency") {
-      const symbol = SYMBOLS[currency];
+      const symbol = options.currencyDisplay === "code" ? undefined : SYMBOLS[currency];
       text = (symbol === undefined ? currency + (/^\d/.test(text) ? " " : "") : symbol) + text;
     }
     return sign + text;
@@ -263,6 +264,7 @@
     const notation = options.notation;
     if (notation !== undefined && notation !== "standard" && notation !== "compact" && notation !== "scientific" && notation !== "engineering") return false;
     if (options.compactDisplay !== undefined && options.compactDisplay !== "short" && options.compactDisplay !== "long") return false;
+    if (options.currencyDisplay !== undefined && options.currencyDisplay !== "symbol" && options.currencyDisplay !== "code") return false;
     return options.style === undefined || options.style === "decimal" || options.style === "percent" || options.style === "currency";
   }
 

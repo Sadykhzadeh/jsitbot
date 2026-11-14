@@ -47,6 +47,20 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await value(`return (5).toLocaleString("en-US", { style: "currency" })`)).toContain("Currency code is required");
   });
 
+  test("writes the code of a currency when currencyDisplay asks for it", async () => {
+    const coded = (n: string, options: string) =>
+      value(`return (${n}).toLocaleString("en-US", { style: "currency", ${options} })`);
+
+    expect(await coded("1234.5", `currency: "USD", currencyDisplay: "code"`)).toBe("USD\u00a01,234.50");
+    expect(await coded("-5", `currency: "eur", currencyDisplay: "code"`)).toBe("-EUR\u00a05.00");
+    expect(await coded("1234.5", `currency: "JPY", currencyDisplay: "code"`)).toBe("JPY\u00a01,235");
+    expect(await coded("5", `currency: "USD", currencyDisplay: "code", signDisplay: "always"`)).toBe("+USD\u00a05.00");
+    expect(await coded("1500", `currency: "USD", currencyDisplay: "code", notation: "compact"`)).toBe("USD\u00a01.5K");
+    expect(await coded("NaN", `currency: "USD", currencyDisplay: "code"`)).toBe("USDNaN");
+    expect(await coded("1234.5", `currency: "USD", currencyDisplay: "symbol"`)).toBe("$1,234.50");
+    expect(await coded("1234.5", `currency: "USD", currencyDisplay: "name"`)).toBe("1234.5");
+  });
+
   test("writes NaN and the infinities", async () => {
     expect(await value(`return [NaN, Infinity, -Infinity].map((n) => n.toLocaleString()).join(" ")`)).toBe("NaN \u221e -\u221e");
     expect(await value(`return NaN.toLocaleString("en-US", { style: "percent" })`)).toBe("NaN%");
