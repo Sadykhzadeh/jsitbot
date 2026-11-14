@@ -96,6 +96,41 @@ describe("values the formatter must not trust", () => {
     expect(text(result)).toBe("[ [ 1, 2 ], 5 ]");
   });
 
+  test("printing an array buffer or a data view runs nothing the program replaced", async () => {
+    const { result, cpuMs } = await run(`
+      const trap = () => { while (true) {} };
+      const buffer = new Uint8Array([7, 8]).buffer;
+      const view = new DataView(buffer);
+      Object.defineProperty(buffer, "byteLength", { get: trap });
+      Object.defineProperty(buffer, Symbol.toStringTag, { get: trap });
+      Object.defineProperty(buffer, "slice", { value: trap });
+      Object.defineProperty(view, "buffer", { get: trap });
+      Object.defineProperty(view, "byteLength", { get: trap });
+      Object.defineProperty(view, "byteOffset", { get: trap });
+      Object.defineProperty(view, Symbol.toStringTag, { get: trap });
+      Object.defineProperty(ArrayBuffer.prototype, "byteLength", { get: trap });
+      Object.defineProperty(DataView.prototype, "buffer", { get: trap });
+      Object.defineProperty(DataView.prototype, "byteLength", { get: trap });
+      Object.defineProperty(DataView.prototype, "byteOffset", { get: trap });
+      globalThis.Uint8Array = trap;
+      console.log(buffer, [view]);
+      return 1;
+    `);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.logs).toEqual([
+      "ArrayBuffer { [Uint8Contents]: <07 08>, [byteLength]: 2 } [\n  DataView {\n    [byteLength]: 2,\n    [byteOffset]: 0,\n    [buffer]: ArrayBuffer { [Uint8Contents]: <07 08>, [byteLength]: 2 }\n  }\n]",
+    ]);
+    expect(cpuMs).toBeLessThan(1_000);
+  });
+
+  test("a huge array buffer is read for at most a hundred bytes", async () => {
+    const { result, cpuMs } = await run(`console.log(new ArrayBuffer(4_000_000).byteLength, new DataView(new ArrayBuffer(4_000_000))); 1`);
+
+    expect(result.timedOut).toBe(false);
+    expect(cpuMs).toBeLessThan(1_000);
+  });
+
   test("getters are named, not run", async () => {
     const { result } = await run(`console.log({ get a() { while (true) {} } }); ({ get b() { while (true) {} }, set c(v) {} })`);
 

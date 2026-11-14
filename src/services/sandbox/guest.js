@@ -81,6 +81,12 @@
   const TypedArray = getPrototypeOf(Uint8Array);
   const typedArrayLength = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "length").get);
   const arrayBufferLength = uncurry(getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get);
+  const arrayBufferPrototype = ArrayBuffer.prototype;
+  const dataViewPrototype = DataView.prototype;
+  const dataViewLength = uncurry(getOwnPropertyDescriptor(DataView.prototype, "byteLength").get);
+  const dataViewOffset = uncurry(getOwnPropertyDescriptor(DataView.prototype, "byteOffset").get);
+  const dataViewBuffer = uncurry(getOwnPropertyDescriptor(DataView.prototype, "buffer").get);
+  const NativeUint8Array = Uint8Array;
   const numberValueOf = uncurry(Number.prototype.valueOf);
   const stringValueOf = uncurry(String.prototype.valueOf);
   const booleanValueOf = uncurry(Boolean.prototype.valueOf);
@@ -518,6 +524,36 @@
     return layout(reference(array, state) + name + "(" + length + ") ", "[", parts, "]", depth, ARRAY, true);
   }
 
+  // The first bytes of a buffer, then the length of it and what was added to it.
+  function formatArrayBuffer(buffer, depth, state) {
+    const length = arrayBufferLength(buffer);
+    const shown = length < MAX_ENTRIES ? length : MAX_ENTRIES;
+    const bytes = new NativeUint8Array(buffer, 0, shown);
+    let hex = "";
+    for (let i = 0; i < shown; i++) hex += (i > 0 ? " " : "") + hexByte(bytes[i]);
+    if (length > shown) {
+      state.cut = true;
+      hex += " ... " + (length - shown) + " more byte" + (length - shown === 1 ? "" : "s");
+    }
+
+    const parts = ["[Uint8Contents]: <" + hex + ">", "[byteLength]: " + length];
+    enter(depth);
+    addProperties(buffer, parts, depth, state, false);
+    const name = constructorName(buffer);
+    const prefix = name === "ArrayBuffer" || name === null ? "ArrayBuffer " : name + " [ArrayBuffer] ";
+    return layout(reference(buffer, state) + prefix, "{", parts, "}", depth);
+  }
+
+  function formatDataView(view, depth, state) {
+    const parts = ["[byteLength]: " + dataViewLength(view), "[byteOffset]: " + dataViewOffset(view)];
+    enter(depth);
+    parts[parts.length] = "[buffer]: " + format(dataViewBuffer(view), depth + 1, state);
+    addProperties(view, parts, depth, state, false);
+    const name = constructorName(view);
+    const prefix = name === "DataView" || name === null ? "DataView " : name + " [DataView] ";
+    return layout(reference(view, state) + prefix, "{", parts, "}", depth);
+  }
+
   function formatMap(map, depth, state) {
     const size = mapSize(map);
     const parts = [];
@@ -701,6 +737,8 @@
     const prototype = getPrototypeOf(value);
     if (prototype === mapIteratorPrototype) return "[Map Iterator] { <items unknown> }";
     if (prototype === setIteratorPrototype) return "[Set Iterator] { <items unknown> }";
+    if (prototype === arrayBufferPrototype) return depth > depthLimit ? "[ArrayBuffer]" : formatArrayBuffer(value, depth, state);
+    if (prototype === dataViewPrototype) return depth > depthLimit ? "[DataView]" : formatDataView(value, depth, state);
 
     const tag = objectToString(value);
 
@@ -719,7 +757,8 @@
     if (tag === "[object Promise]") return formatPromise(value, depth, state);
     if (tag === "[object WeakMap]") return "WeakMap { <items unknown> }";
     if (tag === "[object WeakSet]") return "WeakSet { <items unknown> }";
-    if (tag === "[object ArrayBuffer]") return "ArrayBuffer { byteLength: " + arrayBufferLength(value) + " }";
+    if (tag === "[object ArrayBuffer]") return depth > depthLimit ? "[ArrayBuffer]" : formatArrayBuffer(value, depth, state);
+    if (tag === "[object DataView]") return depth > depthLimit ? "[DataView]" : formatDataView(value, depth, state);
 
     const name = constructorName(value);
     const label = name === null ? "[Object: null prototype]" : name;
