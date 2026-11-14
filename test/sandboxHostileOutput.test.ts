@@ -44,9 +44,20 @@ describe("values the formatter must not trust", () => {
     expect(cpuMs).toBeLessThan(1_000);
   });
 
-  test("a proxy whose traps throw prints as unformattable", async () => {
+  test("a proxy whose traps throw prints its target and runs no trap", async () => {
     const { result } = await run(`
       const hostile = new Proxy({}, { ownKeys() { throw new Error("keys") }, get() { throw 1 }, getPrototypeOf() { throw 2 } });
+      console.log(hostile, { inside: hostile });
+      return 1;
+    `);
+
+    expect(result.ok).toBe(true);
+    expect(result.logs).toEqual(["{} { inside: {} }"]);
+  });
+
+  test("an object whose prototype is a proxy whose traps throw prints as unformattable", async () => {
+    const { result } = await run(`
+      const hostile = Object.create(new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("descriptor") }, getPrototypeOf() { throw 2 } }));
       console.log(hostile, { inside: hostile });
       return 1;
     `);
@@ -55,12 +66,11 @@ describe("values the formatter must not trust", () => {
     expect(result.logs).toEqual(["[Unformattable object] { inside: [Unformattable object] }"]);
   });
 
-  test("a proxy that claims a billion items prints a bounded list quickly", async () => {
+  test("a proxy that claims a billion items prints its target quickly", async () => {
     const { result, cpuMs } = await run(`new Proxy([], { get(target, key) { return key === "length" ? 1e9 : 1 } })`);
 
     expect(result.ok).toBe(true);
-    expect(text(result).length).toBeLessThan(4_000);
-    expect(result.truncated).toBe(true);
+    expect(text(result)).toBe("[]");
     expect(cpuMs).toBeLessThan(1_000);
   });
 

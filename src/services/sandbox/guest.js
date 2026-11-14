@@ -68,6 +68,8 @@
   const mapForEach = uncurry(Map.prototype.forEach);
   const mapGet = uncurry(Map.prototype.get);
   const mapSet = uncurry(Map.prototype.set);
+  const weakMapGet = uncurry(WeakMap.prototype.get);
+  const weakMapSet = uncurry(WeakMap.prototype.set);
   const setForEach = uncurry(Set.prototype.forEach);
   const mapSize = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
   const setSize = uncurry(getOwnPropertyDescriptor(Set.prototype, "size").get);
@@ -690,6 +692,16 @@
       case "symbol": return symbolToString(value);
     }
     if (value === null) return "null";
+
+    if (proxiesMade) {
+      // What a proxy stands for is shown, as Node does, and none of its traps run.
+      let target = weakMapGet(proxyTargets, value);
+      while (target !== undefined) {
+        if (target === null) return "<Revoked Proxy>";
+        value = target;
+        target = weakMapGet(proxyTargets, value);
+      }
+    }
 
     for (let i = 0; i < state.stack.length; i++) {
       if (state.stack[i] === value) {
@@ -1448,10 +1460,19 @@
   // `extra` hands out what another extra exports, evaluating it if need be, so
   // that an extra does not depend on a global the program may have replaced.
   const loaders = Object.create(null);
+  // The target of each proxy the program made, null once it is revoked. The
+  // formatter only looks proxies up after the first one was made.
+  const proxyTargets = new WeakMap();
+  let proxiesMade = false;
   const hostFunctions = {
     setTimeout,
     queueMicrotask,
     defineProperty,
+    Proxy,
+    rememberProxy(proxy, target) {
+      proxiesMade = true;
+      weakMapSet(proxyTargets, proxy, target);
+    },
     now: performance.now,
     extra: (module) => loaders[module](),
   };
@@ -1619,6 +1640,7 @@
   lazyMethod("number", Number.prototype, "toLocaleString");
   lazyMethod("number", BigInt.prototype, "toLocaleString");
   lazyGlobals("clone", ["structuredClone"]);
+  lazyGlobals("proxy", ["Proxy"]);
   lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
   lazyGlobals("url", ["URL", "URLSearchParams"]);
   lazyGlobals("crypto", ["crypto"]);

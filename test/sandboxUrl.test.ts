@@ -311,15 +311,15 @@ describe("printing a URL", () => {
     expect(await value(`new URLSearchParams()`)).toBe("URLSearchParams {}");
   });
 
-  test("a proxy that claims to be one is just unformattable", async () => {
+  test("an object that claims to be one is just unformattable", async () => {
     const result = await sandbox.execute(`
-      const fake = new Proxy({}, { getPrototypeOf: () => URL.prototype });
-      console.log(fake);
+      console.log(Object.create(URL.prototype));
+      console.log(new Proxy({}, { getPrototypeOf: () => URL.prototype }));
       return 1;
     `);
 
     expect(result.ok).toBe(true);
-    expect(result.logs).toEqual(["[Unformattable object]"]);
+    expect(result.logs).toEqual(["[Unformattable object]", "{}"]);
   });
 });
 

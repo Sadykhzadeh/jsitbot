@@ -168,7 +168,7 @@ describe("console", () => {
 
   test("survives values that cannot be printed", async () => {
     expect(await logged(`
-      console.log(new Proxy({}, { ownKeys() { throw new Error("trap") } }));
+      console.log(Object.create(new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("trap") } })));
       console.log({ get a() { throw new Error("getter") } });
       console.log("after");
     `)).toEqual(["[Unformattable object]", "{ a: [Getter] }", "after"]);
