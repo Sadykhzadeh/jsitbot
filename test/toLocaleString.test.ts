@@ -61,6 +61,21 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await coded("1234.5", `currency: "USD", currencyDisplay: "name"`)).toBe("1234.5");
   });
 
+  test("puts a negative currency amount in brackets when currencySign is accounting", async () => {
+    const accounting = (n: string, options = "") =>
+      value(`return (${n}).toLocaleString("en-US", { style: "currency", currency: "USD", currencySign: "accounting"${options} })`);
+
+    expect(await accounting("-1234.5")).toBe("($1,234.50)");
+    expect(await accounting("1234.5")).toBe("$1,234.50");
+    expect(await accounting("-0")).toBe("($0.00)");
+    expect(await accounting("-5", `, signDisplay: "always"`)).toBe("($5.00)");
+    expect(await accounting("5", `, signDisplay: "always"`)).toBe("+$5.00");
+    expect(await accounting("-5", `, signDisplay: "never"`)).toBe("$5.00");
+    expect(await accounting("-5", `, currencyDisplay: "code"`)).toBe("(USD\u00a05.00)");
+    expect(await accounting("-1500", `, notation: "compact"`)).toBe("-$1.5K");
+    expect(await value(`return (-5).toLocaleString("en-US", { currencySign: "accounting" })`)).toBe("-5");
+  });
+
   test("writes NaN and the infinities", async () => {
     expect(await value(`return [NaN, Infinity, -Infinity].map((n) => n.toLocaleString()).join(" ")`)).toBe("NaN \u221e -\u221e");
     expect(await value(`return NaN.toLocaleString("en-US", { style: "percent" })`)).toBe("NaN%");
