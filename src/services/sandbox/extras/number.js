@@ -7,7 +7,7 @@
 // decimals) for the style decimal, percent and currency, with the options
 // minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,
 // minimumSignificantDigits, maximumSignificantDigits, useGrouping, signDisplay
-// and notation "compact" (with compactDisplay). The number is rounded on the
+// and notation "compact" (with compactDisplay), "scientific" and "engineering". The number is rounded on the
 // digits it is written with, half away from zero, so 1.005 gives 1.01.
 // Anything else, another language or an option that is not listed, is left to
 // the engine's own method, which is the `original` it is given, together with
@@ -118,9 +118,21 @@
     return out;
   }
 
+  // The power of ten a number is written with in scientific notation, or the
+  // nearest multiple of three below it in engineering notation.
+  function exponentOf(parts, engineering) {
+    const whole = parts.whole.replace(/^0+/, "");
+    let exponent = 0;
+    if (whole !== "") exponent = whole.length - 1;
+    else if (/[1-9]/.test(parts.fraction)) exponent = -(parts.fraction.length - parts.fraction.replace(/^0+/, "").length + 1);
+    return engineering ? Math.floor(exponent / 3) * 3 : exponent;
+  }
+
   // The digits of a number, rounded and grouped as the options say. A compact
-  // number is written as a smaller number with a word or a letter after it.
-  function digits(magnitude, style, options, defaultMin, defaultMax, compact) {
+  // number is written as a smaller number with a word or a letter after it, and
+  // one in scientific or engineering notation as a smaller number and a power
+  // of ten.
+  function digits(magnitude, style, options, defaultMin, defaultMax, compact, notation) {
     let minimum = digitsOption(options, "minimumFractionDigits", undefined, 0, 100);
     let maximum = digitsOption(options, "maximumFractionDigits", undefined, 0, 100);
     if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
@@ -149,7 +161,16 @@
 
     let parts = split(magnitude, shift);
     let exponent = 0;
-    if (compact) {
+    const engineering = notation === "engineering";
+    if (notation === "scientific" || engineering) {
+      exponent = exponentOf(parts, engineering);
+      for (;;) {
+        parts = round(split(magnitude, shift - exponent));
+        const mantissa = parts.whole.replace(/^0+/, "").length;
+        if (mantissa <= (engineering ? 3 : 1)) break;
+        exponent = engineering ? exponent + 3 : exponent + 1;
+      }
+    } else if (compact) {
       const length = parts.whole.replace(/^0+/, "").length;
       exponent = length > 3 ? Math.min(Math.floor((length - 1) / 3), 4) : 0;
       for (;;) {
@@ -174,6 +195,7 @@
     const short = compact && whole.length < 5 && grouping !== true && grouping !== "always";
     const text = grouping === false || grouping === "false" || short ? whole : group(whole);
     const written = fraction === "" ? text : text + "." + fraction;
+    if (notation === "scientific" || engineering) return written + "E" + exponent;
     return compact ? written + (options.compactDisplay === "long" && style !== "currency" ? LONG_UNITS : SHORT_UNITS)[exponent] : written;
   }
 
@@ -212,10 +234,16 @@
       defaultMin = defaultMax = WHOLE_CURRENCIES.indexOf(currency) >= 0 ? 0 : 2;
     }
 
+    const notation = options.notation;
+    if (notation === "scientific" || notation === "engineering") {
+      defaultMin = 0;
+      defaultMax = style === "percent" ? 0 : 3;
+    }
+
     let text;
     if (magnitude !== magnitude) text = "NaN";
     else if (magnitude === Infinity) text = "∞";
-    else text = digits(magnitude, style, options, defaultMin, defaultMax, options.notation === "compact");
+    else text = digits(magnitude, style, options, defaultMin, defaultMax, notation === "compact", notation);
     const sign = signOf(negative, text, options);
     if (style === "percent") text += "%";
     if (style === "currency") {
@@ -232,7 +260,8 @@
     for (let i = 0; i < UNSUPPORTED.length; i++) {
       if (options[UNSUPPORTED[i]] !== undefined) return false;
     }
-    if (options.notation !== undefined && options.notation !== "standard" && options.notation !== "compact") return false;
+    const notation = options.notation;
+    if (notation !== undefined && notation !== "standard" && notation !== "compact" && notation !== "scientific" && notation !== "engineering") return false;
     if (options.compactDisplay !== undefined && options.compactDisplay !== "short" && options.compactDisplay !== "long") return false;
     return options.style === undefined || options.style === "decimal" || options.style === "percent" || options.style === "currency";
   }

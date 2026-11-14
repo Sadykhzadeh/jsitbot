@@ -58,7 +58,38 @@ describe("Number.prototype.toLocaleString", () => {
 
   test("leaves another language and options it does not know to the engine", async () => {
     expect(await value(`return (1234.5).toLocaleString("de-DE")`)).toBe("1234.5");
-    expect(await value(`return (1234.5).toLocaleString("en-US", { notation: "scientific" })`)).toBe("1234.5");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { roundingMode: "ceil" })`)).toBe("1234.5");
+  });
+
+  test("writes scientific and engineering notation", async () => {
+    const exponent = (n: string, notation: string, options = "") =>
+      value(`return (${n}).toLocaleString("en-US", { notation: "${notation}"${options} })`);
+
+    expect(await exponent("12345", "scientific")).toBe("1.235E4");
+    expect(await exponent("-12345", "scientific")).toBe("-1.235E4");
+    expect(await exponent("0.00012", "scientific")).toBe("1.2E-4");
+    expect(await exponent("0", "scientific")).toBe("0E0");
+    expect(await exponent("1", "scientific", ", minimumFractionDigits: 2")).toBe("1.00E0");
+    expect(await exponent("999999", "scientific")).toBe("1E6");
+    expect(await exponent("9.9996", "scientific")).toBe("1E1");
+    expect(await exponent("12345", "scientific", ", maximumFractionDigits: 0")).toBe("1E4");
+    expect(await exponent("12345", "scientific", ", minimumSignificantDigits: 6")).toBe("1.23450E4");
+    expect(await exponent("12345", "engineering")).toBe("12.345E3");
+    expect(await exponent("0.00012", "engineering")).toBe("120E-6");
+    expect(await exponent("999999", "engineering")).toBe("999.999E3");
+    expect(await exponent("999.9996", "engineering")).toBe("1E3");
+    expect(await exponent("9.9996", "engineering")).toBe("10E0");
+    expect(await exponent("123456789012", "engineering", ", maximumSignificantDigits: 2")).toBe("120E9");
+    expect(await exponent("1e21", "scientific")).toBe("1E21");
+    expect(await exponent("5e-324", "scientific")).toBe("5E-324");
+    expect(await exponent("12345", "scientific", ", signDisplay: 'always'")).toBe("+1.235E4");
+    expect(await exponent("0.5", "scientific", ", style: 'percent'")).toBe("5E1%");
+    expect(await exponent("1234.5678", "engineering", ", style: 'percent'")).toBe("123E3%");
+    expect(await exponent("1234", "scientific", ", style: 'currency', currency: 'USD'")).toBe("$1.234E3");
+    expect(await exponent("5", "scientific", ", style: 'currency', currency: 'USD'")).toBe("$5E0");
+    expect(await exponent("NaN", "scientific")).toBe("NaN");
+    expect(await exponent("-Infinity", "engineering")).toBe("-\u221e");
+    expect(await value(`return (12345n).toLocaleString("en-US", { notation: "scientific" })`)).toBe("1.235E4");
   });
 
   test("writes a compact number as a smaller one and a letter", async () => {
