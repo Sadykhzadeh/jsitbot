@@ -92,6 +92,26 @@ export function awaitsAtTopLevel(code: string): boolean {
 
 // Only the mode that returns the value of the last expression writes this.
 const RETURNS_LAST_VALUE = "__proto__: null";
+// A function or a class declaration, after the comments and blank lines in front of it.
+const OPENS_WITH_DECLARATION = /^(?:\s|\/\/[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*(?:(?:async\s+)?function\b|class\b)/;
+// What the mode writes for a class that is the whole code: the class is its value.
+const CLASS_AS_VALUE = /value: \w+ = class\b/;
+
+/**
+ * Whether the code opens with a function or a class declaration and goes on
+ * after it. Read as one expression, the next line would be taken as part of the
+ * declaration: `function f() {}` and a line `(g())` after it calls f, and a
+ * line `[1].map(h)` after `class A {}` indexes the class.
+ */
+export function opensWithDeclarationAndMore(code: string): boolean {
+  if (!OPENS_WITH_DECLARATION.test(code)) {
+    return false;
+  }
+
+  const read = readAsRepl(code);
+  return read !== undefined && read.includes(RETURNS_LAST_VALUE) && !CLASS_AS_VALUE.test(read);
+}
+
 // How far back from the end to look for where the last statement begins.
 const MAX_STATEMENT_STARTS = 200;
 

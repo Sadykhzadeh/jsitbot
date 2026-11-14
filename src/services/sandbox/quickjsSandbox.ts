@@ -10,6 +10,7 @@ import {
   awaitsAtTopLevel,
   guestExtras,
   guestRuntimeSource,
+  opensWithDeclarationAndMore,
   wrapAsExpression,
   wrapAsStatements,
   wrapAsStatementsWithValue,
@@ -369,7 +370,8 @@ export class QuickJsSandboxService implements SandboxService {
 
   /**
    * Finds the reading of the code that parses, in this order: one expression
-   * (`1 + 1`, `{ a: 1 }`), a script whose last statement is the result
+   * (`1 + 1`, `{ a: 1 }`; not for code that opens with a declaration and goes
+   * on after it), a script whose last statement is the result
    * (`const a = 1; a + 1`), the body of a function (`return`, top-level `await`).
    * A script that awaits at its top level is read as the body of a function.
    *
@@ -390,6 +392,9 @@ export class QuickJsSandboxService implements SandboxService {
       () => this.attemptScript(context, runtime, guest, code, expired),
       () => this.attemptStatements(context, runtime, guest, code, expired),
     ];
+    if (opensWithDeclarationAndMore(code)) {
+      attempts.shift();
+    }
     let outcome = attempts[0]();
     for (let next = 1; !outcome.settled && next < attempts.length; next++) {
       outcome = attempts[next]();

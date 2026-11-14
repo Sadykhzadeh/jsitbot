@@ -46,6 +46,34 @@ describe("the value of the last statement is the result", () => {
   });
 });
 
+describe("a declaration at the start does not take the next line as part of itself", () => {
+  const cases: Array<[string, string, string[], string]> = [
+    ["a function and a parenthesised call", `function f() { return 1 }\n(function () { console.log("iife") })()`, ["iife"], "undefined"],
+    ["an async function and an async call", `async function main() { console.log("main") }\n(async () => { await main() })()`, ["main"], "undefined"],
+    ["a function and an array", `function shout(s) { return s + "!" }\n[1, 2].forEach((n) => console.log(shout(n)))`, ["1!", "2!"], "undefined"],
+    ["a generator and a template", `function* g() {}\n\`tpl\`.length`, [], "3"],
+    ["a class and an array", `class A {}\n[1].forEach(() => console.log("hi"))`, ["hi"], "undefined"],
+    ["a comment first", `// setup\nfunction f() {}\n(function () { console.log("c") })()`, ["c"], "undefined"],
+    ["a function and a parenthesised value", `function f() { return 1 }\n(2)`, [], "2"],
+  ];
+
+  for (const [name, code, logs, expected] of cases) {
+    test(name, async () => {
+      const execution = await run(code);
+
+      expect(execution.logs).toEqual(logs);
+      expect(execution.ok ? execution.result : `error: ${execution.error}`).toBe(expected);
+    });
+  }
+
+  test("a function or a class on its own is still the result", async () => {
+    expect(await show(`function f() {}`)).toBe("[Function: f]");
+    expect(await show(`class A {}`)).toBe("[class A]");
+    expect(await show(`async function* g() {}`)).toBe("[AsyncGeneratorFunction: g]");
+    expect(await show(`function f() {}\nfunction g() {}`)).toBe("undefined");
+  });
+});
+
 describe("the other readings still work", () => {
   test("a single expression", async () => {
     expect(await show(`[1, 2, 3].length`)).toBe("3");
