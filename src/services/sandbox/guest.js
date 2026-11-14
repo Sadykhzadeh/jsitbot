@@ -872,8 +872,9 @@
 
   function isErrorLike(value) {
     try {
-      return typeof value === "object" && value !== null
-        && (objectToString(value) === "[object Error]" || objectToString(value) === "[object DOMException]" || typeof value.message === "string");
+      if (typeof value !== "object" || value === null) return false;
+      const tag = objectToString(value);
+      return tag === "[object Error]" || tag === "[object DOMException]" || inherits(value, errorPrototype);
     } catch (ignored) {
       return false;
     }

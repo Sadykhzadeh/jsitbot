@@ -157,7 +157,6 @@ describe("values the formatter must not trust", () => {
       Object.defineProperty(e, "stack", { get() { while (true) {} } });
       throw e;
     `,
-    "a thrown object whose message never returns": `throw { get message() { while (true) {} } }`,
     "a thenable that never returns": `({ then() { while (true) {} } })`,
   })) {
     test(`${name} ends at the time limit and the sandbox keeps serving`, async () => {
@@ -185,6 +184,14 @@ describe("values the formatter must not trust", () => {
     expect(result.timedOut).toBe(false);
     expect(result.logs[0]).toBe("Error: kept [ [Error: kept] ]");
     expect(result.ok).toBe(false);
+  });
+
+  test("a thrown object whose message never returns is shown, not read", async () => {
+    const { result, cpuMs } = await run(`throw { get message() { while (true) {} }, get name() { while (true) {} } }`);
+
+    expect(result.timedOut).toBe(false);
+    expect(text(result)).toBe("Uncaught { message: [Getter], name: [Getter] }");
+    expect(cpuMs).toBeLessThan(1_000);
   });
 
   test("an error whose name throws still gets reported", async () => {
