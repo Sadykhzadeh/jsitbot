@@ -74,6 +74,28 @@ describe("values the formatter must not trust", () => {
     expect(cpuMs).toBeLessThan(1_000);
   });
 
+  test("printing the iterator of a map or a set runs none of its methods and does not advance it", async () => {
+    const { result } = await run(`
+      const trap = () => { while (true) {} };
+      const entries = new Map([[1, 2], [3, 4]]).entries();
+      const values = new Set([5, 6]).values();
+      for (const it of [entries, values]) {
+        Object.defineProperty(it, "next", { value: trap });
+        Object.defineProperty(it, Symbol.toStringTag, { get: trap });
+        Object.defineProperty(it, Symbol.iterator, { value: trap });
+      }
+      Map.prototype.entries = trap;
+      console.log(entries, [values], { entries });
+      delete entries.next;
+      delete values.next;
+      return [Object.getPrototypeOf(entries).next.call(entries).value, Object.getPrototypeOf(values).next.call(values).value];
+    `);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.logs).toEqual(["[Map Iterator] { <items unknown> } [ [Set Iterator] { <items unknown> } ] { entries: [Map Iterator] { <items unknown> } }"]);
+    expect(text(result)).toBe("[ [ 1, 2 ], 5 ]");
+  });
+
   test("getters are named, not run", async () => {
     const { result } = await run(`console.log({ get a() { while (true) {} } }); ({ get b() { while (true) {} }, set c(v) {} })`);
 

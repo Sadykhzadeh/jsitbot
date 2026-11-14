@@ -28,7 +28,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Has `crypto.subtle.digest` (SHA-1, SHA-256, SHA-384 and SHA-512; nothing else of `crypto.subtle`), `crypto.getRandomValues` and `crypto.randomUUID`. The numbers are well spread and differ from run to run, but they come from a small generator inside the sandbox and are not secure; do not use them for secrets
 - Takes code pasted in a fenced block, with or without a language name
 - Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, or `/run` as a reply to a message that has the code. It ignores everything else that is said there
-- Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors, cycles, and a proxy as its target without running its traps
+- Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors, cycles, and a proxy as its target without running its traps. The items of a Map or Set iterator are not shown (`[Map Iterator] { <items unknown> }`), because reading them would use them up
 - Besides `console.log` and friends it has `console.table`, `assert`, `count`, `group` and `time`
 - Reports the line an error came from. When an error is printed, reading or writing a property of `undefined` or `null`, a name that is not defined and a variable used before its `let` are worded as Node words them (`Cannot read properties of undefined (reading 'x')`); `error.message` itself keeps the engine's wording, as do the other errors
 

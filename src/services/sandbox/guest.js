@@ -75,6 +75,8 @@
   const setForEach = uncurry(Set.prototype.forEach);
   const mapSize = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
   const setSize = uncurry(getOwnPropertyDescriptor(Set.prototype, "size").get);
+  const mapIteratorPrototype = getPrototypeOf(new Map().keys());
+  const setIteratorPrototype = getPrototypeOf(new Set().values());
   const TypedArray = getPrototypeOf(Uint8Array);
   const typedArrayLength = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "length").get);
   const arrayBufferLength = uncurry(getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get);
@@ -674,6 +676,12 @@
   }
 
   function formatObject(value, depth, state) {
+    // What is left to read from these cannot be seen without taking it, so only
+    // the kind is shown. Its prototype tells what it is, without running a tag.
+    const prototype = getPrototypeOf(value);
+    if (prototype === mapIteratorPrototype) return "[Map Iterator] { <items unknown> }";
+    if (prototype === setIteratorPrototype) return "[Set Iterator] { <items unknown> }";
+
     const tag = objectToString(value);
 
     if (tag === "[object Date]") {

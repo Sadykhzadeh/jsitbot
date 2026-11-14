@@ -38,6 +38,8 @@ describe("result formatting", () => {
     ["typed arrays", `new Uint8Array([1, 2, 3])`, "Uint8Array(3) [ 1, 2, 3 ]"],
     ["array buffers", `new ArrayBuffer(8)`, "ArrayBuffer { byteLength: 8 }"],
     ["boxed primitives", `[new Number(3), new String("s"), new Boolean(false)]`, "[ [Number: 3], [String: 's'], [Boolean: false] ]"],
+    ["the iterators of a map and a set, whose items cannot be read without taking them", `[new Map([[1, 2]]).entries(), new Map().keys(), new Set([1]).values(), new Set([1]).entries()]`, "[\n  [Map Iterator] { <items unknown> },\n  [Map Iterator] { <items unknown> },\n  [Set Iterator] { <items unknown> },\n  [Set Iterator] { <items unknown> }\n]"],
+    ["the other iterators hold no items to show", `[[][Symbol.iterator](), [1].entries(), "ab"[Symbol.iterator](), "a".matchAll(/a/g)]`, "[\n  Object [Array Iterator] {},\n  Object [Array Iterator] {},\n  Object [String Iterator] {},\n  Object [RegExp String Iterator] {}\n]"],
     ["weak collections", `[new WeakMap(), new WeakSet()]`, "[ WeakMap { <items unknown> }, WeakSet { <items unknown> } ]"],
     ["functions", `[function f() {}, () => 1, async () => {}]`, "[ [Function: f], [Function (anonymous)], [AsyncFunction (anonymous)] ]"],
     ["a method whose name starts with class is not a class", `({ classify() {} })`, "{ classify: [Function: classify] }"],
