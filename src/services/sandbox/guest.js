@@ -286,6 +286,9 @@
   // that cannot be anything else are changed.
   function nodeWording(name, message) {
     if (name === "TypeError") {
+      if (message === "cannot convert symbol to string") return "Cannot convert a Symbol value to a string";
+      if (message === "cannot convert symbol to number") return "Cannot convert a Symbol value to a number";
+      if (message === "empty array") return "Reduce of empty array with no initial value";
       const read = startsWith(message, "cannot read property '");
       if (read || startsWith(message, "cannot set property '")) {
         const head = read ? "cannot read property '" : "cannot set property '";
@@ -296,6 +299,8 @@
           }
         }
       }
+    } else if (name === "RangeError") {
+      if (message === "invalid array length") return "Invalid array length";
     } else if (name === "ReferenceError") {
       if (startsWith(message, "'") && endsWith(message, "' is not defined")) {
         return stringSlice(message, 1, message.length - "' is not defined".length) + " is not defined";

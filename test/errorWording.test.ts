@@ -25,6 +25,12 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ["writing a property of null", `null.x = 1`, "TypeError: Cannot set properties of null (setting 'x')"],
     ["a name that is not defined", `total + 1`, "ReferenceError: total is not defined"],
     ["a name used before its let", `x; let x = 1`, "ReferenceError: Cannot access 'x' before initialization"],
+    ["a symbol in a template", `const s = Symbol("s"); \`\${s}\``, "TypeError: Cannot convert a Symbol value to a string"],
+    ["a symbol added to a string", `Symbol("s") + ""`, "TypeError: Cannot convert a Symbol value to a string"],
+    ["a symbol turned into a number", `+Symbol("s")`, "TypeError: Cannot convert a Symbol value to a number"],
+    ["reduce of an empty array", `[].reduce((a, b) => a + b)`, "TypeError: Reduce of empty array with no initial value"],
+    ["reduceRight of an empty array", `[].reduceRight((a, b) => a + b)`, "TypeError: Reduce of empty array with no initial value"],
+    ["an array of a length that cannot be", `new Array(-1)`, "RangeError: Invalid array length"],
     ["this used before super", `class A {} class B extends A { constructor() { this.x = 1 } } new B()`, "ReferenceError: Must call super constructor in derived class before accessing 'this' or returning from derived constructor"],
   ];
 
