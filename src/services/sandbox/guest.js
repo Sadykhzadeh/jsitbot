@@ -20,6 +20,8 @@
   const MAX_DEPTH = 3;
   // What objects are shown down to: MAX_DEPTH, except during console.dir with a depth.
   let depthLimit = MAX_DEPTH;
+  // Whether a string given to write on its own is quoted, as console.dir shows it.
+  let quoteStrings = false;
   const MAX_ENTRIES = 100;
   const MAX_SCAN = 100000;
   const LINE_WIDTH = 80;
@@ -995,7 +997,7 @@
       const argument = arguments[i];
       let piece;
       try {
-        piece = typeof argument === "string" ? argument : format(argument, 0, state);
+        piece = typeof argument === "string" && !quoteStrings ? argument : format(argument, 0, state);
       } catch (ignored) {
         piece = "[Unformattable value]";
       }
@@ -1256,10 +1258,12 @@
     } catch (ignored) {}
 
     depthLimit = depth < MAX_NESTING ? depth : MAX_NESTING;
+    quoteStrings = true;
     try {
       write(value);
     } finally {
       depthLimit = MAX_DEPTH;
+      quoteStrings = false;
     }
   }
 

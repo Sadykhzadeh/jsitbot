@@ -188,6 +188,36 @@ describe("console.dir", () => {
   test("prints the value and leaves out the options", async () => {
     expect(await logs(`console.dir({ a: 1 }, { depth: 0 })`)).toEqual(["{ a: 1 }"]);
   });
+
+  test("quotes a string, which console.log prints as it is", async () => {
+    expect(await logs(`console.dir("str"); console.dir("a\\nb", { depth: 0 }); console.dir("it's"); console.log("str")`)).toEqual([
+      "'str'",
+      "'a\\nb'",
+      '"it\'s"',
+      "str",
+    ]);
+  });
+
+  test("shows the other primitives as console.log does", async () => {
+    expect(await logs(`console.dir(5); console.dir(-0); console.dir(10n); console.dir(true); console.dir(null); console.dir(undefined); console.dir(Symbol("s"))`)).toEqual([
+      "5",
+      "-0",
+      "10n",
+      "true",
+      "null",
+      "undefined",
+      "Symbol(s)",
+    ]);
+  });
+
+  test("quotes the strings inside an object as well, and cuts a long one", async () => {
+    expect(await logs(`console.dir(["a"])`)).toEqual(["[ 'a' ]"]);
+
+    const [long] = await logs(`console.dir("x".repeat(5000))`);
+    expect(long.length).toBeLessThan(1100);
+    expect(long.startsWith("'xxx")).toBe(true);
+    expect(long.endsWith("'...")).toBe(true);
+  });
 });
 
 describe("console methods that print nothing or the same as log", () => {
