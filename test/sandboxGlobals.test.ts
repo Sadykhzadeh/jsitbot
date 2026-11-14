@@ -364,8 +364,105 @@ describe("crypto", () => {
     expect(await value(`return crypto.getRandomValues(new Uint8Array(65536)).length`)).toBe("65536");
   });
 
-  test("has nothing else on it", async () => {
-    expect(await value(`return [typeof crypto.subtle, Object.prototype.toString.call(crypto)].join()`)).toBe("undefined,[object Crypto]");
+  test("has only digest on its subtle", async () => {
+    expect(
+      await value(`return [typeof crypto.subtle, Object.prototype.toString.call(crypto), Object.prototype.toString.call(crypto.subtle), Object.getOwnPropertyNames(Object.getPrototypeOf(crypto.subtle)).join()].join()`),
+    ).toBe("object,[object Crypto],[object SubtleCrypto],constructor,digest");
+  });
+});
+
+describe("crypto.subtle.digest", () => {
+  const ALGORITHMS = ["SHA-1", "SHA-256", "SHA-384", "SHA-512"];
+  // Around the edges of one and two blocks of 64 and 128 bytes, where the padding changes shape.
+  const LENGTHS = [0, 1, 3, 55, 56, 57, 63, 64, 65, 111, 112, 113, 119, 120, 127, 128, 129, 200, 1000];
+
+  function bytesOf(length: number): Uint8Array<ArrayBuffer> {
+    return Uint8Array.from({ length }, (_, i) => (i * 31 + 7) & 255);
+  }
+
+  async function hostHex(algorithm: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+    const hash = new Uint8Array(await crypto.subtle.digest(algorithm, bytes));
+    return [...hash].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function guestHex(algorithm: string, length: number): Promise<string> {
+    return value(`
+      const bytes = Uint8Array.from({ length: ${length} }, (_, i) => (i * 31 + 7) & 255);
+      const hash = await crypto.subtle.digest("${algorithm}", bytes);
+      return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    `);
+  }
+
+  test("gives the hash the platform gives, for every length around a block", async () => {
+    for (const algorithm of ALGORITHMS) {
+      for (const length of LENGTHS) {
+        expect(await guestHex(algorithm, length)).toBe(await hostHex(algorithm, bytesOf(length)));
+      }
+    }
+  });
+
+  test("knows the usual examples", async () => {
+    const hash = (algorithm: string, text: string) =>
+      value(`
+        const hash = await crypto.subtle.digest("${algorithm}", new TextEncoder().encode("${text}"));
+        return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      `);
+
+    expect(await hash("SHA-1", "abc")).toBe("a9993e364706816aba3e25717850c26c9cd0d89d");
+    expect(await hash("SHA-256", "abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    expect(await hash("SHA-256", "hello")).toBe("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+    expect(await hash("SHA-384", "abc")).toBe(
+      "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7",
+    );
+    expect(await hash("SHA-512", "abc")).toBe(
+      "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+    );
+  });
+
+  test("takes the algorithm in any case or as an object, and any buffer or view", async () => {
+    expect(
+      await value(`
+        const text = new TextEncoder().encode("abc");
+        const hex = async (hash) => [...new Uint8Array(await hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+        const wanted = await hex(crypto.subtle.digest("SHA-256", text));
+        const padded = new Uint8Array([9, 9, ...text, 9]);
+        return [
+          wanted === await hex(crypto.subtle.digest("sha-256", text)),
+          wanted === await hex(crypto.subtle.digest({ name: "Sha-256" }, text)),
+          wanted === await hex(crypto.subtle.digest("SHA-256", text.buffer.slice(text.byteOffset, text.byteOffset + 3))),
+          wanted === await hex(crypto.subtle.digest("SHA-256", padded.subarray(2, 5))),
+          wanted === await hex(crypto.subtle.digest("SHA-256", new DataView(padded.buffer, 2, 3))),
+        ].join();
+      `),
+    ).toBe("true,true,true,true,true");
+  });
+
+  test("gives a promise of an ArrayBuffer of the size of the hash", async () => {
+    expect(
+      await value(`
+        const promise = crypto.subtle.digest("SHA-384", new Uint8Array(1));
+        const hash = await promise;
+        return [promise instanceof Promise, Object.prototype.toString.call(hash), hash.byteLength].join();
+      `),
+    ).toBe("true,[object ArrayBuffer],48");
+  });
+
+  test("refuses with a rejection what a browser refuses", async () => {
+    expect(await value(`await crypto.subtle.digest("MD5", new Uint8Array(1)).catch((e) => e.name + ": " + e.message)`)).toBe(
+      "NotSupportedError: Unrecognized algorithm name",
+    );
+    expect(await value(`await crypto.subtle.digest("SHA-256", "text").catch((e) => e.name)`)).toBe("TypeError");
+    expect(await value(`await crypto.subtle.digest("SHA-256").catch((e) => e.name)`)).toBe("TypeError");
+    expect(await value(`crypto.subtle.digest("MD5", new Uint8Array(1)).catch(() => {}); return "no throw"`)).toBe("no throw");
+  });
+
+  test("hashes a quarter of a megabyte within the time limit", async () => {
+    const result = await sandbox.execute(`
+      const hash = await crypto.subtle.digest("SHA-256", new Uint8Array(1 << 18));
+      return new Uint8Array(hash)[0];
+    `);
+
+    expect(result.ok).toBe(true);
   });
 });
 

@@ -1678,6 +1678,7 @@
   lazyMethod("number", BigInt.prototype, "toLocaleString");
   lazyGlobals("clone", ["structuredClone"]);
   lazyGlobals("proxy", ["Proxy"]);
+  lazyGlobals("digest", []);
   lazyGlobals("encoding", ["TextEncoder", "TextDecoder", "atob", "btoa"]);
   lazyGlobals("url", ["URL", "URLSearchParams"]);
   lazyGlobals("crypto", ["crypto"]);
