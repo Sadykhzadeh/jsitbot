@@ -59,7 +59,7 @@ describe("DOMException", () => {
   test("is printed like an error", async () => {
     const result = await sandbox.execute(`console.log(new DOMException("nope", "AbortError"))`);
 
-    expect(result.logs[0]).toMatch(/^AbortError: nope/);
+    expect(result.logs[0]).toMatch(/^DOMException \[AbortError\]: nope/);
   });
 });
 

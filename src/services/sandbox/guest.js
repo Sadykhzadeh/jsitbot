@@ -75,6 +75,7 @@
   const setForEach = uncurry(Set.prototype.forEach);
   const mapSize = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
   const setSize = uncurry(getOwnPropertyDescriptor(Set.prototype, "size").get);
+  const errorPrototype = Error.prototype;
   const mapIteratorPrototype = getPrototypeOf(new Map().keys());
   const setIteratorPrototype = getPrototypeOf(new Set().values());
   const TypedArray = getPrototypeOf(Uint8Array);
@@ -303,6 +304,17 @@
     return message;
   }
 
+  // Whether prototype is somewhere on the chain of value, found without running anything of the program's.
+  function inherits(value, prototype) {
+    let proto = value;
+    for (let hops = 0; hops < 100; hops++) {
+      proto = getPrototypeOf(proto);
+      if (proto === null) return false;
+      if (proto === prototype) return true;
+    }
+    return false;
+  }
+
   function errorText(error, state) {
     let name = "Error";
     let message = "";
@@ -313,6 +325,14 @@
       if (typeof m === "string") message = cut(nodeWording(name, m), maxResultLength, state);
       if (name === "RangeError" && message === STACK_OVERFLOW && getPrototypeOf(error) === InternalError.prototype) {
         message = "Maximum call stack size exceeded";
+      } else if (endsWith(name, "Error") && inherits(error, errorPrototype)) {
+        // A subclass that did not name itself is shown by its class, as Node does:
+        // ValidationError, or Foo [Error] when the class name does not hold the name.
+        // A DOMException always names itself, and is shown as DOMException [AbortError].
+        const own = constructorName(error);
+        if (own !== null && own !== name && (own === "DOMException" || !hasOwn(error, "name"))) {
+          name = stringIndexOf(own, name) !== -1 ? own : own + " [" + name + "]";
+        }
       }
     } catch (ignored) {}
     return message ? name + ": " + message : name;

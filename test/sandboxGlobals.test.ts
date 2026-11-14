@@ -126,9 +126,9 @@ describe("structuredClone", () => {
   });
 
   test("refuses what cannot be copied, with the error name a browser uses", async () => {
-    expect(await value(`structuredClone(() => 1)`)).toBe("error: DataCloneError: () => 1 could not be cloned.");
+    expect(await value(`structuredClone(() => 1)`)).toBe("error: DOMException [DataCloneError]: () => 1 could not be cloned.");
     expect(await value(`structuredClone({ f() {} })`)).toContain("DataCloneError");
-    expect(await value(`structuredClone(Symbol("s"))`)).toBe("error: DataCloneError: Symbol(s) could not be cloned.");
+    expect(await value(`structuredClone(Symbol("s"))`)).toBe("error: DOMException [DataCloneError]: Symbol(s) could not be cloned.");
     expect(await value(`structuredClone(new WeakMap())`)).toContain("DataCloneError");
     expect(await value(`structuredClone()`)).toBe("error: TypeError: The value argument is required");
   });

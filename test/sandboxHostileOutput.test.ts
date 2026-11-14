@@ -135,6 +135,23 @@ describe("values the formatter must not trust", () => {
     });
   }
 
+  test("an error whose class cannot be looked up is printed by its own name", async () => {
+    const { result } = await run(`
+      const trap = () => { while (true) {} };
+      const e = new Error("kept");
+      Object.setPrototypeOf(e, Object.create(Error.prototype, { constructor: { get: trap } }));
+      console.log(e, [e]);
+      const f = new TypeError("second");
+      Object.setPrototypeOf(f, new Proxy(TypeError.prototype, { getPrototypeOf() { throw 1 }, getOwnPropertyDescriptor() { throw 2 } }));
+      console.log(f);
+      throw f;
+    `);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.logs[0]).toBe("Error: kept [ [Error: kept] ]");
+    expect(result.ok).toBe(false);
+  });
+
   test("an error whose name throws still gets reported", async () => {
     const { result } = await run(`
       const e = new Error("x");
