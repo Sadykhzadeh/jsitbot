@@ -262,6 +262,43 @@
     return name ? "[" + kind + ": " + name + "]" : "[" + kind + " (anonymous)]";
   }
 
+  function startsWith(text, prefix) {
+    return stringSlice(text, 0, prefix.length) === prefix;
+  }
+
+  function endsWith(text, suffix) {
+    return text.length >= suffix.length && stringSlice(text, text.length - suffix.length) === suffix;
+  }
+
+  // The engine words a few of its errors differently from V8, and what V8 says
+  // is what programs and the people reading their output know. Only the messages
+  // that cannot be anything else are changed.
+  function nodeWording(name, message) {
+    if (name === "TypeError") {
+      const read = startsWith(message, "cannot read property '");
+      if (read || startsWith(message, "cannot set property '")) {
+        const head = read ? "cannot read property '" : "cannot set property '";
+        for (const nothing of [" of undefined", " of null"]) {
+          if (endsWith(message, "'" + nothing)) {
+            const key = stringSlice(message, head.length, message.length - nothing.length - 1);
+            return (read ? "Cannot read properties" : "Cannot set properties") + nothing + (read ? " (reading '" : " (setting '") + key + "')";
+          }
+        }
+      }
+    } else if (name === "ReferenceError") {
+      if (startsWith(message, "'") && endsWith(message, "' is not defined")) {
+        return stringSlice(message, 1, message.length - "' is not defined".length) + " is not defined";
+      }
+      if (endsWith(message, " is not initialized")) {
+        const variable = stringSlice(message, 0, message.length - " is not initialized".length);
+        return variable === "this"
+          ? "Must call super constructor in derived class before accessing 'this' or returning from derived constructor"
+          : "Cannot access '" + variable + "' before initialization";
+      }
+    }
+    return message;
+  }
+
   function errorText(error, state) {
     let name = "Error";
     let message = "";
@@ -269,7 +306,7 @@
       const n = error.name;
       if (typeof n === "string" && n) name = stringSlice(n, 0, 100);
       const m = error.message;
-      if (typeof m === "string") message = cut(m, maxResultLength, state);
+      if (typeof m === "string") message = cut(nodeWording(name, m), maxResultLength, state);
       if (name === "RangeError" && message === STACK_OVERFLOW && getPrototypeOf(error) === InternalError.prototype) {
         message = "Maximum call stack size exceeded";
       }

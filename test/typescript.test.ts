@@ -40,7 +40,7 @@ describe("JavaScript comes first", () => {
   test("code that already parses is never rewritten", async () => {
     // As JavaScript this is `f < number > 1`, a comparison. As TypeScript it
     // would be a call with a type argument. Valid JavaScript keeps its meaning.
-    expect(await show(`const f = (n) => n; f<number>(1)`)).toBe("error: ReferenceError: 'number' is not defined");
+    expect(await show(`const f = (n) => n; f<number>(1)`)).toBe("error: ReferenceError: number is not defined");
   });
 
   test("a genuine syntax error is still reported as one, with its line", async () => {

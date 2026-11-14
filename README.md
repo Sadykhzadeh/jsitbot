@@ -30,7 +30,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, or `/run` as a reply to a message that has the code. It ignores everything else that is said there
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors, cycles, and a proxy as its target without running its traps
 - Besides `console.log` and friends it has `console.table`, `assert`, `count`, `group` and `time`
-- Reports the line an error came from
+- Reports the line an error came from. When an error is printed, reading or writing a property of `undefined` or `null`, a name that is not defined and a variable used before its `let` are worded as Node words them (`Cannot read properties of undefined (reading 'x')`); `error.message` itself keeps the engine's wording, as do the other errors
 
 ## Security
 

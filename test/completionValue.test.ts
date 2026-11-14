@@ -102,7 +102,7 @@ describe("errors", () => {
     expect(execution.ok).toBe(false);
     expect(execution.logs).toEqual(["before"]);
     if (!execution.ok) {
-      expect(execution.error).toBe("ReferenceError: 'undefinedFunction' is not defined");
+      expect(execution.error).toBe("ReferenceError: undefinedFunction is not defined");
     }
   });
 });
