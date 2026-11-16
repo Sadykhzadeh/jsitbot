@@ -1007,6 +1007,7 @@
     switch (code) {
       case "s": {
         if (typeof argument === "string") return argument;
+        if (typeof argument === "function") return toText(argument);
         if (typeof argument !== "object" || argument === null) return format(argument, 0, state);
 
         if (!hasBuiltInToString(argument)) {

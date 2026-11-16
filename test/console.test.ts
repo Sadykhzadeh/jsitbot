@@ -378,6 +378,13 @@ describe("console.log format specifiers", () => {
       "NaN NaN 3.5",
     ]);
   });
+
+  test("%s shows a function or a class as its source text, as Node does", async () => {
+    expect(await logs(`console.log("%s|%s", function foo() {}, class Q {}); console.log("%s", () => 1)`)).toEqual([
+      "function foo() {}|class Q {}",
+      "() => 1",
+    ]);
+  });
 });
 
 describe("console methods", () => {
