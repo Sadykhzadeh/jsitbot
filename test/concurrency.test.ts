@@ -229,6 +229,27 @@ describe("handling updates concurrently", () => {
     expect(finished.indexOf("quick")).toBeLessThan(finished.indexOf("slow b"));
   });
 
+  test("with one place, another user's update starts before the flooder's next one", async () => {
+    const { bot, message, poll } = createBot({ limit: 1, perUser: 3 });
+    const started: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    bot.on("message:text", async (ctx) => {
+      started.push(ctx.message.text);
+      if (ctx.message.text === "a1") {
+        await gate;
+      }
+    });
+
+    await poll(message(1, "a1"), message(1, "a2"), message(1, "a3"));
+    const other = poll(message(2, "b1"));
+    release();
+    await other;
+    await until(() => started.length === 4);
+
+    expect(started).toEqual(["a1", "b1", "a2", "a3"]);
+  });
+
   test("a user can send again once earlier updates have finished", async () => {
     const { bot, message, poll } = createBot({ limit: 8, perUser: 1 });
     const handled: string[] = [];
