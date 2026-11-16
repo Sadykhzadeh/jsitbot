@@ -334,6 +334,16 @@ describe("console.log format specifiers", () => {
     ]);
   });
 
+  test("each console method is named after itself, as Node names them", async () => {
+    const [listed] = await logs(
+      `console.log(JSON.stringify(Object.getOwnPropertyNames(console).filter((k) => typeof console[k] === "function").map((k) => [k, console[k].name])))`,
+    );
+    const pairs: Array<[string, string]> = JSON.parse(listed);
+
+    expect(pairs.length).toBeGreaterThan(20);
+    expect(pairs.filter(([key, name]) => key !== name)).toEqual([]);
+  });
+
   test("fills %s, %d, %i, %f, %j and %o from the arguments that follow", async () => {
     expect(
       await logs(`

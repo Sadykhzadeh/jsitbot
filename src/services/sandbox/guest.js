@@ -1435,6 +1435,16 @@
 
   function clear() {}
 
+  function timeStamp() {}
+
+  function profile() {}
+
+  function profileEnd() {}
+
+  function groupCollapsed() {
+    reflectApply(group, undefined, arguments);
+  }
+
   function dirxml() {
     reflectApply(write, undefined, arguments);
   }
@@ -1457,14 +1467,14 @@
     dir,
     dirxml,
     clear,
-    timeStamp: clear,
-    profile: clear,
-    profileEnd: clear,
+    timeStamp,
+    profile,
+    profileEnd,
     assert,
     count,
     countReset,
     group,
-    groupCollapsed: group,
+    groupCollapsed,
     groupEnd,
     table,
     trace,
