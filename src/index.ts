@@ -3,6 +3,7 @@ import { GrammyError, HttpError, type Bot, type Context } from "grammy";
 import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
 import type { ConcurrentMiddleware } from "./bot/concurrency";
+import { listenForCrashes } from "./runtime/crash";
 import { logBotError } from "./runtime/logError";
 import { listenForShutdown } from "./runtime/shutdown";
 import { logStatsPeriodically } from "./runtime/stats";
@@ -22,6 +23,8 @@ try {
   }
   throw error;
 }
+
+listenForCrashes([env.botToken]);
 
 const apiGuard = createApiGuard(env.telegramApi);
 

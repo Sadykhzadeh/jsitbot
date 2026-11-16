@@ -56,6 +56,19 @@ export function describeBotError(error: BotError): string {
   return `${prefix} a non-error value was thrown`;
 }
 
+/**
+ * One line for an error that nothing handled. Every given secret is taken out
+ * of it, because an error from a failed fetch carries the address it was sent to.
+ */
+export function describeFailure(error: unknown, secrets: readonly string[]): string {
+  const line =
+    error instanceof Error
+      ? `${error.name}: ${oneLine(error.message)}${whereFrom(error)}`
+      : "a non-error value was thrown";
+
+  return secrets.reduce((text, secret) => text.split(secret).join("<token>"), line);
+}
+
 export function logBotError(error: BotError): void {
   console.error(describeBotError(error));
 }
