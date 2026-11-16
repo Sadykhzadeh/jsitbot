@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { BotError, Context, GrammyError, HttpError } from "grammy";
 import type { Update } from "grammy/types";
 
-import { describeBotError } from "../src/runtime/logError";
+import { describeAnyError, describeBotError } from "../src/runtime/logError";
 
 const CODE = "const secret = 'hunter2'; secret";
 const TOKEN = "123456789:AAH-valid_token0123456789abcdefghijk";
@@ -81,5 +81,27 @@ describe("describeBotError", () => {
 
   test("copes with something that is not an error", () => {
     expect(describeBotError(botError("just a string"))).toBe("Bot error in message#77: a non-error value was thrown");
+  });
+});
+
+describe("describeAnyError", () => {
+  test("names a failed call made outside a handler, without its payload", () => {
+    const cause = new GrammyError(
+      "Call to 'setMyCommands' failed!",
+      { ok: false, error_code: 400, description: "Bad Request: BOT_COMMANDS_TOO_MUCH" },
+      "setMyCommands",
+      { commands: [{ command: "run", description: CODE }] },
+    );
+
+    const line = describeAnyError(cause);
+
+    expect(line).toBe("setMyCommands failed with 400: Bad Request: BOT_COMMANDS_TOO_MUCH");
+    expect(line).not.toContain("hunter2");
+  });
+
+  test("describes a handler error the same way it is described for an update", () => {
+    const cause = new GrammyError("x", { ok: false, error_code: 403, description: "Forbidden" }, "sendMessage", {});
+
+    expect(describeAnyError(botError(cause))).toBe("Bot error in message#77: sendMessage failed with 403: Forbidden");
   });
 });

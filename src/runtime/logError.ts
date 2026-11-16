@@ -37,24 +37,30 @@ function updateKind(error: BotError): string {
  * built from it, so the line says what failed and leaves that out.
  */
 export function describeBotError(error: BotError): string {
-  const cause = error.error;
-  const prefix = `Bot error in ${updateKind(error)}:`;
+  return `Bot error in ${updateKind(error)}: ${describeCause(error.error)}`;
+}
 
+/** The same line for an error that was not raised by a handler, such as a failed call made at startup. */
+export function describeAnyError(error: unknown): string {
+  return error instanceof BotError ? describeBotError(error) : describeCause(error);
+}
+
+function describeCause(cause: unknown): string {
   if (cause instanceof GrammyError) {
     const wait = cause.parameters.retry_after ? ` (retry_after ${cause.parameters.retry_after}s)` : "";
-    return `${prefix} ${cause.method} failed with ${cause.error_code}: ${oneLine(cause.description)}${wait}`;
+    return `${cause.method} failed with ${cause.error_code}: ${oneLine(cause.description)}${wait}`;
   }
 
   if (cause instanceof HttpError) {
     const reason = cause.error instanceof Error ? ` (${oneLine(cause.error.message)})` : "";
-    return `${prefix} no answer from Telegram for the call${reason}`;
+    return `no answer from Telegram for the call${reason}`;
   }
 
   if (cause instanceof Error) {
-    return `${prefix} ${cause.name}: ${oneLine(cause.message)}${whereFrom(cause)}`;
+    return `${cause.name}: ${oneLine(cause.message)}${whereFrom(cause)}`;
   }
 
-  return `${prefix} a non-error value was thrown`;
+  return "a non-error value was thrown";
 }
 
 /**

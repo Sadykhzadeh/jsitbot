@@ -1,5 +1,7 @@
 import { BotError, type Bot, type Context, type MiddlewareFn } from "grammy";
 
+import { describeAnyError } from "../runtime/logError";
+
 export interface ConcurrencyPolicy {
   /** How many updates may be in progress at once, whoever they are from. */
   limit: number;
@@ -81,7 +83,7 @@ export function handleConcurrently<C extends Context>(
     try {
       await bot.errorHandler(error instanceof BotError ? error : new BotError(error, ctx));
     } catch (unhandled) {
-      console.error("Error in the bot's error handler:", unhandled);
+      console.error(`Error in the bot's error handler: ${describeAnyError(unhandled)}`);
     }
   }
 

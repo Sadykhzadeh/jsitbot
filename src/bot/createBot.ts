@@ -1,6 +1,7 @@
 import { Bot, type Context } from "grammy";
 
 import type { AppEnv } from "../config/env";
+import { describeAnyError, logBotError } from "../runtime/logError";
 import { publishCommandMenus } from "./commandMenu";
 import { type ConcurrentMiddleware, handleConcurrently } from "./concurrency";
 import { registerInlineQueryHandler } from "./handlers/inlineQuery";
@@ -30,7 +31,9 @@ export async function createBot(
   const timeBudget = new SandboxTimeBudget();
 
   // The menu is a convenience: starting must not wait for it or fail without it.
-  publishCommandMenus(bot.api).catch((error) => console.error("Could not publish the command menu:", error));
+  publishCommandMenus(bot.api).catch((error) =>
+    console.error(`Could not publish the command menu: ${describeAnyError(error)}`),
+  );
 
   const concurrency = handleConcurrently(bot, config.limits.concurrency);
   bot.use(concurrency);
@@ -77,9 +80,7 @@ export async function createBot(
     helpLimits,
   });
 
-  bot.catch((error) => {
-    console.error("Bot error:", error.error);
-  });
+  bot.catch(logBotError);
 
   return { bot, concurrency };
 }

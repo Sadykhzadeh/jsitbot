@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Bot } from "grammy";
+import { Bot, GrammyError } from "grammy";
+import { inspect } from "node:util";
 import type { Update, UserFromGetMe } from "grammy/types";
 
 import { handleConcurrently } from "../src/bot/concurrency";
@@ -353,5 +354,40 @@ describe("with the real handlers", () => {
     const answers = harness.callsTo("sendMessage").map((call) => call.payload.chat_id);
     expect(new Set(answers).size).toBe(16);
     expect(harness.barrierGroups).toEqual([8, 8]);
+  });
+});
+
+describe("an error the error handler cannot report", () => {
+  test("is logged as one line that names the failed call and leaves out its payload", async () => {
+    const { bot, message, poll } = createBot({ limit: 8, perUser: 3 });
+    const logged: unknown[][] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args);
+    };
+
+    try {
+      bot.on("message:text", () => {
+        throw new Error("handler failed");
+      });
+      bot.catch(() => {
+        throw new GrammyError(
+          "Call to 'sendMessage' failed!",
+          { ok: false, error_code: 400, description: "Bad Request: chat not found" },
+          "sendMessage",
+          { chat_id: 5, text: "SECRET CODE OUTPUT" },
+        );
+      });
+
+      await poll(message(1, "hi"));
+      await until(() => logged.length === 1);
+    } finally {
+      console.error = original;
+    }
+
+    const written = inspect(logged, { depth: Infinity });
+    expect(written).toContain("sendMessage failed with 400: Bad Request: chat not found");
+    expect(written).not.toContain("SECRET CODE OUTPUT");
+    expect(written).not.toContain("payload");
   });
 });
