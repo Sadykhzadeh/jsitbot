@@ -224,7 +224,13 @@
       else if (stringIndexOf(source, "`") === -1) mark = "`";
     }
 
-    let out = mark;
+    return mark + escapeBody(source, mark) + mark + (clipped ? "..." : "");
+  }
+
+  // The characters of a quoted text, with the quote mark, a backslash and
+  // control characters escaped the way Node writes them.
+  function escapeBody(source, mark) {
+    let out = "";
     for (let i = 0; i < source.length; i++) {
       const c = source[i];
       if (c === mark || c === "\\") out += "\\" + c;
@@ -242,7 +248,7 @@
         else out += "\\u" + numberToString(code, 16);
       } else out += c;
     }
-    return out + mark + (clipped ? "..." : "");
+    return out;
   }
 
   function formatNumber(n) {
@@ -678,7 +684,7 @@
         }
 
         const descriptor = getOwnPropertyDescriptor(object, key);
-        const label = pass === 1 ? symbolToString(key)
+        const label = pass === 1 ? escapeBody(symbolToString(key), "'")
           : key === "__proto__" ? "['__proto__']"
           : isIdentifier(key) ? key
           : quote(key, state);

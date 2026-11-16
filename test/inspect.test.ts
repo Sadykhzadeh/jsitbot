@@ -30,6 +30,7 @@ describe("result formatting", () => {
     ["a key with a dollar sign is quoted, as Node quotes it", `({ $a: 1, _a1: 2 })`, "{ '$a': 1, _a1: 2 }"],
     ["an own __proto__ key is bracketed, not taken for the prototype", `JSON.parse('{"__proto__": 1, "a": 2}')`, "{ ['__proto__']: 1, a: 2 }"],
     ["symbol keys", `({ [Symbol("k")]: 1 })`, "{ Symbol(k): 1 }"],
+    ["a quote, backslash or newline in a symbol key is escaped, as Node escapes it", `({ [Symbol("a'b")]: 1, [Symbol("a\\\\b")]: 2, [Symbol("a\\nb")]: 3 })`, "{ Symbol(a\\'b): 1, Symbol(a\\\\b): 2, Symbol(a\\nb): 3 }"],
     ["arguments are shown under their own name", `(function () { return arguments })(1, "a")`, "[Arguments] { '0': 1, '1': 'a' }"],
     ["empty arguments", `(function () { return arguments })()`, "[Arguments] {}"],
     ["a null-prototype array says so", `Object.setPrototypeOf([1, 2], null)`, "[Array(2): null prototype] [ 1, 2 ]"],

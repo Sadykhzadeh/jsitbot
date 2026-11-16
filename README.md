@@ -34,15 +34,15 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 ## How Output Compares With Node
 
-Checked on 17 November 2026 against Node 26.13.0 with 514 snippets: the inputs of the inspect and console tests, hand-picked cases, and generated runs of line widths, grouping, nesting, key counts, numbers and strings. Each snippet was run once by Node with `console.log` at its default options and once with a depth of 3, which is what the sandbox uses. The sandbox matches exactly on 472 snippets against Node at depth 3 and on 456 against Node's default depth of 2.
+Checked on 17 November 2026 against Node 26.13.0 with 514 snippets: the inputs of the inspect and console tests, hand-picked cases, and generated runs of line widths, grouping, nesting, key counts, numbers and strings. Each snippet was run once by Node with `console.log` at its default options and once with a depth of 3, which is what the sandbox uses. The sandbox matches exactly on 473 snippets against Node at depth 3 and on 457 against Node's default depth of 2.
 
 | Group | Snippets | Exact |
 | --- | ---: | ---: |
 | Inspect test inputs | 106 | 93 |
 | Console and sandbox test inputs | 37 | 29 |
-| Hand-picked cases (containers, errors, iterators, format specifiers) | 184 | 164 |
+| Hand-picked cases (containers, errors, iterators, format specifiers) | 184 | 165 |
 | Generated (line width, grouping, nesting, numbers, strings, console forms) | 187 | 186 |
-| Total | 514 | 472 |
+| Total | 514 | 473 |
 
 Deliberate differences, with the reason:
 
@@ -61,7 +61,6 @@ Known gaps, not fixed yet:
 - `%o` does not show hidden properties such as `[length]` on arrays and functions.
 - Properties added to a typed array (`tag: 'x'`) are not shown.
 - A SharedArrayBuffer is shown without its bytes.
-- A symbol key whose description has a quote is not escaped.
 - A `%s` with an object whose `toString` throws is shown as the object, where Node stops the whole call. A test pins this, so it stays until it is decided.
 
 ## Security
