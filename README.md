@@ -34,7 +34,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 ## How Output Compares With Node
 
-Checked on 17 November 2026 against Node 26.13.0 with 514 snippets: the inputs of the inspect and console tests, hand-picked cases, and generated runs of line widths, grouping, nesting, key counts, numbers and strings. Each snippet was run once by Node with `console.log` at its default options and once with a depth of 3, which is what the sandbox uses. The sandbox matches exactly on 477 snippets against Node at depth 3 and on 461 against Node's default depth of 2.
+Checked on 17 November 2026 against Node 26.13.0 with 627 snippets: the inputs of the inspect and console tests, hand-picked cases, generated runs of line widths, grouping, nesting, key counts, numbers and strings, and 113 cases of template literals, console forms (no arguments, groups, assertions, counts), JSON, number and date formatting, and null-prototype objects. Each snippet was run once by Node with `console.log` at its default options and once with a depth of 3, which is what the sandbox uses. The sandbox matches exactly on 587 snippets against Node at depth 3 and on 571 against Node's default depth of 2.
 
 | Group | Snippets | Exact |
 | --- | ---: | ---: |
@@ -42,7 +42,8 @@ Checked on 17 November 2026 against Node 26.13.0 with 514 snippets: the inputs o
 | Console and sandbox test inputs | 37 | 29 |
 | Hand-picked cases (containers, errors, iterators, format specifiers) | 184 | 169 |
 | Generated (line width, grouping, nesting, numbers, strings, console forms) | 187 | 186 |
-| Total | 514 | 477 |
+| Templates, console forms, JSON, numbers, dates, null prototypes | 113 | 110 |
+| Total | 627 | 587 |
 
 Deliberate differences, with the reason:
 
@@ -55,6 +56,7 @@ Deliberate differences, with the reason:
 - A listener that throws does not stop the run, because events have no event loop behind them.
 - `globalThis` has the names the sandbox provides, not Node's.
 - A program that starts with `{ a: 1 }` shows the object, as a REPL does.
+- A lone surrogate in a string printed on its own is written as U+FFFD, so the text sent to Telegram is well-formed; Node escapes it as `\ud83d`. Inside an array or object the sandbox escapes it, as Node does.
 
 Known gaps, not fixed yet:
 
