@@ -30,6 +30,7 @@ describe("result formatting", () => {
     ["a key with a dollar sign is quoted, as Node quotes it", `({ $a: 1, _a1: 2 })`, "{ '$a': 1, _a1: 2 }"],
     ["an own __proto__ key is bracketed, not taken for the prototype", `JSON.parse('{"__proto__": 1, "a": 2}')`, "{ ['__proto__']: 1, a: 2 }"],
     ["symbol keys", `({ [Symbol("k")]: 1 })`, "{ Symbol(k): 1 }"],
+    ["a property added to a typed array is shown after its items", `Object.assign(new Uint8Array(2), { tag: "x" })`, "Uint8Array(2) [ 0, 0, tag: 'x' ]"],
     ["a SharedArrayBuffer shows its bytes, as an ArrayBuffer does", `new SharedArrayBuffer(3)`, "SharedArrayBuffer { [Uint8Contents]: <00 00 00>, [byteLength]: 3 }"],
     ["an empty SharedArrayBuffer", `new SharedArrayBuffer(0)`, "SharedArrayBuffer { [Uint8Contents]: <>, [byteLength]: 0 }"],
     ["a quote, backslash or newline in a symbol key is escaped, as Node escapes it", `({ [Symbol("a'b")]: 1, [Symbol("a\\\\b")]: 2, [Symbol("a\\nb")]: 3 })`, "{ Symbol(a\\'b): 1, Symbol(a\\\\b): 2, Symbol(a\\nb): 3 }"],

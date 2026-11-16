@@ -26,6 +26,7 @@
   let quoteStrings = false;
   const MAX_ENTRIES = 100;
   const MAX_SCAN = 100000;
+  const MAX_TYPED_KEYS = 100000;
   const LINE_WIDTH = 80;
   // Objects with more levels than this in them are not put on one line.
   const COMPACT = 3;
@@ -543,7 +544,7 @@
   function formatTypedArray(array, name, depth, state) {
     const length = typedArrayLength(array);
     const parts = [];
-    if (length > 0) enter(depth);
+    const before = enter(depth);
     for (let i = 0; i < length && i < MAX_ENTRIES && state.left > 0; i++) {
       const part = format(array[i], depth + 1, state);
       parts[parts.length] = part;
@@ -553,8 +554,16 @@
       state.cut = true;
       parts[parts.length] = more(length - parts.length, "item", "items");
     }
+    // Listing the own keys of a typed array makes one key for each item, so
+    // the properties added to a long one are not shown.
+    if (length <= MAX_TYPED_KEYS) addProperties(array, parts, depth, state, true);
+    if (parts.length === 0) currentDepth = before;
+    let numeric = true;
+    for (let i = 0; numeric && i < parts.length; i++) {
+      numeric = typeof array[i] === "number" || typeof array[i] === "bigint";
+    }
     const prefix = getPrototypeOf(array) === null ? "[" + name + "(" + length + "): null prototype] " : name + "(" + length + ") ";
-    return layout(reference(array, state) + prefix, "[", parts, "]", depth, ARRAY, true);
+    return layout(reference(array, state) + prefix, "[", parts, "]", depth, ARRAY, numeric);
   }
 
   // Whether a buffer is a SharedArrayBuffer, which is told by its length getter

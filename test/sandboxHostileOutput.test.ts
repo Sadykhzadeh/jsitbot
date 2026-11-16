@@ -222,6 +222,7 @@ describe("structures of absurd size", () => {
     "an object with a hundred thousand keys": `Object.fromEntries(Array.from({ length: 100000 }, (_, i) => ["k" + i, i]))`,
     "a sparse array with four billion slots": `const a = []; a[2 ** 32 - 2] = 1; a`,
     "a typed array of a million items": `new Uint8Array(1e6)`,
+    "a typed array of a million items with a property added": `Object.assign(new Uint8Array(1e6), { tag: "x" })`,
     "keys and symbols of five thousand characters": `({ [Symbol("a".repeat(5000))]: 1, ["b".repeat(5000)]: 2 })`,
   };
 
