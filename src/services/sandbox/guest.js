@@ -20,6 +20,8 @@
   const MAX_DEPTH = 3;
   // What objects are shown down to: MAX_DEPTH, except during console.dir with a depth.
   let depthLimit = MAX_DEPTH;
+  // Whether non-enumerable properties are shown in brackets, as %o shows them.
+  let showHidden = false;
   // Whether a string given to write on its own is quoted, as console.dir shows it.
   let quoteStrings = false;
   const MAX_ENTRIES = 100;
@@ -675,7 +677,8 @@
       const keys = pass === 0 ? names : symbols;
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
-        if (!isEnumerable(object, key)) continue;
+        const hidden = !isEnumerable(object, key);
+        if (hidden && !showHidden) continue;
         if (skipIndexes && pass === 0 && isIndexKey(key)) continue;
         if (skipErrorFields && pass === 0 && (key === "name" || key === "message" || key === "stack")) continue;
         if (parts.length >= MAX_ENTRIES || state.left <= 0) {
@@ -694,7 +697,7 @@
         } else {
           value = format(descriptor.value, depth + 1, state);
         }
-        const part = label + ": " + value;
+        const part = (hidden ? "[" + label + "]" : label) + ": " + value;
         parts[parts.length] = part;
         state.left -= part.length;
       }
@@ -1029,6 +1032,19 @@
           return format(argument, 0, state);
         } finally {
           depthLimit = limit;
+        }
+      }
+      case "o": {
+        // Node's %o shows hidden properties and goes four levels down.
+        const limit = depthLimit;
+        const hiddenBefore = showHidden;
+        depthLimit = 4;
+        showHidden = true;
+        try {
+          return format(argument, 0, state);
+        } finally {
+          depthLimit = limit;
+          showHidden = hiddenBefore;
         }
       }
       case "d":

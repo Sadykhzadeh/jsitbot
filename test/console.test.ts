@@ -294,6 +294,30 @@ describe("console.trace", () => {
 });
 
 describe("console.log format specifiers", () => {
+  test("%o shows the hidden properties of arrays and functions, as Node does", async () => {
+    expect(
+      await logs(`
+        console.log("%o", [1, 2]);
+        console.log("%o", function f(a) {});
+        console.log("%o", [1, [2, [3, [4]]]]);
+        console.log("%o", [1, 2, 3, 4, 5, 6, 7]);
+        console.log("%o", Math.max);
+        console.log("%o", Object.defineProperty([], "hidden", { value: 1 }));
+        console.log("%o", { a: [1, 2], f() {} });
+        console.log("%O", [1, 2]);
+      `),
+    ).toEqual([
+      "[ 1, 2, [length]: 2 ]",
+      "<ref *1> [Function: f] {\n  [length]: 1,\n  [name]: 'f',\n  [prototype]: { [constructor]: [Circular *1] }\n}",
+      "[\n  1,\n  [ 2, [ 3, [ 4, [length]: 1 ], [length]: 2 ], [length]: 2 ],\n  [length]: 2\n]",
+      "[ 1, 2, 3, 4, 5, 6, 7, [length]: 7 ]",
+      "[Function: max] { [length]: 2, [name]: 'max' }",
+      "[ [length]: 0, [hidden]: 1 ]",
+      "{\n  a: [ 1, 2, [length]: 2 ],\n  f: [Function: f] { [length]: 0, [name]: 'f' }\n}",
+      "[ 1, 2 ]",
+    ]);
+  });
+
   test("fills %s, %d, %i, %f, %j and %o from the arguments that follow", async () => {
     expect(
       await logs(`
