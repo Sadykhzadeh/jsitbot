@@ -243,12 +243,14 @@ describe("handling updates concurrently", () => {
     });
 
     await poll(message(1, "a1"), message(1, "a2"), message(1, "a3"));
-    const other = poll(message(2, "b1"));
+    // Two other users wait, in the order they came, behind the flood.
+    const second = poll(message(2, "b1"));
+    const third = poll(message(3, "c1"));
     release();
-    await other;
-    await until(() => started.length === 4);
+    await Promise.all([second, third]);
+    await until(() => started.length === 5);
 
-    expect(started).toEqual(["a1", "b1", "a2", "a3"]);
+    expect(started).toEqual(["a1", "b1", "c1", "a2", "a3"]);
   });
 
   test("a user can send again once earlier updates have finished", async () => {
