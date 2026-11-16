@@ -83,3 +83,35 @@ describe("error line numbers", () => {
     expect("line" in execution).toBe(false);
   });
 });
+
+describe("syntax error columns", () => {
+  async function positionOf(code: string): Promise<{ line?: number; column?: number }> {
+    const execution = await sandbox.execute(code);
+
+    expect(execution.ok).toBe(false);
+    return execution.ok ? {} : { line: execution.line, column: execution.column };
+  }
+
+  test("a syntax error gives its line and the column it starts at", async () => {
+    expect(await positionOf("const a = 1;\nlet b = ;\nconst c = 3;")).toEqual({ line: 2, column: 9 });
+  });
+
+  test("a tab before the error counts as one column", async () => {
+    expect(await positionOf("const a = 1;\n\tlet b = ;")).toEqual({ line: 2, column: 10 });
+  });
+
+  test("an error at the end of code without a line break is still placed", async () => {
+    expect(await positionOf("const a = 1;\nlet b = 2 +")).toEqual({ line: 2, column: 12 });
+  });
+
+  test("non-ASCII before the error is counted in code points", async () => {
+    expect(await positionOf('const s = "é😀"; let z = ;')).toEqual({ line: 1, column: 25 });
+  });
+
+  test("a runtime error has a line but no column", async () => {
+    const execution = await sandbox.execute("const a = 1;\nnull.name");
+
+    expect(execution.ok).toBe(false);
+    expect(execution.ok ? undefined : execution.column).toBeUndefined();
+  });
+});

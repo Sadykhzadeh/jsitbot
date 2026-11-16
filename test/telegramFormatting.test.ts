@@ -177,6 +177,46 @@ describe("error locations", () => {
   });
 });
 
+describe("syntax error carets", () => {
+  const syntaxFailure = (line: number, column: number, error: string) => ({
+    ok: false as const,
+    logs: [],
+    error,
+    line,
+    column,
+    durationMs: 1,
+    timedOut: false,
+    truncated: false,
+  });
+
+  test("shows the line, a caret under the column, then the message", () => {
+    const message = formatExecutionMessage(
+      syntaxFailure(2, 9, "SyntaxError: unexpected token in expression: ';'"),
+      "const a = 1;\nlet b = ;\nconst c = 3;",
+    );
+
+    expect(message.text).toContain("let b = ;\n        ^\nSyntaxError: unexpected token in expression: ';'");
+  });
+
+  test("keeps a tab before the error so the caret lines up under it", () => {
+    const message = formatExecutionMessage(syntaxFailure(2, 10, "SyntaxError: unexpected token in expression: ';'"), "const a = 1;\n\tlet b = ;");
+
+    expect(message.text).toContain("\tlet b = ;\n\t        ^\n");
+  });
+
+  test("places a caret after the last character of a line with no line break", () => {
+    const message = formatExecutionMessage(syntaxFailure(2, 12, "SyntaxError: unexpected end of input"), "const a = 1;\nlet b = 2 +");
+
+    expect(message.text).toContain("let b = 2 +\n           ^\n");
+  });
+
+  test("counts characters outside ASCII by code point", () => {
+    const message = formatExecutionMessage(syntaxFailure(1, 25, "SyntaxError: unexpected token in expression: ';'"), 'const s = "é😀"; let z = ;');
+
+    expect(message.text).toContain(`const s = "é😀"; let z = ;\n${" ".repeat(24)}^\n`);
+  });
+});
+
 describe("cutting text that holds characters outside the BMP", () => {
   const loneSurrogate = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
 

@@ -56,6 +56,12 @@ function describeError(execution: SandboxExecution, code: string): string {
  */
 function locateError(execution: SandboxExecutionFailure, code: string): string {
   const sourceLines = code.split("\n");
+  if (execution.column && execution.line && execution.line <= sourceLines.length) {
+    // Shown the way Node shows a syntax error: the line, a caret under the
+    // column, then the message. Tabs stay in the caret line so it lines up.
+    const source = sourceLines[execution.line - 1];
+    return `${source}\n${caretLine(source, execution.column)}\n${execution.error}`;
+  }
   if (!execution.line || sourceLines.length < 2 || execution.line > sourceLines.length) {
     return execution.error;
   }
@@ -64,6 +70,19 @@ function locateError(execution: SandboxExecutionFailure, code: string): string {
   const excerpt = truncateText(source, ERROR_SOURCE_EXCERPT_LIMIT).value;
 
   return `${execution.error}\n    at line ${execution.line}${excerpt ? `: ${excerpt}` : ""}`;
+}
+
+/** Spaces up to the column, counted in code points, with the tabs of the source kept, and a caret. */
+function caretLine(source: string, column: number): string {
+  let out = "";
+  let placed = 0;
+  for (const character of source) {
+    if (placed === column - 1) break;
+    out += character === "\t" ? "\t" : " ";
+    placed++;
+  }
+
+  return out + " ".repeat(column - 1 - placed) + "^";
 }
 
 function buildSection(title: string, content: string): string {

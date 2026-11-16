@@ -60,6 +60,8 @@ interface Packed {
   text: string;
   /** Line of the user's code an error came from. */
   line?: number;
+  /** Column, counted in code points from 1, of a syntax error on that line. */
+  column?: number;
   truncated: boolean;
 }
 
@@ -234,7 +236,7 @@ export class QuickJsSandboxService implements SandboxService {
 
     const failure = (
       error: string,
-      details: { timedOut?: boolean; truncated?: boolean; line?: number } = {},
+      details: { timedOut?: boolean; truncated?: boolean; line?: number; column?: number } = {},
     ): SandboxExecution => {
       const timedOut = details.timedOut ?? interrupted;
       // With the heap used up to the last page QuickJS cannot even allocate its
@@ -251,6 +253,7 @@ export class QuickJsSandboxService implements SandboxService {
         logs,
         error: bounded.value,
         ...(ownError && details.line ? { line: details.line } : {}),
+        ...(ownError && details.line && details.column ? { column: details.column } : {}),
         durationMs: Math.round(performance.now() - startedAt),
         timedOut,
         truncated: bounded.truncated || Boolean(details.truncated),
@@ -301,7 +304,7 @@ export class QuickJsSandboxService implements SandboxService {
         return failure(UNREADABLE_MESSAGE);
       }
       if (!packed.ok) {
-        return failure(packed.text, { truncated: packed.truncated, line: packed.line });
+        return failure(packed.text, { truncated: packed.truncated, line: packed.line, column: packed.column });
       }
 
       const result = truncateText(packed.text, this.options.maxResultLength);
@@ -365,7 +368,27 @@ export class QuickJsSandboxService implements SandboxService {
       };
     }
 
-    return direct.parseError;
+    return this.locateSyntaxError(context, code, direct.parseError);
+  }
+
+  /**
+   * Where the engine puts a syntax error in the code as the user wrote it. The
+   * readings that were tried wrap the code, which moves its first line along, so
+   * the code is compiled again as it is and the position is read off that.
+   */
+  private locateSyntaxError(context: QuickJSContext, code: string, packed: Packed): Packed {
+    const compiled = context.evalCode(code, GUEST_FILE, { compileOnly: true });
+    if (!compiled.error) {
+      return packed;
+    }
+
+    const error = compiled.error;
+    const described = context.dump(error) as { stack?: unknown } | null;
+    error.dispose();
+
+    const stack = typeof described?.stack === "string" ? described.stack : "";
+    const at = /input\.js:(\d+):(\d+)/.exec(stack);
+    return at ? { ...packed, line: Number(at[1]), column: Number(at[2]) } : packed;
   }
 
   /**

@@ -13,6 +13,8 @@ export interface SandboxExecutionFailure {
   error: string;
   /** Line of the submitted code the error came from, when it is known. */
   line?: number;
+  /** Column of a syntax error on that line, counted in code points from 1. */
+  column?: number;
   durationMs: number;
   timedOut: boolean;
   truncated: boolean;
