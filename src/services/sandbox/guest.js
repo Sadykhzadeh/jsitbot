@@ -83,6 +83,7 @@
   const TypedArray = getPrototypeOf(Uint8Array);
   const typedArrayLength = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "length").get);
   const arrayBufferLength = uncurry(getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get);
+  const sharedArrayBufferLength = uncurry(getOwnPropertyDescriptor(SharedArrayBuffer.prototype, "byteLength").get);
   const arrayBufferPrototype = ArrayBuffer.prototype;
   const dataViewPrototype = DataView.prototype;
   const dataViewLength = uncurry(getOwnPropertyDescriptor(DataView.prototype, "byteLength").get);
@@ -556,9 +557,21 @@
     return layout(reference(array, state) + prefix, "[", parts, "]", depth, ARRAY, true);
   }
 
+  // Whether a buffer is a SharedArrayBuffer, which is told by its length getter
+  // throwing for anything else. A tag set by the program does not count.
+  function isSharedBuffer(buffer) {
+    try {
+      sharedArrayBufferLength(buffer);
+      return true;
+    } catch (ignored) {
+      return false;
+    }
+  }
+
   // The first bytes of a buffer, then the length of it and what was added to it.
   function formatArrayBuffer(buffer, depth, state) {
-    const length = arrayBufferLength(buffer);
+    const shared = isSharedBuffer(buffer);
+    const length = shared ? sharedArrayBufferLength(buffer) : arrayBufferLength(buffer);
     const shown = length < MAX_ENTRIES ? length : MAX_ENTRIES;
     const bytes = new NativeUint8Array(buffer, 0, shown);
     let hex = "";
@@ -572,7 +585,8 @@
     enter(depth);
     addProperties(buffer, parts, depth, state, false);
     const name = constructorName(buffer);
-    const prefix = name === "ArrayBuffer" || name === null ? "ArrayBuffer " : name + " [ArrayBuffer] ";
+    const kind = shared ? "SharedArrayBuffer" : "ArrayBuffer";
+    const prefix = name === kind || name === null ? kind + " " : name + " [" + kind + "] ";
     return layout(reference(buffer, state) + prefix, "{", parts, "}", depth);
   }
 
@@ -793,6 +807,7 @@
     if (tag === "[object WeakMap]") return "WeakMap { <items unknown> }";
     if (tag === "[object WeakSet]") return "WeakSet { <items unknown> }";
     if (tag === "[object ArrayBuffer]") return depth > depthLimit ? "[ArrayBuffer]" : formatArrayBuffer(value, depth, state);
+    if (tag === "[object SharedArrayBuffer]" && isSharedBuffer(value)) return depth > depthLimit ? "[SharedArrayBuffer]" : formatArrayBuffer(value, depth, state);
     if (tag === "[object DataView]") return depth > depthLimit ? "[DataView]" : formatDataView(value, depth, state);
 
     const name = constructorName(value);
