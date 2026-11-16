@@ -58,7 +58,7 @@ Deliberate differences, with the reason:
 
 Known gaps, not fixed yet:
 
-- `%o` does not show the hidden properties of typed arrays and errors, such as `[BYTES_PER_ELEMENT]` or `[stack]`.
+- `%o` on an error does not show its hidden properties, such as `[stack]` and `[message]`: Node prints them after the stack frames, and the sandbox shows no frames.
 - Properties added to a typed array longer than 100,000 items are not shown: listing its keys would make one for each item. Shorter ones show them after the items, as Node does.
 - A `%s` with an object whose `toString` throws is shown as the object, where Node stops the whole call. A test pins this, so it stays until it is decided.
 

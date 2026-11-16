@@ -318,6 +318,22 @@ describe("console.log format specifiers", () => {
     ]);
   });
 
+  test("%o shows the hidden fields of a typed array after its items, as Node does", async () => {
+    expect(
+      await logs(`
+        console.log("%o", new Uint8Array([1, 2, 3]));
+        console.log("%o", Object.assign(new Uint8Array(2), { tag: "x" }));
+        console.log("%o", new Float64Array(1));
+        console.log("%o", new BigInt64Array(0));
+      `),
+    ).toEqual([
+      "Uint8Array(3) [\n  1,\n  2,\n  3,\n  [BYTES_PER_ELEMENT]: 1,\n  [length]: 3,\n  [byteLength]: 3,\n  [byteOffset]: 0,\n  [buffer]: ArrayBuffer { [byteLength]: 3 }\n]",
+      "Uint8Array(2) [\n  0,\n  0,\n  [BYTES_PER_ELEMENT]: 1,\n  [length]: 2,\n  [byteLength]: 2,\n  [byteOffset]: 0,\n  [buffer]: ArrayBuffer { [byteLength]: 2 },\n  tag: 'x'\n]",
+      "Float64Array(1) [\n  0,\n  [BYTES_PER_ELEMENT]: 8,\n  [length]: 1,\n  [byteLength]: 8,\n  [byteOffset]: 0,\n  [buffer]: ArrayBuffer { [byteLength]: 8 }\n]",
+      "BigInt64Array(0) [\n  [BYTES_PER_ELEMENT]: 8,\n  [length]: 0,\n  [byteLength]: 0,\n  [byteOffset]: 0,\n  [buffer]: ArrayBuffer { [byteLength]: 0 }\n]",
+    ]);
+  });
+
   test("fills %s, %d, %i, %f, %j and %o from the arguments that follow", async () => {
     expect(
       await logs(`

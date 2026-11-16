@@ -83,6 +83,9 @@
   const setIteratorPrototype = getPrototypeOf(new Set().values());
   const TypedArray = getPrototypeOf(Uint8Array);
   const typedArrayLength = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "length").get);
+  const typedArrayByteLength = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "byteLength").get);
+  const typedArrayByteOffset = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "byteOffset").get);
+  const typedArrayBuffer = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "buffer").get);
   const arrayBufferLength = uncurry(getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get);
   const sharedArrayBufferLength = uncurry(getOwnPropertyDescriptor(SharedArrayBuffer.prototype, "byteLength").get);
   const arrayBufferPrototype = ArrayBuffer.prototype;
@@ -119,6 +122,10 @@
     "Int32Array", "Uint32Array", "Float32Array", "Float64Array",
     "BigInt64Array", "BigUint64Array",
   ];
+  const ELEMENT_BYTES = {
+    Int8Array: 1, Uint8Array: 1, Uint8ClampedArray: 1, Int16Array: 2, Uint16Array: 2,
+    Int32Array: 4, Uint32Array: 4, Float32Array: 4, Float64Array: 8, BigInt64Array: 8, BigUint64Array: 8,
+  };
 
   let logCount = 0;
   let logsCutShort = false;
@@ -553,6 +560,22 @@
     if (length > parts.length) {
       state.cut = true;
       parts[parts.length] = more(length - parts.length, "item", "items");
+    }
+    // With %o the hidden fields come after the items, as Node lists them.
+    if (showHidden) {
+      const buffer = typedArrayBuffer(array);
+      const bufferName = isSharedBuffer(buffer) ? "SharedArrayBuffer" : "ArrayBuffer";
+      const hidden = [
+        "[BYTES_PER_ELEMENT]: " + ELEMENT_BYTES[name],
+        "[length]: " + length,
+        "[byteLength]: " + typedArrayByteLength(array),
+        "[byteOffset]: " + typedArrayByteOffset(array),
+        "[buffer]: " + bufferName + " { [byteLength]: " + (bufferName === "SharedArrayBuffer" ? sharedArrayBufferLength(buffer) : arrayBufferLength(buffer)) + " }",
+      ];
+      for (let i = 0; i < hidden.length; i++) {
+        parts[parts.length] = hidden[i];
+        state.left -= hidden[i].length;
+      }
     }
     // Listing the own keys of a typed array makes one key for each item, so
     // the properties added to a long one are not shown.
