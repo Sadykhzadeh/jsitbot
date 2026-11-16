@@ -785,7 +785,8 @@
     // A tag the object has as an own property is shown as a property already.
     const tagName = tag === "[object Object]" || isEnumerable(value, Symbol.toStringTag) ? "" : stringSlice(tag, 8, tag.length - 1);
     let prefix = (name === null ? label : name) + " ";
-    if (tagName !== "" && tagName !== name) prefix += "[" + tagName + "] ";
+    if (tagName === "Arguments" && name === "Object") prefix = "[Arguments] ";
+    else if (tagName !== "" && tagName !== name) prefix += "[" + tagName + "] ";
     else if (name === "Object") prefix = "";
     return formatProperties(value, prefix, depth, state);
   }

@@ -28,6 +28,8 @@ describe("result formatting", () => {
     ["objects", `({ a: 1, b: "x", c: [1, 2], d: { e: null } })`, "{ a: 1, b: 'x', c: [ 1, 2 ], d: { e: null } }"],
     ["keys that are not identifiers are quoted", `({ "a-b": 1, 2: 3, valid_id: 4 })`, "{ '2': 3, 'a-b': 1, valid_id: 4 }"],
     ["symbol keys", `({ [Symbol("k")]: 1 })`, "{ Symbol(k): 1 }"],
+    ["arguments are shown under their own name", `(function () { return arguments })(1, "a")`, "[Arguments] { '0': 1, '1': 'a' }"],
+    ["empty arguments", `(function () { return arguments })()`, "[Arguments] {}"],
     ["array holes", `[1, , 3, , , 6]`, "[ 1, <1 empty item>, 3, <2 empty items>, 6 ]"],
     ["a sparse array", `new Array(5)`, "[ <5 empty items> ]"],
     ["maps", `new Map([["a", 1], ["b", { c: 2 }]])`, "Map(2) { 'a' => 1, 'b' => { c: 2 } }"],
