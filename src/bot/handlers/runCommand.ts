@@ -3,19 +3,16 @@ import type { Message } from "grammy/types";
 
 import { rateKey, createRunner, type RunnerOptions } from "../runner";
 import { stripCodeFence } from "../codeInput";
-import { sendWholeOutput } from "../wholeOutput";
+import { ReplyTracker } from "../replyTracker";
+import { createPrivateAnswerer, USAGE } from "./privateMessage";
 
 interface RunCommandOptions extends RunnerOptions {
   botUsername: string;
+  /** Shared with the private handler, so that an edit of a command finds the answer it made. */
+  replies: ReplyTracker;
 }
 
 const COMMAND = /^\/run(?:@([A-Za-z0-9_]+))?(?=\s|$)/;
-
-/** What to answer to /run without any code to run. */
-const USAGE = [
-  "Send `/run 6 * 7` and the bot answers with the result\\.",
-  "Or reply to a message that has code in it with /run\\.",
-].join("\n");
 
 /** The code in a message that is being replied to: its first code block if it has one, the whole text if not. */
 function codeIn(message: Message): string {
@@ -73,7 +70,10 @@ export function addressedCode(message: Message, botUsername: string): { code: st
 
 export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions): void {
   const runCode = createRunner(options);
+  const answerer = createPrivateAnswerer(options);
 
+  // In a private chat the answer is handled like the answer to any message, so
+  // that editing the command updates it.
   bot.on("message:text", async (ctx, next) => {
     const request = addressedCode(ctx.message, options.botUsername);
     if (!request || !ctx.from || ctx.from.is_bot) {
@@ -82,33 +82,54 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
     }
 
     const inPrivate = ctx.chat.type === "private";
-    const reply = (text: string, quote: boolean) =>
-      ctx.reply(text, {
-        parse_mode: "MarkdownV2",
-        ...(quote
-          ? { reply_parameters: { message_id: ctx.message.message_id, allow_sending_without_reply: true } }
-          : {}),
-      });
 
     if (request.code.trim() === "") {
       // Nothing to run, but a reply costs the chat a message all the same.
       if (options.rateLimiter.consume(rateKey(ctx.from.id), options.rateLimitPolicy).allowed) {
-        await reply(USAGE, !inPrivate);
+        await ctx.reply(USAGE, {
+          parse_mode: "MarkdownV2",
+          ...(inPrivate
+            ? {}
+            : { reply_parameters: { message_id: ctx.message.message_id, allow_sending_without_reply: true } }),
+        });
       }
       return;
     }
 
-    const outcome = await runCode(ctx.from.id, request.code);
-    if (!outcome.ran && outcome.refusal !== "too-long" && !inPrivate) {
-      // In a group, a user who is over a limit is not worth a message everybody reads.
+    if (inPrivate) {
+      await answerer.send(ctx.api, {
+        chatId: ctx.chat.id,
+        userId: ctx.from.id,
+        messageId: ctx.message.message_id,
+        code: request.code,
+      });
       return;
     }
 
-    const answer = await reply(outcome.message.text, outcome.ran || !inPrivate);
-
-    // A file in a group would be one more message for everybody, so only a private chat gets one.
-    if (inPrivate && outcome.ran && outcome.document !== undefined) {
-      await sendWholeOutput(ctx.api, ctx.chat.id, answer.message_id, outcome.document);
+    const outcome = await runCode(ctx.from.id, request.code);
+    // In a group, a user who is over a limit is not worth a message everybody reads.
+    if (!outcome.ran && outcome.refusal !== "too-long") {
+      return;
     }
+
+    await ctx.reply(outcome.message.text, {
+      parse_mode: "MarkdownV2",
+      reply_parameters: { message_id: ctx.message.message_id, allow_sending_without_reply: true },
+    });
+  });
+
+  bot.on("edited_message:text", async (ctx, next) => {
+    const request = addressedCode(ctx.editedMessage, options.botUsername);
+    if (!request || ctx.chat.type !== "private" || !ctx.from || ctx.from.is_bot) {
+      await next();
+      return;
+    }
+
+    await answerer.edit(ctx.api, {
+      chatId: ctx.chat.id,
+      userId: ctx.from.id,
+      messageId: ctx.editedMessage.message_id,
+      code: request.code,
+    });
   });
 }

@@ -6,6 +6,7 @@ import { type ConcurrentMiddleware, handleConcurrently } from "./concurrency";
 import { registerInlineQueryHandler } from "./handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "./handlers/privateMessage";
 import { registerRunCommandHandler } from "./handlers/runCommand";
+import { ReplyTracker } from "./replyTracker";
 import { registerStartHelpHandlers } from "./handlers/startHelp";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../security/rateLimiter";
 import { createSandbox } from "../services/sandbox/createSandbox";
@@ -40,10 +41,13 @@ export async function createBot(
     maxCodeLength: config.limits.maxCodeLength,
   };
   registerStartHelpHandlers(bot, botUsername, helpLimits);
+  // Both answer through the same reply tracker, so an edit of a /run finds its answer.
+  const replies = new ReplyTracker();
   // Before the private handler, so that "/run" and "@bot" are taken out of the
   // messages it would otherwise run as code.
   registerRunCommandHandler(bot, {
     botUsername,
+    replies,
     sandbox,
     rateLimiter,
     rateLimitPolicy: config.limits.privateRateLimit,
@@ -53,6 +57,7 @@ export async function createBot(
   });
   registerPrivateMessageHandler(bot, {
     botUserId: me.id,
+    replies,
     sandbox,
     rateLimiter,
     rateLimitPolicy: config.limits.privateRateLimit,

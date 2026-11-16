@@ -6,6 +6,8 @@ import { addressedCode, registerRunCommandHandler } from "../src/bot/handlers/ru
 import { registerPrivateMessageHandler } from "../src/bot/handlers/privateMessage";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../src/security/rateLimiter";
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
+import { handleConcurrently } from "../src/bot/concurrency";
+import { ReplyTracker } from "../src/bot/replyTracker";
 
 const BOT_ID = 999;
 type ReplyMessage = NonNullable<Message["reply_to_message"]>;
@@ -13,7 +15,7 @@ type ReplyMessage = NonNullable<Message["reply_to_message"]>;
 const GROUP_ID = -100123;
 const sandbox = new QuickJsSandboxService();
 
-function createBotUnderTest(options: { maxRequests?: number } = {}) {
+function createBotUnderTest(options: { maxRequests?: number; concurrency?: boolean } = {}) {
   const bot = new Bot("1:test", {
     botInfo: {
       id: BOT_ID,
@@ -40,20 +42,38 @@ function createBotUnderTest(options: { maxRequests?: number } = {}) {
     timeBudgetPolicy: { windowMs: 10_000, maxMs: 10_000_000 },
     maxCodeLength: 2_000,
   };
-  registerRunCommandHandler(bot, { ...shared, botUsername: "jsitbot" });
-  registerPrivateMessageHandler(bot, { ...shared, botUserId: BOT_ID });
+  const concurrency = options.concurrency ? handleConcurrently(bot, { limit: 8, perUser: 3 }) : undefined;
+  if (concurrency) {
+    bot.use(concurrency);
+  }
+  const replies = new ReplyTracker();
+  registerRunCommandHandler(bot, { ...shared, botUsername: "jsitbot", replies });
+  registerPrivateMessageHandler(bot, { ...shared, botUserId: BOT_ID, replies });
 
   let updateId = 1;
   let messageId = 10;
   return {
     sent: () => calls.filter((call) => call.method === "sendMessage").map((call) => call.payload),
+    edits: () => calls.filter((call) => call.method === "editMessageText").map((call) => call.payload),
+    /** Waits until the updates taken by the concurrency middleware have all finished. */
+    async settle(): Promise<void> {
+      while (concurrency && concurrency.inProgress() > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+    },
     documents: () => calls.filter((call) => call.method === "sendDocument").map((call) => ({ payload: call.payload })),
 
     async say(
       text: string,
-      extra: { chat?: "group" | "private"; replyTo?: Partial<Message>; entities?: MessageEntity[]; userId?: number } = {},
+      extra: {
+        chat?: "group" | "private";
+        replyTo?: Partial<Message>;
+        entities?: MessageEntity[];
+        userId?: number;
+        messageId?: number;
+      } = {},
     ): Promise<number> {
-      const id = messageId++;
+      const id = extra.messageId ?? messageId++;
       const userId = extra.userId ?? 42;
       const chat =
         extra.chat === "private"
@@ -72,6 +92,20 @@ function createBotUnderTest(options: { maxRequests?: number } = {}) {
         },
       } as Update);
       return id;
+    },
+
+    async edit(text: string, editedId: number, userId = 42): Promise<void> {
+      await bot.handleUpdate({
+        update_id: updateId++,
+        edited_message: {
+          message_id: editedId,
+          date: 0,
+          edit_date: 1,
+          chat: { id: userId, type: "private", first_name: "T" },
+          from: { id: userId, is_bot: false, first_name: "T" },
+          text,
+        },
+      } as Update);
     },
   };
 }
@@ -221,6 +255,51 @@ describe("the same commands in a private chat", () => {
     expect(replies).toHaveLength(2);
     expect(replies[0].text).toContain("42");
     expect(replies[1].text).toContain("*Code*\n```\n1 + 1\n```");
+  });
+
+  test("an edit of the command updates the answer, as an edit of an ordinary message does", async () => {
+    const chat = createBotUnderTest();
+
+    const id = await chat.say("/run 6 * 7", { chat: "private" });
+    await chat.edit("/run 7 * 7", id);
+
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.edits()).toHaveLength(1);
+    expect(chat.edits()[0].text).toContain("49");
+  });
+
+  test("an edit to code that fails shows the error in the answer", async () => {
+    const chat = createBotUnderTest();
+
+    const id = await chat.say("/run 6 * 7", { chat: "private" });
+    await chat.edit("/run 6 * (", id);
+
+    expect(chat.edits()).toHaveLength(1);
+    expect(chat.edits()[0].text).toContain("*Error*");
+  });
+
+  test("an edit that comes while the first run is still going updates its answer, and sends no second one", async () => {
+    const chat = createBotUnderTest({ concurrency: true });
+
+    // Dispatched one after the other, as polling does: the edit arrives while the first run is still going.
+    await chat.say("/run 6 * 7", { chat: "private", messageId: 77 });
+    await chat.edit("/run 7 * 7", 77);
+    await chat.settle();
+
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.edits()).toHaveLength(1);
+    expect(chat.edits()[0].text).toContain("49");
+  });
+
+  test("the /run@botname form is tracked too", async () => {
+    const chat = createBotUnderTest();
+
+    const id = await chat.say("/run@jsitbot 6 * 7", { chat: "private" });
+    await chat.edit("/run@jsitbot 7 * 7", id);
+
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.edits()).toHaveLength(1);
+    expect(chat.edits()[0].text).toContain("49");
   });
 
   test("ordinary text still goes to the private handler", async () => {
