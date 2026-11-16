@@ -11,9 +11,9 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 ## What It Does
 
-- Executes JavaScript from private messages and inline queries, answering up to 8 users at a time
-- Re-runs a message when you edit it, and updates the answer in place
-- Sends the whole output as a text file after the answer when it does not fit in one message
+- Executes JavaScript from private messages and inline queries, handling up to 8 updates at a time
+- In a private chat, re-runs a message when you edit it and updates the answer in place, `/run` commands included
+- In a private chat, sends the whole output as a text file after the answer when it does not fit in one message
 - Returns the value of the last statement, like a REPL, and understands `return` and top-level `await`
 - Accepts TypeScript syntax (the types are stripped)
 - Has `setTimeout`, `setInterval`, `setImmediate` and their `clear` twins on a virtual clock: a sleep returns at once instead of using up the time limit, and `Date.now()` does not move. `performance.now()` does move with it, so a measurement around a sleep shows the sleep, and so does `performance.mark` and `measure` (entries are plain objects, not `PerformanceMark`). An interval that is never cleared runs until the time limit
@@ -35,7 +35,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 ## Security
 
 - Fresh WebAssembly instance and QuickJS runtime per execution; nothing survives into the next run
-- Runs in a separate process that has none of the bot's configuration. A run that has not reported back 150 ms after its timeout gets the process killed and replaced, so even a single native call that never returns cannot hold the bot or keep eating memory
+- Runs in a separate process that has none of the bot's configuration. A run that has not reported back 150 ms after its timeout gets the process killed and replaced (400 ms if the process has not yet started it), so even a single native call that never returns cannot hold the bot or keep eating memory
 - Hard memory cap on the WebAssembly heap (QuickJS's own limit does not see large allocations in the Emscripten build)
 - Timeout enforced by the engine's interrupt handler, with a clock that starts when the guest does
 - Output is bounded inside the sandbox: at most 50 console lines of 2000 characters and a 4000-character result, whatever the code prints
