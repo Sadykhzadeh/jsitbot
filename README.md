@@ -32,6 +32,38 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Besides `console.log` and friends it has `console.table`, `assert`, `count`, `group` and `time`
 - Reports the line an error came from, and for a syntax error shows that line with a caret under the column (a line longer than 80 characters is cut around the column). When an error is printed, reading or writing a property of `undefined` or `null`, a name that is not defined, a variable used before its `let`, a symbol turned into a string or number, `reduce` of an empty array and an invalid array length are worded as Node words them (`Cannot read properties of undefined (reading 'x')`); `error.message` itself keeps the engine's wording, as do the other errors
 
+## How Output Compares With Node
+
+Checked on 17 November 2026 against Node 26.13.0 with 514 snippets: the inputs of the inspect and console tests, hand-picked cases, and generated runs of line widths, grouping, nesting, key counts, numbers and strings. Each snippet was run once by Node with `console.log` at its default options and once with a depth of 3, which is what the sandbox uses. The sandbox matches exactly on 472 snippets against Node at depth 3 and on 456 against Node's default depth of 2.
+
+| Group | Snippets | Exact |
+| --- | ---: | ---: |
+| Inspect test inputs | 106 | 93 |
+| Console and sandbox test inputs | 37 | 29 |
+| Hand-picked cases (containers, errors, iterators, format specifiers) | 184 | 164 |
+| Generated (line width, grouping, nesting, numbers, strings, console forms) | 187 | 186 |
+| Total | 514 | 472 |
+
+Deliberate differences, with the reason:
+
+- Nested objects are shown three levels deep, Node shows two: a little more is visible without asking.
+- Errors have their header and no stack frames, so there are no `at` lines and the paths of the bot are not shown.
+- The items of a Map, Set or weak collection are not read, so an iterator shows `<items unknown>`: reading would use them up.
+- `console.table` cuts rows, columns and long cells, and `console.dir` cuts a long string, so one reply stays short.
+- A getter that throws in `console.table` shows `[Unreadable]`: a formatting error does not end the run.
+- A promise still pending when the program ends is an error: the sandbox waits for the result of the run.
+- A listener that throws does not stop the run, because events have no event loop behind them.
+- `globalThis` has the names the sandbox provides, not Node's.
+- A program that starts with `{ a: 1 }` shows the object, as a REPL does.
+
+Known gaps, not fixed yet:
+
+- `%o` does not show hidden properties such as `[length]` on arrays and functions.
+- Properties added to a typed array (`tag: 'x'`) are not shown.
+- A SharedArrayBuffer is shown without its bytes.
+- A symbol key whose description has a quote is not escaped.
+- A `%s` with an object whose `toString` throws is shown as the object, where Node stops the whole call. A test pins this, so it stays until it is decided.
+
 ## Security
 
 - Fresh WebAssembly instance and QuickJS runtime per execution; nothing survives into the next run
