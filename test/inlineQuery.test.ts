@@ -20,6 +20,14 @@ describe("inline queries", () => {
     expect(article.input_message_content.parse_mode).toBe("MarkdownV2");
   });
 
+  test("runs a query in a code fence without the fence, as a private message does", async () => {
+    const harness = createHarness();
+
+    await harness.inlineQuery("```js 6 * 7```");
+
+    expect(articles(harness)[0].title).toBe("Result: 42");
+  });
+
   test("answers short queries with help instead of running them", async () => {
     const harness = createHarness();
 

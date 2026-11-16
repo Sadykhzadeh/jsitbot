@@ -5,6 +5,7 @@ import {
 } from "grammy";
 
 import type { SandboxService } from "../../services/sandbox/types";
+import { stripCodeFence } from "../codeInput";
 import {
   type RateLimitPolicy,
   SandboxTimeBudget,
@@ -54,9 +55,9 @@ function buildArticle(
 
 export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandlerOptions): void {
   bot.on("inline_query", async (ctx) => {
-    const code = ctx.inlineQuery.query;
+    const query = ctx.inlineQuery.query;
 
-    if (!isInlineQueryLongEnough(code, options.minCodeLength)) {
+    if (!isInlineQueryLongEnough(query, options.minCodeLength)) {
       const help = formatHelpMessage(options.botUsername, options.helpLimits);
       await ctx.answerInlineQuery(
         [
@@ -78,6 +79,8 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
       );
       return;
     }
+
+    const code = stripCodeFence(query);
 
     if (!isCodeLengthAllowed(code, options.maxCodeLength)) {
       const rejection = formatRejectionMessage(
