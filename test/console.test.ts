@@ -372,3 +372,21 @@ describe("console.log format specifiers", () => {
     ).toEqual(["{ a: 1 } Symbol(s) -0", "NaN NaN NaN NaN", "[Circular]"]);
   });
 });
+
+describe("console methods", () => {
+  test("each method is named after itself, as in Node", async () => {
+    expect(
+      await logs(
+        `console.log([console.log, console.info, console.warn, console.error, console.debug, console.dir, console.table].map((f) => f.name).join(" "))`,
+      ),
+    ).toEqual(["log info warn error debug dir table"]);
+  });
+
+  test("the methods that print the same way are still different functions", async () => {
+    expect(await logs(`console.log(console.log === console.error, console.log.length)`)).toEqual(["false 0"]);
+  });
+
+  test("a method still prints what it is given", async () => {
+    expect(await logs(`console.log(); console.info("a", 1); console.warn({ b: 2 })`)).toEqual(["", "a 1", "{ b: 2 }"]);
+  });
+});

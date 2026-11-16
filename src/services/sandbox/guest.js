@@ -1350,12 +1350,21 @@
     reflectApply(write, undefined, arguments);
   }
 
+  // Each printing method is a function of its own, so it has its own name.
+  function printer(name) {
+    return {
+      [name]() {
+        return reflectApply(write, undefined, arguments);
+      },
+    }[name];
+  }
+
   const console = freeze({
-    log: write,
-    info: write,
-    warn: write,
-    error: write,
-    debug: write,
+    log: printer("log"),
+    info: printer("info"),
+    warn: printer("warn"),
+    error: printer("error"),
+    debug: printer("debug"),
     dir,
     dirxml,
     clear,
