@@ -26,19 +26,12 @@ const MODULE_STATEMENT = /^\s*(?:import\s*[\w${*"']|export\b)/m;
 const MODULE_HINT = "Hint: this runs as a script, not a module, so import and export do not work.";
 
 // A program can print half of a surrogate pair. Telegram cannot store that, so
-// it is shown as the replacement character. The swap keeps the length, so the
-// cuts that follow are unchanged.
+// it is shown as the replacement character. This runs on the text that is
+// about to be sent, after the cut: a whole megabyte of output is never scanned.
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 
 function wellFormed(text: string): string {
   return text.replace(LONE_SURROGATE, "�");
-}
-
-function wellFormedExecution(execution: SandboxExecution): SandboxExecution {
-  const logs = execution.logs.map(wellFormed);
-  return execution.ok
-    ? { ...execution, logs, result: wellFormed(execution.result) }
-    : { ...execution, logs, error: wellFormed(execution.error) };
 }
 
 function describeError(execution: SandboxExecution, code: string): string {
@@ -74,7 +67,7 @@ function locateError(execution: SandboxExecutionFailure, code: string): string {
 }
 
 function buildSection(title: string, content: string): string {
-  return `*${title}*\n${toMarkdownV2CodeBlock(content)}`;
+  return `*${title}*\n${toMarkdownV2CodeBlock(wellFormed(content))}`;
 }
 
 interface ExecutionSection {
@@ -146,8 +139,6 @@ export interface ExecutionMessage {
 export function formatExecutionMessage(execution: SandboxExecution): ExecutionMessage;
 export function formatExecutionMessage(execution: SandboxExecution, code: string): ExecutionMessage;
 export function formatExecutionMessage(execution: SandboxExecution, code = ""): ExecutionMessage {
-  execution = wellFormedExecution(execution);
-  code = wellFormed(code);
   const sections: ExecutionSection[] = [
     { title: "Code", content: code.trim().length > 0 ? code : " " },
   ];
@@ -171,8 +162,6 @@ export function formatExecutionMessage(execution: SandboxExecution, code = ""): 
 
 /** Everything the sandbox returned, as plain text, for a message that could not hold it all. */
 export function formatExecutionDocument(execution: SandboxExecution, code: string): string {
-  execution = wellFormedExecution(execution);
-  code = wellFormed(code);
   const sections = [["Code", code]];
   if (execution.logs.length > 0) {
     sections.push(["Console", execution.logs.join("\n")]);
@@ -246,17 +235,16 @@ export function formatInlineExecutionPreview(execution: SandboxExecution): {
   title: string;
   description: string;
 } {
-  execution = wellFormedExecution(execution);
   const headline = execution.ok ? execution.result : execution.error;
   const titlePrefix = execution.ok ? "Result: " : "Error: ";
-  const title = truncateText(oneLine(`${titlePrefix}${headline}`), INLINE_TITLE_LIMIT).value;
+  const title = wellFormed(truncateText(oneLine(`${titlePrefix}${headline}`), INLINE_TITLE_LIMIT).value);
 
   const logSummary = execution.logs.length > 0
     ? `console: ${execution.logs.join(" | ")}`
     : execution.ok
       ? `done in ${execution.durationMs}ms`
       : `failed in ${execution.durationMs}ms`;
-  const description = truncateText(oneLine(logSummary), INLINE_DESCRIPTION_LIMIT).value;
+  const description = wellFormed(truncateText(oneLine(logSummary), INLINE_DESCRIPTION_LIMIT).value);
 
   return { title, description };
 }
@@ -274,8 +262,6 @@ export function formatCompactExecution(
   execution: SandboxExecution,
   code: string,
 ): { title: string; text: string; parseMode: ParseMode } | undefined {
-  execution = wellFormedExecution(execution);
-  code = wellFormed(code);
   if (
     !execution.ok ||
     execution.logs.length > 0 ||
@@ -287,8 +273,8 @@ export function formatCompactExecution(
   }
 
   return {
-    title: truncateText(`Share: ${execution.result}`, INLINE_TITLE_LIMIT).value,
-    text: toMarkdownV2CodeBlock(`${code.trim()}\n// => ${execution.result}`),
+    title: wellFormed(truncateText(`Share: ${execution.result}`, INLINE_TITLE_LIMIT).value),
+    text: toMarkdownV2CodeBlock(wellFormed(`${code.trim()}\n// => ${execution.result}`)),
     parseMode: "MarkdownV2",
   };
 }

@@ -349,7 +349,7 @@ describe("output that needs a file", () => {
 describe("lone surrogates in what a program printed", () => {
   const loneSurrogate = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
 
-  test("are sent as U+FFFD in the message, the preview and the file, so Telegram gets well-formed text", () => {
+  test("are sent as U+FFFD in the message and the preview, so Telegram gets well-formed text", () => {
     const execution = {
       ok: true as const,
       logs: ["half \ud800 here"],
@@ -362,9 +362,8 @@ describe("lone surrogates in what a program printed", () => {
 
     const message = formatExecutionMessage(execution, code);
     const preview = formatInlineExecutionPreview(execution);
-    const file = formatExecutionDocument(execution, code);
 
-    for (const text of [message.text, preview.title, preview.description, file]) {
+    for (const text of [message.text, preview.title, preview.description]) {
       expect(loneSurrogate.test(text)).toBe(false);
     }
     expect(message.text).toContain("half � here");
