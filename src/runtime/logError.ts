@@ -1,3 +1,4 @@
+import { format } from "node:util";
 import { BotError, GrammyError, HttpError } from "grammy";
 
 // Longest piece of any message that is copied into a log line.
@@ -66,7 +67,26 @@ export function describeFailure(error: unknown, secrets: readonly string[]): str
       ? `${error.name}: ${oneLine(error.message)}${whereFrom(error)}`
       : "a non-error value was thrown";
 
-  return secrets.reduce((text, secret) => text.split(secret).join("<token>"), line);
+  return redact(line, secrets);
+}
+
+function redact(text: string, secrets: readonly string[]): string {
+  return secrets.reduce((kept, secret) => kept.split(secret).join("<token>"), text);
+}
+
+/**
+ * Sends console.error and console.warn through redaction. Code that is not the
+ * bot's own error handling, such as the startup call that publishes the command
+ * menu, prints a failed Telegram call as the error object, and that object
+ * carries the address the call was sent to. What is written is the same text,
+ * with the given secrets taken out.
+ */
+export function redactConsoleErrors(secrets: readonly string[], output: Console = console): void {
+  for (const method of ["error", "warn"] as const) {
+    const write = output[method].bind(output);
+
+    output[method] = (...args: unknown[]) => write(redact(format(...args), secrets));
+  }
 }
 
 export function logBotError(error: BotError): void {

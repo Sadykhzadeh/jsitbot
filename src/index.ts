@@ -4,7 +4,7 @@ import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
 import type { ConcurrentMiddleware } from "./bot/concurrency";
 import { listenForCrashes } from "./runtime/crash";
-import { logBotError } from "./runtime/logError";
+import { logBotError, redactConsoleErrors } from "./runtime/logError";
 import { listenForShutdown } from "./runtime/shutdown";
 import { logStatsPeriodically } from "./runtime/stats";
 import { createApiGuard } from "./runtime/telegramApi";
@@ -25,6 +25,7 @@ try {
 }
 
 listenForCrashes([env.botToken]);
+redactConsoleErrors([env.botToken]);
 
 const apiGuard = createApiGuard(env.telegramApi);
 
