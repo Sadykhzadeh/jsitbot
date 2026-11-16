@@ -213,7 +213,8 @@ describe("syntax error carets", () => {
   test("counts characters outside ASCII by code point", () => {
     const message = formatExecutionMessage(syntaxFailure(1, 25, "SyntaxError: unexpected token in expression: ';'"), 'const s = "é😀"; let z = ;');
 
-    expect(message.text).toContain(`const s = "é😀"; let z = ;\n${" ".repeat(24)}^\n`);
+    // The column is 25 in code points; the emoji before it takes two cells, so the caret is 25 cells in.
+    expect(message.text).toContain(`const s = "é😀"; let z = ;\n${" ".repeat(25)}^\n`);
   });
 });
 
@@ -424,5 +425,46 @@ describe("lone surrogates in what a program printed", () => {
     expect(message.text.length).toBeLessThanOrEqual(4_096);
     expect(message.cut).toBe(true);
     expect(loneSurrogate.test(message.text)).toBe(false);
+  });
+});
+
+describe("syntax error carets in a message, from a real run", () => {
+  const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
+
+  /** The source line and the caret line above the message, as they are before escaping. */
+  function caretPair(text: string): { source: string; caret: string } {
+    const plain = text.replace(/\\([`\\])/g, "$1");
+    const lines = plain.split("\n");
+    const at = lines.findIndex((line) => line.trimEnd().endsWith("^"));
+    expect(at).toBeGreaterThan(0);
+    return { source: lines[at - 1], caret: lines[at] };
+  }
+
+  test("a long line is cut around the error, keeps the caret under it and stays within the limit", async () => {
+    const code = `const total = ${"1 + ".repeat(70)}1 2;`;
+    const message = formatExecutionMessage(await sandbox.execute(code), code);
+    const { source, caret } = caretPair(message.text);
+
+    expect(message.text.length).toBeLessThanOrEqual(4_096);
+    expect(source.length).toBeLessThanOrEqual(100);
+    expect(source).toContain("...");
+    expect(caret.indexOf("^")).toBe(source.lastIndexOf("2"));
+  });
+
+  test("a character outside the BMP before the error takes two cells, as it does in a monospace font", async () => {
+    const code = '"😀😀😀" ! 1';
+    const message = formatExecutionMessage(await sandbox.execute(code), code);
+    const { caret } = caretPair(message.text);
+
+    expect(caret.indexOf("^")).toBe(9);
+  });
+
+  test("the caret stays under the error when the source has backticks that are escaped in the message", async () => {
+    const code = "const a_b = `x` 1;";
+    const message = formatExecutionMessage(await sandbox.execute(code), code);
+    const { source, caret } = caretPair(message.text);
+
+    expect(message.text).toContain("\\`x\\`");
+    expect(caret.indexOf("^")).toBe(source.indexOf("1"));
   });
 });

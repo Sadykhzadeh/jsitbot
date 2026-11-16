@@ -58,9 +58,8 @@ function locateError(execution: SandboxExecutionFailure, code: string): string {
   const sourceLines = code.split("\n");
   if (execution.column && execution.line && execution.line <= sourceLines.length) {
     // Shown the way Node shows a syntax error: the line, a caret under the
-    // column, then the message. Tabs stay in the caret line so it lines up.
-    const source = sourceLines[execution.line - 1];
-    return `${source}\n${caretLine(source, execution.column)}\n${execution.error}`;
+    // column, then the message.
+    return `${caretBlock(sourceLines[execution.line - 1], execution.column)}\n${execution.error}`;
   }
   if (!execution.line || sourceLines.length < 2 || execution.line > sourceLines.length) {
     return execution.error;
@@ -72,17 +71,39 @@ function locateError(execution: SandboxExecutionFailure, code: string): string {
   return `${execution.error}\n    at line ${execution.line}${excerpt ? `: ${excerpt}` : ""}`;
 }
 
-/** Spaces up to the column, counted in code points, with the tabs of the source kept, and a caret. */
-function caretLine(source: string, column: number): string {
-  let out = "";
-  let placed = 0;
-  for (const character of source) {
-    if (placed === column - 1) break;
-    out += character === "\t" ? "\t" : " ";
-    placed++;
+/** Characters of a source line shown around a syntax error; a longer line is cut to a window around the column. */
+const CARET_WINDOW = 80;
+
+/**
+ * The source line and a caret under the column. The engine counts the column in
+ * code points, but a character outside the BMP takes two cells in a monospace
+ * font, so the caret is placed by cells. Tabs are kept in the caret line so it
+ * lines up with the source. A long line is cut to a window around the error,
+ * with "..." where it was cut, so the caret stays in view.
+ */
+function caretBlock(source: string, column: number): string {
+  const chars = Array.from(source);
+  const at = column - 1;
+  let from = 0;
+  let to = chars.length;
+  if (chars.length > CARET_WINDOW) {
+    from = Math.min(Math.max(0, at - CARET_WINDOW / 2), chars.length - CARET_WINDOW);
+    to = from + CARET_WINDOW;
   }
 
-  return out + " ".repeat(column - 1 - placed) + "^";
+  const lead = from > 0 ? "..." : "";
+  const shown = `${lead}${chars.slice(from, to).join("")}${to < chars.length ? "..." : ""}`;
+
+  let caret = " ".repeat(lead.length);
+  for (const character of chars.slice(from, Math.min(at, to))) {
+    if (character === "\t") {
+      caret += "\t";
+    } else {
+      caret += (character.codePointAt(0) ?? 0) > 0xffff ? "  " : " ";
+    }
+  }
+
+  return `${shown}\n${caret}^`;
 }
 
 function buildSection(title: string, content: string): string {
