@@ -679,6 +679,7 @@
 
         const descriptor = getOwnPropertyDescriptor(object, key);
         const label = pass === 1 ? symbolToString(key)
+          : key === "__proto__" ? "['__proto__']"
           : isIdentifier(key) ? key
           : quote(key, state);
         let value;

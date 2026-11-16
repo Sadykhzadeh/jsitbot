@@ -28,6 +28,7 @@ describe("result formatting", () => {
     ["objects", `({ a: 1, b: "x", c: [1, 2], d: { e: null } })`, "{ a: 1, b: 'x', c: [ 1, 2 ], d: { e: null } }"],
     ["keys that are not identifiers are quoted", `({ "a-b": 1, 2: 3, valid_id: 4 })`, "{ '2': 3, 'a-b': 1, valid_id: 4 }"],
     ["a key with a dollar sign is quoted, as Node quotes it", `({ $a: 1, _a1: 2 })`, "{ '$a': 1, _a1: 2 }"],
+    ["an own __proto__ key is bracketed, not taken for the prototype", `JSON.parse('{"__proto__": 1, "a": 2}')`, "{ ['__proto__']: 1, a: 2 }"],
     ["symbol keys", `({ [Symbol("k")]: 1 })`, "{ Symbol(k): 1 }"],
     ["arguments are shown under their own name", `(function () { return arguments })(1, "a")`, "[Arguments] { '0': 1, '1': 'a' }"],
     ["empty arguments", `(function () { return arguments })()`, "[Arguments] {}"],
