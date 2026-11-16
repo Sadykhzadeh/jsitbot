@@ -50,6 +50,9 @@ try {
   if (error instanceof GrammyError && error.error_code === 401) {
     fail("Telegram refused BOT_TOKEN (401 Unauthorized). Check that it is the token BotFather sent for this bot.");
   }
+  if (error instanceof GrammyError) {
+    fail(`Telegram did not start the bot: ${error.method} failed with ${error.error_code}: ${error.description}. Check BOT_TOKEN in .env.`);
+  }
   if (error instanceof HttpError) {
     fail(`Could not reach Telegram: ${error.message}`);
   }
