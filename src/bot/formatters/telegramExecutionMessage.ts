@@ -279,11 +279,16 @@ export function formatInlineExecutionPreview(execution: SandboxExecution): {
   const titlePrefix = execution.ok ? "Result: " : "Error: ";
   const title = wellFormed(truncateText(oneLine(`${titlePrefix}${headline}`), INLINE_TITLE_LIMIT).value);
 
+  const where = !execution.ok && execution.line
+    ? execution.column
+      ? `at line ${execution.line}, column ${execution.column}`
+      : `at line ${execution.line}`
+    : undefined;
   const logSummary = execution.logs.length > 0
     ? `console: ${execution.logs.join(" | ")}`
     : execution.ok
       ? `done in ${execution.durationMs}ms`
-      : `failed in ${execution.durationMs}ms`;
+      : (where ?? `failed in ${execution.durationMs}ms`);
   const description = wellFormed(truncateText(oneLine(logSummary), INLINE_DESCRIPTION_LIMIT).value);
 
   return { title, description };

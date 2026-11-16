@@ -127,6 +127,36 @@ describe("telegramExecutionMessage", () => {
     expect(preview.title).toContain("Error:");
     expect(preview.description).toContain("failed in 15ms");
   });
+
+  test("says where a syntax error is, since the list shows it before the user picks", () => {
+    const preview = formatInlineExecutionPreview({
+      ok: false,
+      logs: [],
+      error: "SyntaxError: expecting ';'",
+      line: 3,
+      column: 17,
+      durationMs: 2,
+      timedOut: false,
+      truncated: false,
+    });
+
+    expect(preview.title).toBe("Error: SyntaxError: expecting ';'");
+    expect(preview.description).toBe("at line 3, column 17");
+  });
+
+  test("says a run that timed out timed out, and how long it ran", () => {
+    const preview = formatInlineExecutionPreview({
+      ok: false,
+      logs: [],
+      error: "Sandbox execution timed out.",
+      durationMs: 701,
+      timedOut: true,
+      truncated: false,
+    });
+
+    expect(preview.title).toBe("Error: Sandbox execution timed out.");
+    expect(preview.description).toBe("failed in 701ms");
+  });
 });
 
 describe("error locations", () => {
