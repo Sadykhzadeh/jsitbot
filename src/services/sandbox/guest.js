@@ -202,7 +202,7 @@
     if (key.length === 0) return false;
     for (let i = 0; i < key.length; i++) {
       const c = key[i];
-      const letter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_" || c === "$";
+      const letter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_";
       const digit = c >= "0" && c <= "9";
       if (!(letter || (digit && i > 0))) return false;
     }
