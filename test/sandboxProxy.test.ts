@@ -27,7 +27,7 @@ describe("printing a proxy", () => {
         console.log([proxy], { inside: proxy });
         console.log(seen.join());
       `),
-    ).toEqual(["{ a: 1, b: [ 2 ] }", "[ { a: 1, b: [ 2 ] } ] { inside: { a: 1, b: [ 2 ] } }", ""]);
+    ).toEqual(["Proxy({ a: 1, b: [ 2 ] })", "[ Proxy({ a: 1, b: [ 2 ] }) ] { inside: Proxy({ a: 1, b: [ 2 ] }) }", ""]);
   });
 
   test("does not log the reads a logging proxy makes", async () => {
@@ -37,20 +37,20 @@ describe("printing a proxy", () => {
         console.log(proxy);
         console.log(proxy.name);
       `),
-    ).toEqual(["{ name: 'x' }", "get name", "x"]);
+    ).toEqual(["Proxy({ name: 'x' })", "get name", "x"]);
   });
 
   test("shows what kind of thing the target is", async () => {
-    expect(await value(`new Proxy(new Map([[1, 2]]), {})`)).toBe("Map(1) { 1 => 2 }");
-    expect(await value(`new Proxy([1, 2], {})`)).toBe("[ 1, 2 ]");
-    expect(await value(`new Proxy(function f() {}, {})`)).toBe("[Function: f]");
-    expect(await value(`class A { x = 1 } new Proxy(new A(), {})`)).toBe("A { x: 1 }");
-    expect(await value(`new Proxy(new Proxy({ a: 1 }, {}), {})`)).toBe("{ a: 1 }");
+    expect(await value(`new Proxy(new Map([[1, 2]]), {})`)).toBe("Proxy(Map(1) { 1 => 2 })");
+    expect(await value(`new Proxy([1, 2], {})`)).toBe("Proxy([ 1, 2 ])");
+    expect(await value(`new Proxy(function f() {}, {})`)).toBe("Proxy([Function: f])");
+    expect(await value(`class A { x = 1 } new Proxy(new A(), {})`)).toBe("Proxy(A { x: 1 })");
+    expect(await value(`new Proxy(new Proxy({ a: 1 }, {}), {})`)).toBe("Proxy(Proxy({ a: 1 }))");
   });
 
   test("shows a proxy that was made by Reflect.construct and by Proxy.revocable", async () => {
-    expect(await value(`Reflect.construct(Proxy, [{ a: 1 }, {}])`)).toBe("{ a: 1 }");
-    expect(await value(`Proxy.revocable({ a: 1 }, {}).proxy`)).toBe("{ a: 1 }");
+    expect(await value(`Reflect.construct(Proxy, [{ a: 1 }, {}])`)).toBe("Proxy({ a: 1 })");
+    expect(await value(`Proxy.revocable({ a: 1 }, {}).proxy`)).toBe("Proxy({ a: 1 })");
   });
 
   test("says so when the proxy has been revoked", async () => {
@@ -60,7 +60,7 @@ describe("printing a proxy", () => {
   });
 
   test("still stops at a target that is hostile", async () => {
-    expect(await logged(`console.log(new Proxy({ get a() { throw new Error("no") } }, { get() { throw 1 } }))`)).toEqual(["{ a: [Getter] }"]);
+    expect(await logged(`console.log(new Proxy({ get a() { throw new Error("no") } }, { get() { throw 1 } }))`)).toEqual(["Proxy({ a: [Getter] })"]);
   });
 });
 
@@ -99,6 +99,6 @@ describe("Proxy", () => {
         const p = new Proxy({ a: 1 }, {});
         p
       `),
-    ).toBe("{ a: 1 }");
+    ).toBe("Proxy({ a: 1 })");
   });
 });

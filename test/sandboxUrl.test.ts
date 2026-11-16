@@ -319,7 +319,7 @@ describe("printing a URL", () => {
     `);
 
     expect(result.ok).toBe(true);
-    expect(result.logs).toEqual(["[Unformattable object]", "{}"]);
+    expect(result.logs).toEqual(["[Unformattable object]", "Proxy({})"]);
   });
 });
 

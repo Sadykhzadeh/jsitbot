@@ -52,7 +52,7 @@ describe("values the formatter must not trust", () => {
     `);
 
     expect(result.ok).toBe(true);
-    expect(result.logs).toEqual(["{} { inside: {} }"]);
+    expect(result.logs).toEqual(["Proxy({}) { inside: Proxy({}) }"]);
   });
 
   test("an object whose prototype is a proxy whose traps throw prints as unformattable", async () => {
@@ -70,7 +70,7 @@ describe("values the formatter must not trust", () => {
     const { result, cpuMs } = await run(`new Proxy([], { get(target, key) { return key === "length" ? 1e9 : 1 } })`);
 
     expect(result.ok).toBe(true);
-    expect(text(result)).toBe("[]");
+    expect(text(result)).toBe("Proxy([])");
     expect(cpuMs).toBeLessThan(1_000);
   });
 

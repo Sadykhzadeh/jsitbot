@@ -884,13 +884,10 @@
     if (value === null) return "null";
 
     if (proxiesMade) {
-      // What a proxy stands for is shown, as Node does, and none of its traps run.
-      let target = weakMapGet(proxyTargets, value);
-      while (target !== undefined) {
-        if (target === null) return "<Revoked Proxy>";
-        value = target;
-        target = weakMapGet(proxyTargets, value);
-      }
+      // A proxy is shown as its target inside Proxy(...), as Node shows it, and none of its traps run.
+      const target = weakMapGet(proxyTargets, value);
+      if (target === null) return "<Revoked Proxy>";
+      if (target !== undefined) return "Proxy(" + format(target, depth, state) + ")";
     }
 
     for (let i = 0; i < state.stack.length; i++) {
