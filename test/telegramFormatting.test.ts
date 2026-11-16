@@ -345,3 +345,45 @@ describe("output that needs a file", () => {
     expect(text).toContain("Error\n-----\nReferenceError: x is not defined\n    at line 2: x;\n");
   });
 });
+
+describe("lone surrogates in what a program printed", () => {
+  const loneSurrogate = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+  test("are sent as U+FFFD in the message, the preview and the file, so Telegram gets well-formed text", () => {
+    const execution = {
+      ok: true as const,
+      logs: ["half \ud800 here"],
+      result: "\udc00 result",
+      durationMs: 1,
+      timedOut: false as const,
+      truncated: false,
+    };
+    const code = "'\ud800'";
+
+    const message = formatExecutionMessage(execution, code);
+    const preview = formatInlineExecutionPreview(execution);
+    const file = formatExecutionDocument(execution, code);
+
+    for (const text of [message.text, preview.title, preview.description, file]) {
+      expect(loneSurrogate.test(text)).toBe(false);
+    }
+    expect(message.text).toContain("half � here");
+    expect(message.text).toContain("� result");
+  });
+
+  test("a lone surrogate at the cut keeps the message within the limit", () => {
+    const result = "a".repeat(3_990) + "\ud800" + "b".repeat(200);
+    const message = formatExecutionMessage({
+      ok: true,
+      logs: [],
+      result,
+      durationMs: 1,
+      timedOut: false,
+      truncated: false,
+    });
+
+    expect(message.text.length).toBeLessThanOrEqual(4_096);
+    expect(message.cut).toBe(true);
+    expect(loneSurrogate.test(message.text)).toBe(false);
+  });
+});

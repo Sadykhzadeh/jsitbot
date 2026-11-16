@@ -25,6 +25,22 @@ const MODULE_ERROR = /^SyntaxError: (?:expecting '\('|unsupported keyword: expor
 const MODULE_STATEMENT = /^\s*(?:import\s*[\w${*"']|export\b)/m;
 const MODULE_HINT = "Hint: this runs as a script, not a module, so import and export do not work.";
 
+// A program can print half of a surrogate pair. Telegram cannot store that, so
+// it is shown as the replacement character. The swap keeps the length, so the
+// cuts that follow are unchanged.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+function wellFormed(text: string): string {
+  return text.replace(LONE_SURROGATE, "�");
+}
+
+function wellFormedExecution(execution: SandboxExecution): SandboxExecution {
+  const logs = execution.logs.map(wellFormed);
+  return execution.ok
+    ? { ...execution, logs, result: wellFormed(execution.result) }
+    : { ...execution, logs, error: wellFormed(execution.error) };
+}
+
 function describeError(execution: SandboxExecution, code: string): string {
   if (execution.ok) {
     return execution.result;
@@ -130,6 +146,8 @@ export interface ExecutionMessage {
 export function formatExecutionMessage(execution: SandboxExecution): ExecutionMessage;
 export function formatExecutionMessage(execution: SandboxExecution, code: string): ExecutionMessage;
 export function formatExecutionMessage(execution: SandboxExecution, code = ""): ExecutionMessage {
+  execution = wellFormedExecution(execution);
+  code = wellFormed(code);
   const sections: ExecutionSection[] = [
     { title: "Code", content: code.trim().length > 0 ? code : " " },
   ];
@@ -153,6 +171,8 @@ export function formatExecutionMessage(execution: SandboxExecution, code = ""): 
 
 /** Everything the sandbox returned, as plain text, for a message that could not hold it all. */
 export function formatExecutionDocument(execution: SandboxExecution, code: string): string {
+  execution = wellFormedExecution(execution);
+  code = wellFormed(code);
   const sections = [["Code", code]];
   if (execution.logs.length > 0) {
     sections.push(["Console", execution.logs.join("\n")]);
@@ -226,6 +246,7 @@ export function formatInlineExecutionPreview(execution: SandboxExecution): {
   title: string;
   description: string;
 } {
+  execution = wellFormedExecution(execution);
   const headline = execution.ok ? execution.result : execution.error;
   const titlePrefix = execution.ok ? "Result: " : "Error: ";
   const title = truncateText(oneLine(`${titlePrefix}${headline}`), INLINE_TITLE_LIMIT).value;
@@ -253,6 +274,8 @@ export function formatCompactExecution(
   execution: SandboxExecution,
   code: string,
 ): { title: string; text: string; parseMode: ParseMode } | undefined {
+  execution = wellFormedExecution(execution);
+  code = wellFormed(code);
   if (
     !execution.ok ||
     execution.logs.length > 0 ||
