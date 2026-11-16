@@ -193,6 +193,30 @@ describe("edited messages", () => {
     expect(harness.callsTo("sendMessage")).toHaveLength(1);
   });
 
+  test("answers an empty code fence with the usage hint and runs nothing", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("```\n```", 3);
+    await harness.sendMessage("   ", 4);
+
+    const texts = harness.callsTo("sendMessage").map((call) => call.payload.text);
+    expect(texts).toHaveLength(2);
+    for (const text of texts) {
+      expect(text).toContain("Send `/run 6 * 7`");
+      expect(text).not.toContain("undefined");
+    }
+  });
+
+  test("an edit that empties the code updates the answer to the usage hint", async () => {
+    const harness = createHarness();
+
+    await harness.sendMessage("6 * 7", 3);
+    await harness.editMessage("```\n```", 3);
+
+    expect(harness.callsTo("editMessageText")).toHaveLength(1);
+    expect(harness.callsTo("editMessageText")[0].payload.text).toContain("Send `/run 6 * 7`");
+  });
+
   test("ignores an edit that turns the message into a command", async () => {
     const harness = createHarness();
 

@@ -81,28 +81,24 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
       return;
     }
 
-    const inPrivate = ctx.chat.type === "private";
-
-    if (request.code.trim() === "") {
-      // Nothing to run, but a reply costs the chat a message all the same.
-      if (options.rateLimiter.consume(rateKey(ctx.from.id), options.rateLimitPolicy).allowed) {
-        await ctx.reply(USAGE, {
-          parse_mode: "MarkdownV2",
-          ...(inPrivate
-            ? {}
-            : { reply_parameters: { message_id: ctx.message.message_id, allow_sending_without_reply: true } }),
-        });
-      }
-      return;
-    }
-
-    if (inPrivate) {
+    if (ctx.chat.type === "private") {
       await answerer.send(ctx.api, {
         chatId: ctx.chat.id,
         userId: ctx.from.id,
         messageId: ctx.message.message_id,
         code: request.code,
       });
+      return;
+    }
+
+    if (request.code.trim() === "") {
+      // Nothing to run, but a reply costs the chat a message all the same.
+      if (options.rateLimiter.consume(rateKey(ctx.from.id), options.rateLimitPolicy).allowed) {
+        await ctx.reply(USAGE, {
+          parse_mode: "MarkdownV2",
+          reply_parameters: { message_id: ctx.message.message_id, allow_sending_without_reply: true },
+        });
+      }
       return;
     }
 

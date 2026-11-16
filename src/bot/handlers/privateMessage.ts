@@ -1,7 +1,7 @@
 import { GrammyError, type Api, type Bot } from "grammy";
 import type { ParseMode } from "grammy/types";
 
-import { createRunner, type RunnerOptions } from "../runner";
+import { rateKey, createRunner, type RunnerOptions } from "../runner";
 import { stripCodeFence } from "../codeInput";
 import { isBotCommand } from "../commands";
 import { ReplyTracker, type TrackedReply } from "../replyTracker";
@@ -54,7 +54,15 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
     return error instanceof GrammyError && /message is not modified/i.test(error.description);
   }
 
-  async function answerFor(request: PrivateRequest): Promise<Answer> {
+  async function answerFor(request: PrivateRequest): Promise<Answer | undefined> {
+    if (request.code.trim() === "") {
+      // Nothing to run, but a reply costs the chat a message all the same.
+      if (!options.rateLimiter.consume(rateKey(request.userId), options.rateLimitPolicy).allowed) {
+        return undefined;
+      }
+      return { text: USAGE, parseMode: "MarkdownV2", quote: false };
+    }
+
     const outcome = await runCode(request.userId, request.code);
 
     return {
@@ -123,6 +131,9 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
 
   async function run(api: Api, request: PrivateRequest, earlier: TrackedReply | undefined): Promise<void> {
     const answer = await answerFor(request);
+    if (!answer) {
+      return;
+    }
     const replyId = await deliver(api, request, answer, earlier);
     const documentId = await syncDocument(api, request.chatId, replyId, answer.document, earlier?.documentId);
 
