@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { inspect } from "node:util";
 import { InputFile } from "grammy";
 
 import { createHarness } from "./helpers/botHarness";
@@ -103,5 +104,25 @@ describe("output that does not fit in a message", () => {
     expect(harness.callsTo("sendMessage")).toHaveLength(1);
     expect(harness.callsTo("editMessageText")).toHaveLength(1);
     expect(harness.callsTo("deleteMessage")).toHaveLength(0);
+  });
+
+  test("logs why the file failed without logging the output in it", async () => {
+    const harness = createHarness({ failures: { sendDocument: "Bad Request: wrong file" } });
+    const logged: unknown[][] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args);
+    };
+
+    try {
+      await harness.sendMessage(LONG_OUTPUT, 7);
+    } finally {
+      console.error = original;
+    }
+
+    const written = inspect(logged, { depth: Infinity });
+    expect(written).toContain("Bad Request: wrong file");
+    expect(written).not.toContain("payload");
+    expect(written).not.toContain("<Buffer");
   });
 });

@@ -1,4 +1,4 @@
-import { InputFile, type Api } from "grammy";
+import { GrammyError, InputFile, type Api } from "grammy";
 
 /**
  * Sends everything a run printed as a text file, as a reply to the answer it
@@ -18,7 +18,12 @@ export async function sendWholeOutput(
     });
     return sent.message_id;
   } catch (error) {
-    console.error("Could not send the output file:", error);
+    // A GrammyError keeps the payload it was sent with, which is the whole output: log what failed, not the payload.
+    const reason =
+      error instanceof GrammyError
+        ? `${error.method} failed with ${error.error_code}: ${error.description}`
+        : String(error);
+    console.error(`Could not send the output file: ${reason}`);
     return undefined;
   }
 }
