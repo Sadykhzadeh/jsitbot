@@ -8,6 +8,8 @@ import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../src/security/rat
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 import { handleConcurrently } from "../src/bot/concurrency";
 import { ReplyTracker } from "../src/bot/replyTracker";
+import { registerStartHelpHandlers } from "../src/bot/handlers/startHelp";
+import { HELP_LIMITS } from "./helpers/botHarness";
 
 const BOT_ID = 999;
 type ReplyMessage = NonNullable<Message["reply_to_message"]>;
@@ -47,6 +49,7 @@ function createBotUnderTest(options: { maxRequests?: number; concurrency?: boole
     bot.use(concurrency);
   }
   const replies = new ReplyTracker();
+  registerStartHelpHandlers(bot, "jsitbot", HELP_LIMITS);
   registerRunCommandHandler(bot, { ...shared, botUsername: "jsitbot", replies });
   registerPrivateMessageHandler(bot, { ...shared, botUserId: BOT_ID, replies });
 
@@ -94,14 +97,17 @@ function createBotUnderTest(options: { maxRequests?: number; concurrency?: boole
       return id;
     },
 
-    async edit(text: string, editedId: number, userId = 42): Promise<void> {
+    async edit(text: string, editedId: number, userId = 42, chat: "group" | "private" = "private"): Promise<void> {
       await bot.handleUpdate({
         update_id: updateId++,
         edited_message: {
           message_id: editedId,
           date: 0,
           edit_date: 1,
-          chat: { id: userId, type: "private", first_name: "T" },
+          chat:
+            chat === "private"
+              ? { id: userId, type: "private", first_name: "T" }
+              : { id: GROUP_ID, type: "supergroup", title: "Chat" },
           from: { id: userId, is_bot: false, first_name: "T" },
           text,
         },
@@ -241,6 +247,41 @@ describe("running code in a group", () => {
     await chat.say(`/run ${"1".repeat(2_001)}`);
 
     expect(chat.sent()[0].text).toContain("exceeds the 2000-character limit");
+  });
+
+  test("answers /run addressed to its own name, as it answers /run", async () => {
+    const chat = createBotUnderTest();
+
+    await chat.say("/run@jsitbot 6 * 7");
+
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.sent()[0].text).toContain("42");
+  });
+
+  test("does not answer an edit of a command, since a group's messages are not re-run", async () => {
+    const chat = createBotUnderTest();
+
+    const id = await chat.say("/run 6 * 7");
+    await chat.edit("/run 7 * 7", id, 42, "group");
+    await chat.settle();
+
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.edits()).toHaveLength(0);
+  });
+
+  test("answers /help for this bot, and nothing that is meant for another bot", async () => {
+    const chat = createBotUnderTest();
+
+    // Telegram marks a command with a bot_command entity; grammY only reads commands that have one.
+    const command = (text: string) => ({ entities: [{ type: "bot_command" as const, offset: 0, length: text.length }] });
+
+    await chat.say("/help@other_bot", command("/help@other_bot"));
+    await chat.say("/start@other_bot", command("/start@other_bot"));
+    expect(chat.sent()).toHaveLength(0);
+
+    await chat.say("/help@jsitbot", command("/help@jsitbot"));
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.sent()[0].text).toContain("JS Sandbox Bot");
   });
 });
 
