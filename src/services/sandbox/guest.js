@@ -93,6 +93,23 @@
   const bigintValueOf = uncurry(BigInt.prototype.valueOf);
   const symbolValueOf = uncurry(Symbol.prototype.valueOf);
 
+  // The tag of an object whose prototype was taken away is only Object, though
+  // what it is still shows in its internal slots: each of these throws for
+  // anything else.
+  const mapSizeOf = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
+  const setSizeOf = uncurry(getOwnPropertyDescriptor(Set.prototype, "size").get);
+  const dateTimeOf = uncurry(Date.prototype.getTime);
+  const typedArrayNameOf = uncurry(getOwnPropertyDescriptor(getPrototypeOf(Uint8Array.prototype), Symbol.toStringTag).get);
+
+  function brandOf(value, tag) {
+    if (tag !== "[object Object]" || getPrototypeOf(value) !== null) return tag;
+    try { mapSizeOf(value); return "[object Map]"; } catch (ignored) {}
+    try { setSizeOf(value); return "[object Set]"; } catch (ignored) {}
+    try { dateTimeOf(value); return "[object Date]"; } catch (ignored) {}
+    const typed = typedArrayNameOf(value);
+    return typed === undefined ? tag : "[object " + typed + "]";
+  }
+
   const TYPED_ARRAYS = [
     "Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array",
     "Int32Array", "Uint32Array", "Float32Array", "Float64Array",
@@ -469,7 +486,8 @@
   // What comes before the items of a collection of a class that extends Array, Map or Set.
   function subclassPrefix(value, base, size) {
     const name = constructorName(value);
-    if (name === null || name === base) return base === "Array" ? "" : base + "(" + size + ") ";
+    if (name === null) return "[" + base + "(" + size + "): null prototype] ";
+    if (name === base) return base === "Array" ? "" : base + "(" + size + ") ";
     return name + "(" + size + ") " + (base === "Array" ? "" : "[" + base + "] ");
   }
 
@@ -526,7 +544,8 @@
       state.cut = true;
       parts[parts.length] = more(length - parts.length, "item", "items");
     }
-    return layout(reference(array, state) + name + "(" + length + ") ", "[", parts, "]", depth, ARRAY, true);
+    const prefix = getPrototypeOf(array) === null ? "[" + name + "(" + length + "): null prototype] " : name + "(" + length + ") ";
+    return layout(reference(array, state) + prefix, "[", parts, "]", depth, ARRAY, true);
   }
 
   // The first bytes of a buffer, then the length of it and what was added to it.
@@ -745,11 +764,12 @@
     if (prototype === arrayBufferPrototype) return depth > depthLimit ? "[ArrayBuffer]" : formatArrayBuffer(value, depth, state);
     if (prototype === dataViewPrototype) return depth > depthLimit ? "[DataView]" : formatDataView(value, depth, state);
 
-    const tag = objectToString(value);
+    const tag = brandOf(value, objectToString(value));
 
     if (tag === "[object Date]") {
       let text = "Invalid Date";
       try { text = dateToISOString(value); } catch (ignored) {}
+      if (getPrototypeOf(value) === null) text = "[Date: null prototype] " + text;
       return withProperties(text, value, depth, state);
     }
     if (tag === "[object RegExp]") return withProperties(regExpToString(value), value, depth, state);
@@ -769,6 +789,7 @@
     const label = name === null ? "[Object: null prototype]" : name;
 
     if (depth > depthLimit) {
+      if (name === null) return "[" + (isArray(value) ? "Array" : stringSlice(tag, 8, tag.length - 1)) + ": null prototype]";
       return "[" + (isArray(value) ? "Array" : label) + "]";
     }
 
