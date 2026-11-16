@@ -371,6 +371,13 @@ describe("console.log format specifiers", () => {
       `),
     ).toEqual(["{ a: 1 } Symbol(s) -0", "NaN NaN NaN NaN", "[Circular]"]);
   });
+
+  test("%d, %i and %f turn an object into a number when it can be one, as Node does", async () => {
+    expect(await logs(`console.log("%d|%i|%f", new Date(0), [1, 2], [7]); console.log("%i %d %f", {}, "x", "3.5z")`)).toEqual([
+      "0|1|7",
+      "NaN NaN 3.5",
+    ]);
+  });
 });
 
 describe("console methods", () => {
