@@ -15,6 +15,7 @@ describe("loadEnv", () => {
 
   test("ignores whitespace around the token", () => {
     expect(loadEnv({ BOT_TOKEN: `  ${TOKEN}\n` }).botToken).toBe(TOKEN);
+    expect(loadEnv({ BOT_TOKEN: `${TOKEN}\r\n` }).botToken).toBe(TOKEN);
   });
 
   test("names the variable when the token is missing or empty", () => {
