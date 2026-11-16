@@ -59,7 +59,7 @@ Deliberate differences, with the reason:
 Known gaps, not fixed yet:
 
 - `%o` does not show the hidden properties of typed arrays and errors, such as `[BYTES_PER_ELEMENT]` or `[stack]`.
-- Properties added to a typed array longer than 100,000 items are not shown: listing its keys would make one for each item. Shorter ones show them, though past 100 items they are counted as "more properties" where Node lists them.
+- Properties added to a typed array longer than 100,000 items are not shown: listing its keys would make one for each item. Shorter ones show them after the items, as Node does.
 - A `%s` with an object whose `toString` throws is shown as the object, where Node stops the whole call. A test pins this, so it stays until it is decided.
 
 ## Security

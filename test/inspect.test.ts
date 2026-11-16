@@ -126,6 +126,13 @@ describe("result formatting", () => {
       "}",
     ].join("\n")],
     ["more than a hundred items are summarised", `Array.from({ length: 120 }, (_, i) => i)`, "... 20 more items"],
+    ["properties of a long typed array are listed after its more items line", `Object.assign(new Uint8Array(101), { tag: "x" })`, [
+      "Uint8Array(101) [",
+      ...Array.from({ length: 25 }, () => "  0,               0, 0, 0,"),
+      "  ... 1 more item,",
+      "  tag: 'x'",
+      "]",
+    ].join("\n")],
     ["the match of a regular expression keeps its index and input", `/(\\d)/.exec("a1")`, "[ '1', '1', index: 1, input: 'a1', groups: undefined ]"],
     ["properties added to a function", `function f() {} f.calls = 2; f`, "[Function: f] { calls: 2 }"],
     ["properties added to a class", `class A { static count = 1 } A`, "[class A] { count: 1 }"],

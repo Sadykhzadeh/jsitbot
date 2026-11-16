@@ -556,7 +556,7 @@
     }
     // Listing the own keys of a typed array makes one key for each item, so
     // the properties added to a long one are not shown.
-    if (length <= MAX_TYPED_KEYS) addProperties(array, parts, depth, state, true);
+    if (length <= MAX_TYPED_KEYS) addProperties(array, parts, depth, state, true, false, true);
     if (parts.length === 0) currentDepth = before;
     let numeric = true;
     for (let i = 0; numeric && i < parts.length; i++) {
@@ -691,7 +691,7 @@
   // Adds "key: value" for each enumerable own property to parts, and says how
   // many it left out for want of room. Indexes are skipped for the objects that
   // list their items on their own.
-  function addProperties(object, parts, depth, state, skipIndexes, skipErrorFields) {
+  function addProperties(object, parts, depth, state, skipIndexes, skipErrorFields, uncapped) {
     const names = getOwnPropertyNames(object);
     const symbols = getOwnPropertySymbols(object);
     let seen = 0;
@@ -704,7 +704,7 @@
         if (hidden && !showHidden) continue;
         if (skipIndexes && pass === 0 && isIndexKey(key)) continue;
         if (skipErrorFields && pass === 0 && (key === "name" || key === "message" || key === "stack")) continue;
-        if (parts.length >= MAX_ENTRIES || state.left <= 0) {
+        if ((parts.length >= MAX_ENTRIES && !uncapped) || state.left <= 0) {
           seen++;
           continue;
         }
