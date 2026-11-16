@@ -145,6 +145,20 @@ describe("result formatting", () => {
     ["a function that holds itself", `const f = () => {}; f.self = f; f`, "<ref *1> [Function: f] { self: [Circular *1] }"],
   ];
 
+  test("properties of a long array are listed after its more items line, as Node does", async () => {
+    const long = await show(`Object.assign(Array.from({ length: 150 }, (_, i) => i), { tag: "x" })`);
+    expect(long).toContain("96, 97, 98, 99,\n  ... 50 more items,\n  tag: 'x'\n]");
+    const hundred = await show(`Object.assign(Array.from({ length: 100 }, (_, i) => i), { tag: "x" })`);
+    expect(hundred).toContain("\n  96, 97, 98, 99,\n  tag: 'x'\n]");
+    const hundredAndOne = await show(`Object.assign(Array.from({ length: 101 }, (_, i) => i), { tag: "x" })`);
+    expect(hundredAndOne).toContain("\n  96,              97, 98, 99,\n  ... 1 more item,\n  tag: 'x'\n]");
+    const subclass = await show(`class Stack extends Array {} const s = Stack.from(Array.from({ length: 105 }, (_, i) => i)); s.tag = 1; s`);
+    expect(subclass).toContain("\n  ... 5 more items,\n  tag: 1\n]");
+    const sparse = await show(`const a = [1, , 3]; a[200] = 9; a.tag = "s"; a`);
+    expect(sparse).toBe("[ 1, <1 empty item>, 3, <197 empty items>, 9, tag: 's' ]");
+    for (const text of [long, hundredAndOne, subclass]) expect(text).not.toContain("more propert");
+  });
+
   for (const [name, code, expected] of cases) {
     test(name, async () => {
       const text = await show(code);

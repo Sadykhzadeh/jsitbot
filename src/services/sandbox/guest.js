@@ -538,7 +538,7 @@
       state.cut = true;
       parts[parts.length] = more(length - index, "item", "items");
     }
-    addProperties(array, parts, depth, state, true);
+    addProperties(array, parts, depth, state, true, false, true);
     if (parts.length === 0) currentDepth = before;
 
     let numeric = true;
