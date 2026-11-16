@@ -709,10 +709,10 @@
 
   // Text that stands for the whole value, followed by the properties that were
   // added to it, as in `[Function: f] { calls: 2 }`.
-  function withProperties(text, object, depth, state) {
+  function withProperties(text, object, depth, state, skipIndexes) {
     const parts = [];
     const before = enter(depth);
-    addProperties(object, parts, depth, state, false);
+    addProperties(object, parts, depth, state, skipIndexes);
     if (parts.length === 0) currentDepth = before;
     return parts.length === 0 ? text : layout(reference(object, state) + text + " ", "{", parts, "}", depth, BASE);
   }
@@ -774,11 +774,11 @@
     }
     if (tag === "[object RegExp]") return withProperties(regExpToString(value), value, depth, state);
     if (tag === "[object Error]" || tag === "[object DOMException]") return formatError(value, depth, state);
-    if (tag === "[object Number]") return "[Number: " + formatNumber(numberValueOf(value)) + "]";
-    if (tag === "[object String]") return "[String: " + quote(stringValueOf(value), state) + "]";
-    if (tag === "[object Boolean]") return "[Boolean: " + booleanValueOf(value) + "]";
-    if (tag === "[object BigInt]") return "[BigInt: " + bigintToString(bigintValueOf(value)) + "n]";
-    if (tag === "[object Symbol]") return "[Symbol: " + symbolToString(symbolValueOf(value)) + "]";
+    if (tag === "[object Number]") return withProperties("[Number: " + formatNumber(numberValueOf(value)) + "]", value, depth, state);
+    if (tag === "[object String]") return withProperties("[String: " + quote(stringValueOf(value), state) + "]", value, depth, state, true);
+    if (tag === "[object Boolean]") return withProperties("[Boolean: " + booleanValueOf(value) + "]", value, depth, state);
+    if (tag === "[object BigInt]") return withProperties("[BigInt: " + bigintToString(bigintValueOf(value)) + "n]", value, depth, state);
+    if (tag === "[object Symbol]") return withProperties("[Symbol: " + symbolToString(symbolValueOf(value)) + "]", value, depth, state);
     if (tag === "[object Promise]") return formatPromise(value, depth, state);
     if (tag === "[object WeakMap]") return "WeakMap { <items unknown> }";
     if (tag === "[object WeakSet]") return "WeakSet { <items unknown> }";

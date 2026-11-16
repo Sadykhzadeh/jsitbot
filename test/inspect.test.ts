@@ -54,6 +54,7 @@ describe("result formatting", () => {
     ["an array buffer too deep is named only", `({ a: { b: { c: { d: new ArrayBuffer(2) } } } })`, "{\n  a: { b: { c: { d: [ArrayBuffer] } } }\n}"],
     ["a data view and the bytes it looks at", `new DataView(new ArrayBuffer(4), 1, 2)`, "DataView {\n  [byteLength]: 2,\n  [byteOffset]: 1,\n  [buffer]: ArrayBuffer { [Uint8Contents]: <00 00 00 00>, [byteLength]: 4 }\n}"],
     ["boxed primitives", `[new Number(3), new String("s"), new Boolean(false)]`, "[ [Number: 3], [String: 's'], [Boolean: false] ]"],
+    ["boxed primitives with properties of their own", `[Object.assign(new Number(3), { a: 1 }), Object.assign(new String("ab"), { b: 2 })]`, "[ [Number: 3] { a: 1 }, [String: 'ab'] { b: 2 } ]"],
     ["the iterators of a map and a set, whose items cannot be read without taking them", `[new Map([[1, 2]]).entries(), new Map().keys(), new Set([1]).values(), new Set([1]).entries()]`, "[\n  [Map Iterator] { <items unknown> },\n  [Map Iterator] { <items unknown> },\n  [Set Iterator] { <items unknown> },\n  [Set Iterator] { <items unknown> }\n]"],
     ["the other iterators hold no items to show", `[[][Symbol.iterator](), [1].entries(), "ab"[Symbol.iterator](), "a".matchAll(/a/g)]`, "[\n  Object [Array Iterator] {},\n  Object [Array Iterator] {},\n  Object [String Iterator] {},\n  Object [RegExp String Iterator] {}\n]"],
     ["weak collections", `[new WeakMap(), new WeakSet()]`, "[ WeakMap { <items unknown> }, WeakSet { <items unknown> } ]"],
