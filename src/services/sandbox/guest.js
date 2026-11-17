@@ -1620,21 +1620,31 @@
 
   // Node's second argument is options for the inspector, not another value to print.
   // Its depth, when it has one, is how far down objects are shown.
+  // Node reads the depth as a number: null is no limit, and so is anything that
+  // is not a number, since a comparison with it is never true; a negative depth
+  // cuts the top level. showHidden shows the non-enumerable properties, for this call.
   function dir(value, options) {
     let depth = MAX_DEPTH;
+    let hidden = false;
     try {
-      if (typeof options === "object" && options !== null && options.depth !== undefined) {
-        const asked = options.depth;
-        depth = asked === null || asked === Infinity ? MAX_NESTING : typeof asked === "number" && asked >= 0 ? asked : MAX_DEPTH;
+      if (typeof options === "object" && options !== null) {
+        if (options.depth !== undefined) {
+          const asked = options.depth === null ? Infinity : toNumber(options.depth);
+          depth = asked === asked ? asked : Infinity;
+        }
+        hidden = !!options.showHidden;
       }
     } catch (ignored) {}
 
+    const hiddenBefore = showHidden;
     depthLimit = depth < MAX_NESTING ? depth : MAX_NESTING;
+    showHidden = hidden;
     quoteStrings = true;
     try {
       write(value);
     } finally {
       depthLimit = MAX_DEPTH;
+      showHidden = hiddenBefore;
       quoteStrings = false;
     }
   }

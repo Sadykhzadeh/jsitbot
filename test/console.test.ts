@@ -241,11 +241,43 @@ describe("console.dir depth", () => {
     expect(await logs(`console.dir(${nested}, { depth: null })`)).toEqual(["{\n  a: {\n    b: {\n      c: { d: { e: { f: 1 } } }\n    }\n  }\n}"]);
   });
 
+  test("a depth that is not a number is no limit, and a negative one cuts the top level, as Node does", async () => {
+    expect(await logs(`console.dir({ a: { b: { c: { d: { e: 1 } } } } }, { depth: NaN })`)).toEqual([
+      "{\n  a: {\n    b: { c: { d: { e: 1 } } }\n  }\n}",
+    ]);
+    expect(await logs(`console.dir({ a: { b: { c: { d: { e: 1 } } } } }, { depth: "x" })`)).toEqual([
+      "{\n  a: {\n    b: { c: { d: { e: 1 } } }\n  }\n}",
+    ]);
+    expect(await logs(`console.dir(${nested}, { depth: -1 })`)).toEqual(["[Object]"]);
+  });
+
+  test("a fraction of a depth counts levels as Node does", async () => {
+    expect(await logs(`console.dir(${nested}, { depth: 1.5 })`)).toEqual(["{ a: { b: [Object] } }"]);
+  });
+
   test("the depth belongs to that call only", async () => {
     const [first, second] = await logs(`console.dir(${nested}, { depth: 1 }); console.log(${nested})`);
 
     expect(first).toBe("{ a: { b: [Object] } }");
     expect(second).toBe("{\n  a: { b: { c: { d: [Object] } } }\n}");
+  });
+});
+
+describe("console.dir showHidden", () => {
+  test("shows the non-enumerable properties in brackets, as Node does", async () => {
+    expect(await logs(`console.dir(Object.defineProperty({}, "h", { value: 1 }), { showHidden: true })`)).toEqual(["{ [h]: 1 }"]);
+    expect(await logs(`console.dir([1, 2], { showHidden: true })`)).toEqual(["[ 1, 2, [length]: 2 ]"]);
+    expect(await logs(`console.dir(Object.assign([1], { tag: "t" }), { showHidden: true })`)).toEqual(["[ 1, [length]: 1, tag: 't' ]"]);
+  });
+
+  test("shows the hidden fields of a typed array after its items", async () => {
+    expect(await logs(`console.dir(new Uint8Array([1]), { showHidden: true })`)).toEqual([
+      "Uint8Array(1) [\n  1,\n  [BYTES_PER_ELEMENT]: 1,\n  [length]: 1,\n  [byteLength]: 1,\n  [byteOffset]: 0,\n  [buffer]: ArrayBuffer { [byteLength]: 1 }\n]",
+    ]);
+  });
+
+  test("applies to that call only", async () => {
+    expect(await logs(`console.dir([1], { showHidden: true }); console.log([1])`)).toEqual(["[ 1, [length]: 1 ]", "[ 1 ]"]);
   });
 });
 
