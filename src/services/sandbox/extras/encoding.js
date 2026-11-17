@@ -1,14 +1,31 @@
 // TextEncoder, TextDecoder, atob and btoa, for the guest. Evaluated the first
 // time the code asks for one of them; see lazyGlobals in guest.js.
-(function () {
+(function (register, seed, host) {
   "use strict";
 
   const REPLACEMENT = 0xfffd;
 
-  function domError(name, message) {
-    const error = new Error(message);
-    error.name = name;
+  // An error of the kind Node throws, with the code it sets on it.
+  function nodeError(Type, code, message) {
+    const error = new Type(message);
+    error.code = code;
     return error;
+  }
+
+  function argumentError(name, expected, value) {
+    let received;
+    if (value === undefined || value === null) {
+      received = "Received " + value;
+    } else if (typeof value === "object" || typeof value === "function") {
+      received = "Received an instance of " + (value.constructor && value.constructor.name ? value.constructor.name : "Object");
+    } else {
+      received = "Received type " + typeof value + " (" + String(value) + ")";
+    }
+    return nodeError(TypeError, "ERR_INVALID_ARG_TYPE", 'The "' + name + '" argument must be ' + expected + ". " + received);
+  }
+
+  function domError(message) {
+    return new (host.extra("events").DOMException)(message, "InvalidCharacterError");
   }
 
   // The UTF-8 bytes of a string, as many as fit in `limit` when it is given.
@@ -59,6 +76,10 @@
       return "utf-8";
     }
 
+    get [Symbol.toStringTag]() {
+      return "TextEncoder";
+    }
+
     encode(input = "") {
       const text = String(input);
       const bytes = new Uint8Array(text.length * 3);
@@ -68,6 +89,9 @@
     }
 
     encodeInto(source, destination) {
+      if (!(destination instanceof Uint8Array)) {
+        throw argumentError("dest", "an instance of Uint8Array", destination);
+      }
       return encode(String(source), destination, destination.length);
     }
   }
@@ -80,7 +104,11 @@
     if (ArrayBuffer.isView(input)) {
       return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
     }
-    throw new TypeError("The input must be an ArrayBuffer or a view of one");
+    throw nodeError(
+      TypeError,
+      "ERR_INVALID_ARG_TYPE",
+      'The "list" argument must be an instance of SharedArrayBuffer, ArrayBuffer or ArrayBufferView.',
+    );
   }
 
   // The decoder of the Encoding Standard: an invalid sequence gives one U+FFFD
@@ -99,7 +127,7 @@
     }
 
     function invalid() {
-      if (fatal) throw new TypeError("The encoded data was not valid for encoding " + label);
+      if (fatal) throw nodeError(TypeError, "ERR_ENCODING_INVALID_ENCODED_DATA", "The encoded data was not valid for encoding " + label);
       units.push(REPLACEMENT);
     }
 
@@ -167,20 +195,22 @@
 
   // UTF-16 little endian. A lone surrogate is an error, and so is a last byte
   // without its pair; with `stream` they are kept for the next chunk instead.
-  function decodeUtf16(bytes, fatal, dropBom, stream) {
+  function decodeUtf16(bytes, fatal, dropBom, stream, label, bigEndian) {
     const units = [];
     let i = 0;
     let rest = null;
 
     function invalid() {
-      if (fatal) throw new TypeError("The encoded data was not valid for encoding utf-16le");
+      if (fatal) throw nodeError(TypeError, "ERR_ENCODING_INVALID_ENCODED_DATA", "The encoded data was not valid for encoding " + label);
       units.push(REPLACEMENT);
     }
 
-    if (dropBom && bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) i = 2;
+    const at = (index) => (bigEndian ? (bytes[index] << 8) | bytes[index + 1] : bytes[index] | (bytes[index + 1] << 8));
+    const bom = bigEndian ? [0xfe, 0xff] : [0xff, 0xfe];
+    if (dropBom && bytes.length >= 2 && bytes[0] === bom[0] && bytes[1] === bom[1]) i = 2;
 
     while (i + 1 < bytes.length) {
-      const unit = bytes[i] | (bytes[i + 1] << 8);
+      const unit = at(i);
       if (unit >= 0xd800 && unit <= 0xdbff) {
         if (i + 3 >= bytes.length) {
           if (stream) {
@@ -191,7 +221,7 @@
           invalid();
           continue;
         }
-        const next = bytes[i + 2] | (bytes[i + 3] << 8);
+        const next = at(i + 2);
         if (next >= 0xdc00 && next <= 0xdfff) {
           units.push(unit, next);
           i += 4;
@@ -241,6 +271,7 @@
   // The labels of the Encoding Standard for the encodings that are there.
   const LABELS = {
     "utf-8": ["unicode-1-1-utf-8", "unicode11utf8", "unicode20utf8", "utf-8", "utf8", "x-unicode20utf8"],
+    "utf-16be": ["unicodefffe", "utf-16be"],
     "utf-16le": ["csunicode", "iso-10646-ucs-2", "ucs-2", "unicode", "unicodefeff", "utf-16", "utf-16le"],
     "windows-1252": [
       "ansi_x3.4-1968", "ascii", "cp1252", "cp819", "csisolatin1", "ibm819", "iso-8859-1", "iso-ir-100", "iso8859-1",
@@ -253,7 +284,7 @@
     for (const encoding in LABELS) {
       if (LABELS[encoding].indexOf(name) !== -1) return encoding;
     }
-    throw new RangeError('The "' + label + '" encoding is not supported');
+    throw nodeError(RangeError, "ERR_ENCODING_NOT_SUPPORTED", 'The "' + label + '" encoding is not supported');
   }
 
   class TextDecoder {
@@ -265,8 +296,15 @@
 
     constructor(label = "utf-8", options = {}) {
       this.#encoding = encodingOf(label);
+      if (options !== null && typeof options !== "object" && typeof options !== "function") {
+        throw argumentError("options", "of type object", options);
+      }
       this.#fatal = Boolean(options && options.fatal);
       this.#ignoreBOM = Boolean(options && options.ignoreBOM);
+    }
+
+    get [Symbol.toStringTag]() {
+      return "TextDecoder";
     }
 
     get encoding() {
@@ -295,8 +333,8 @@
       try {
         const dropBom = !this.#ignoreBOM && !this.#started;
         result =
-          this.#encoding === "utf-16le"
-            ? decodeUtf16(bytes, this.#fatal, dropBom, stream)
+          this.#encoding === "utf-16le" || this.#encoding === "utf-16be"
+            ? decodeUtf16(bytes, this.#fatal, dropBom, stream, this.#encoding, this.#encoding === "utf-16be")
             : this.#encoding === "windows-1252"
               ? decodeWindows1252(bytes)
               : decode(bytes, this.#fatal, dropBom, stream);
@@ -316,8 +354,8 @@
   const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
   function btoa(input) {
-    if (arguments.length === 0) throw new TypeError("The string argument is required");
-    const text = String(input);
+    if (arguments.length === 0) throw nodeError(TypeError, "ERR_MISSING_ARGS", 'The "input" argument must be specified');
+    const text = `${input}`;
     let out = "";
 
     for (let i = 0; i < text.length; i += 3) {
@@ -325,7 +363,7 @@
       const b = i + 1 < text.length ? text.charCodeAt(i + 1) : -1;
       const c = i + 2 < text.length ? text.charCodeAt(i + 2) : -1;
       if (a > 255 || b > 255 || c > 255) {
-        throw domError("InvalidCharacterError", "Invalid character");
+        throw domError("Invalid character");
       }
 
       out += ALPHABET[a >> 2];
@@ -338,11 +376,12 @@
   }
 
   function atob(input) {
-    if (arguments.length === 0) throw new TypeError("The string argument is required");
-    let text = String(input).replace(/[\t\n\f\r ]+/g, "");
+    if (arguments.length === 0) throw nodeError(TypeError, "ERR_MISSING_ARGS", 'The "input" argument must be specified');
+    let text = `${input}`.replace(/[\t\n\f\r ]+/g, "");
     if (text.length % 4 === 0) text = text.replace(/==?$/, "");
-    if (text.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(text)) {
-      throw domError("InvalidCharacterError", "The string to be decoded is not correctly encoded.");
+    if (/[^A-Za-z0-9+/]/.test(text)) throw domError("Invalid character");
+    if (text.length % 4 === 1) {
+      throw domError("The string to be decoded is not correctly encoded.");
     }
 
     let out = "";

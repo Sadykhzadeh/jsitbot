@@ -48,6 +48,6 @@ describe("TextDecoder with UTF-16 and the single-byte Western encoding", () => {
 
   test("still refuses an encoding it has not got", async () => {
     expect(await value(`return new TextDecoder("shift_jis")`)).toBe('error: RangeError: The "shift_jis" encoding is not supported');
-    expect(await value(`return new TextDecoder("utf-16be")`)).toBe('error: RangeError: The "utf-16be" encoding is not supported');
+    expect(await value(`return new TextDecoder("utf-32")`)).toBe('error: RangeError: The "utf-32" encoding is not supported');
   });
 });

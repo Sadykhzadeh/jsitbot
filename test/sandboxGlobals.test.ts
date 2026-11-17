@@ -274,7 +274,7 @@ describe("atob and btoa", () => {
   });
 
   test("refuse what is not Latin-1 or not base64, with the error name a browser uses", async () => {
-    expect(await value(`btoa("€")`)).toBe("error: InvalidCharacterError: Invalid character");
+    expect(await value(`btoa("€")`)).toBe("error: DOMException [InvalidCharacterError]: Invalid character");
     expect(await value(`atob("a")`)).toContain("InvalidCharacterError");
     expect(await value(`atob("ab$d")`)).toContain("InvalidCharacterError");
     expect(await value(`atob("YQ=")`)).toContain("InvalidCharacterError");
