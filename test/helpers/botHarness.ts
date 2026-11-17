@@ -5,6 +5,8 @@ import { handleConcurrently, type ConcurrencyPolicy } from "../../src/bot/concur
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../../src/security/rateLimiter";
 import { registerInlineQueryHandler } from "../../src/bot/handlers/inlineQuery";
 import { registerPrivateMessageHandler } from "../../src/bot/handlers/privateMessage";
+import { registerRunCommandHandler } from "../../src/bot/handlers/runCommand";
+import { ReplyTracker } from "../../src/bot/replyTracker";
 import { QuickJsSandboxService } from "../../src/services/sandbox/quickjsSandbox";
 import type { SandboxService } from "../../src/services/sandbox/types";
 
@@ -36,6 +38,8 @@ export interface HarnessOptions {
   failures?: Record<string, string>;
   /** The error code a failing method answers with; 400 when it is not named here. */
   failureCodes?: Record<string, number>;
+  /** Also registers the /run handler, ahead of the private one as the bot does, so group messages get answers. */
+  runCommand?: boolean;
   /** Telegram refuses a reply to a message that was deleted, unless the reply allows being sent without one. */
   deletedReplyTargets?: boolean;
 }
@@ -125,8 +129,22 @@ export function createHarness(options: HarnessOptions = {}) {
   const timeBudget = new SandboxTimeBudget();
   const timeBudgetPolicy = { windowMs: 10_000, maxMs: options.maxSandboxMs ?? 10_000_000 };
 
+  const replies = new ReplyTracker();
+  if (options.runCommand) {
+    registerRunCommandHandler(bot, {
+      botUsername: "jsitbot",
+      replies,
+      sandbox,
+      rateLimiter,
+      rateLimitPolicy,
+      timeBudget,
+      timeBudgetPolicy,
+      maxCodeLength: 2_000,
+    });
+  }
   registerPrivateMessageHandler(bot, {
     botUserId: BOT_ID,
+    replies,
     sandbox,
     rateLimiter,
     rateLimitPolicy,
