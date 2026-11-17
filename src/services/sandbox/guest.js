@@ -439,6 +439,8 @@
         for (const nothing of [" of undefined", " of null"]) {
           if (endsWith(message, "'" + nothing)) {
             const key = stringSlice(message, head.length, message.length - nothing.length - 1);
+            // Spread, for-of and array destructuring read the iterator of a value, and Node says what is not iterable.
+            if (read && key === "Symbol.iterator") return stringSlice(nothing, 4) + " is not iterable";
             return (read ? "Cannot read properties" : "Cannot set properties") + nothing + (read ? " (reading '" : " (setting '") + key + "')";
           }
         }
