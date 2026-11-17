@@ -1693,6 +1693,7 @@
     queueMicrotask,
     defineProperty,
     Proxy,
+    WeakRef,
     rememberProxy(proxy, target) {
       proxiesMade = true;
       weakMapSet(proxyTargets, proxy, target);
@@ -1902,6 +1903,7 @@
   lazyGlobals("crypto", ["crypto"]);
   lazyGlobals("intl", ["Intl"]);
   lazyGlobals("events", ["DOMException", "Event", "CustomEvent", "EventTarget", "AbortController", "AbortSignal"]);
+  lazyGlobals("weakref", ["WeakRef"]);
   lazyMethods("bytes", [
     [Uint8Array, "fromBase64", 1],
     [Uint8Array, "fromHex", 1],

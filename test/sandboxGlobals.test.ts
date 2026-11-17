@@ -496,3 +496,18 @@ describe("Error.captureStackTrace", () => {
     expect(await value(`Error.captureStackTrace(5)`)).toBe("error: TypeError: Invalid argument");
   });
 });
+
+describe("WeakRef", () => {
+  test("keeps the target it was made with for the run, as Node does", async () => {
+    expect(
+      await value(`
+        const o = {};
+        const w = new WeakRef(o);
+        const fresh = typeof new WeakRef({}).deref();
+        class W extends WeakRef {}
+        const sub = new W({ x: 1 }).deref().x;
+        return [w.deref() === o, fresh, sub, Object.prototype.toString.call(w), w instanceof WeakRef, WeakRef.name, WeakRef.length].join("|");
+      `),
+    ).toBe("true|object|1|[object WeakRef]|true|WeakRef|1");
+  });
+});
