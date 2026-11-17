@@ -18,6 +18,7 @@ describe("a runtime error reports its line in the code the user wrote", () => {
     ["after tabs", "const a: number = 1;\n\tconst b: number = a;\n\n\tnull.name", 4],
     ["with CRLF line ends", "const a: number = 1;\r\ninterface N {}\r\nnull.name", 3],
     ["after an enum, which the transpiler expands", "enum E { A }\nconst v: number = 2;\nnull.name", 3],
+    ["in a snippet that returns at its top level", "const n: number = await Promise.resolve(2);\nconst o: { q?: { z: number } } = {};\nreturn o.q.z + n;", 3],
     ["after a surrogate pair", "const s: string = '\u{1F600}';\ninterface X {}\nnull.name", 3],
     ["after a combining mark", "const s: string = 'é';\ninterface X {}\nnull.name", 3],
   ];

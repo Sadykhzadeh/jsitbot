@@ -100,24 +100,30 @@ export function stripTypes(code: string): Stripped | undefined {
  * only for an error, so the cost is paid rarely.
  */
 export function sourceLine(code: string, outputLine: number): number | undefined {
+  // A function body is printed between its opening line and its closing one,
+  // so the first output line is the opening and is not counted.
   const wrapped = needsFunctionBody(code);
+  const target = outputLine - (wrapped ? 1 : 0);
+  if (target < 1) {
+    return undefined;
+  }
+
   const lines = code.split("\n");
   let before = { source: 0, output: 0 };
 
   for (let source = 1; source <= lines.length; source++) {
-    const text = transpilePrefix(lines.slice(0, source).join("\n"), wrapped);
-    if (text === undefined) {
+    const output = transpilePrefix(lines.slice(0, source).join("\n"), wrapped);
+    if (output === undefined) {
       continue;
     }
 
-    const output = outputLines(text);
-    if (output.length >= outputLine) {
+    if (output.length >= target) {
       const stretch = lines.slice(before.source, source);
       if (stretch.length === output.length - before.output) {
-        return before.source + (outputLine - before.output);
+        return before.source + (target - before.output);
       }
 
-      return matchingLine(stretch, before.source + 1, output[outputLine - 1]);
+      return matchingLine(stretch, before.source + 1, output[target - 1]);
     }
     before = { source, output: output.length };
   }
@@ -164,9 +170,12 @@ function needsFunctionBody(code: string): boolean {
   }
 }
 
-function transpilePrefix(prefix: string, wrapped: boolean): string | undefined {
+/** The lines a prefix of the code is transpiled to, without the lines of its function wrapper. */
+function transpilePrefix(prefix: string, wrapped: boolean): string[] | undefined {
   try {
-    return transform(wrapped ? `(async () => {${prefix}\n})()` : prefix);
+    const lines = outputLines(transform(wrapped ? `(async () => {${prefix}\n})()` : prefix));
+
+    return wrapped ? lines.slice(1, -1) : lines;
   } catch {
     return undefined;
   }
