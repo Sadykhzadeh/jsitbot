@@ -36,6 +36,20 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Besides `console.log` and friends it has `console.table`, `assert`, `count`, `group` and `time`
 - Reports the line an error came from, and for a syntax error shows that line with a caret under the column (a line longer than 80 characters is cut around the column). When an error is printed, reading or writing a property of `undefined` or `null`, a name that is not defined, a variable used before its `let`, a symbol turned into a string or number, `reduce` of an empty array and an invalid array length are worded as Node words them (`Cannot read properties of undefined (reading 'x')`); `error.message` itself keeps the engine's wording, as do the other errors
 
+## TypeScript
+
+A snippet that does not run as JavaScript is read as TypeScript, and its types are removed before it runs. Code that runs as JavaScript is never changed. Types are not checked: `const n: number = "a"` runs and gives `a`.
+
+Supported, with the same meaning as in `tsc`:
+
+- Annotations, `interface`, `type`, generics on functions, classes and calls, `as`, `satisfies`, `!`, `let x!: T`, optional parameters, overload signatures, `declare`, `abstract` classes and members, index signatures, `unique symbol`, `asserts`, `infer`, template literal types, `this` parameters, `implements`, `override` and `readonly`, `<T,>(x: T) => x` and `<number>value`
+- `enum` (regular, `const`, string and computed members, reverse mapping), `namespace` with exported members, and parameter properties such as `constructor(private x: number)`
+
+Not supported, and refused with one line:
+
+- Decorators, `accessor` and `using` (`decorators, accessor and using are not supported`)
+- `import type` and `export type`, which get the same hint as `import` and `export`
+
 ## How Output Compares With Node
 
 Measured with `bun run compat` against Node 26.13.0: 397 snippets in `scripts/node-diff/corpus`, run once by Node with `console.log` and once by the sandbox, both at a depth of 3 (what the sandbox shows; Node's own default is 2). 390 match exactly (98.2%). The corpus covers the inspect and console test inputs, hand-picked containers, errors and iterators, generated runs of line width, grouping, nesting and numbers, template literals, JSON, dates, null-prototype objects, generators, classes, proxies, reflection, weak references, namespaces, functions and the console forms. To reproduce it, see [Running the comparison](#running-the-comparison).

@@ -364,6 +364,8 @@ describe("import and export", () => {
       'import "side-effect"',
       "const a = 1\nexport default a",
       "export function f() {}",
+      'import type { A } from "a";\nconst b: A = 1;\nb',
+      "const a: number = 1;\nexport type T = number;\na",
     ]) {
       const message = formatExecutionMessage(await sandbox.execute(code), code);
 

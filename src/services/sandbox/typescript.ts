@@ -1,6 +1,7 @@
 export type Stripped =
   | { code: string }
-  | { error: { message: string; line: number } };
+  | { error: { message: string; line: number } }
+  | { refusal: { message: string } };
 
 let transpiler: Bun.Transpiler | undefined;
 
@@ -18,6 +19,15 @@ function transform(source: string): string {
   return transpiler.transformSync(source);
 }
 
+// Where the transpiler puts a helper it needs for these. The helpers are
+// imported from a module the script does not have, so they are refused.
+const NEEDS_HELPERS = 'from "bun:wrap"';
+const HELPERS_REFUSAL = "SyntaxError: decorators, accessor and using are not supported";
+
+// An import or an export that only exists for types is erased by the
+// transpiler, so the code would run. It is refused as the module statement it is.
+const TYPE_ONLY_MODULE = /^[ \t]*(import|export)[ \t]+type\b/m;
+
 /**
  * Removes TypeScript syntax (annotations, interfaces, generics, enums...) and
  * returns plain JavaScript. If the code is not valid TypeScript either, says
@@ -28,6 +38,20 @@ function transform(source: string): string {
  * the user wants back.
  */
 export function stripTypes(code: string): Stripped | undefined {
+  const moduleStatement = TYPE_ONLY_MODULE.exec(code);
+  if (moduleStatement) {
+    return { refusal: { message: `SyntaxError: unsupported keyword: ${moduleStatement[1]}` } };
+  }
+
+  const stripped = stripWithTranspiler(code);
+  if (stripped && "code" in stripped && stripped.code.includes(NEEDS_HELPERS)) {
+    return { refusal: { message: HELPERS_REFUSAL } };
+  }
+
+  return stripped;
+}
+
+function stripWithTranspiler(code: string): Stripped | undefined {
   try {
     const output = transform(code);
 

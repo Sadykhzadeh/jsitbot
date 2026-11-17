@@ -350,6 +350,9 @@ export class QuickJsSandboxService implements SandboxService {
     }
 
     const stripped = stripTypes(code);
+    if (stripped && "refusal" in stripped) {
+      return { ok: false, text: stripped.refusal.message, truncated: false };
+    }
     if (stripped && "code" in stripped) {
       const typed = this.readCode(context, runtime, guest, stripped.code, expired);
       if (typed.settled) {

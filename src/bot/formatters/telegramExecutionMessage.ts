@@ -21,7 +21,7 @@ const CURLY_QUOTES_HINT = "Hint: the code has curly quotes (\u201C \u201D \u2018
 // Code copied from a tutorial often starts with an import. A script has none of
 // them, and the engine reports the first as "expecting '('" and the second as an
 // unsupported keyword, neither of which says what is wrong.
-const MODULE_ERROR = /^SyntaxError: (?:expecting '\('|unsupported keyword: export)/;
+const MODULE_ERROR = /^SyntaxError: (?:expecting '\('|unsupported keyword: (?:export|import))/;
 const MODULE_STATEMENT = /^\s*(?:import\s*[\w${*"']|export\b)/m;
 const MODULE_HINT = "Hint: this runs as a script, not a module, so import and export do not work.";
 
