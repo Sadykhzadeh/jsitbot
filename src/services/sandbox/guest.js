@@ -433,6 +433,7 @@
       if (message === "cannot convert symbol to string") return "Cannot convert a Symbol value to a string";
       if (message === "cannot convert symbol to number") return "Cannot convert a Symbol value to a number";
       if (message === "empty array") return "Reduce of empty array with no initial value";
+      if (message === "bigint argument with unary +") return "Cannot convert a BigInt value to a number";
       const read = startsWith(message, "cannot read property '");
       if (read || startsWith(message, "cannot set property '")) {
         const head = read ? "cannot read property '" : "cannot set property '";
