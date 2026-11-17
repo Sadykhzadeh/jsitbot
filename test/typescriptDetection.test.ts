@@ -51,7 +51,7 @@ describe("TypeScript is read when it is the only reading that parses", () => {
     });
   }
 
-  test("bare JSX is refused as a syntax error, as Node refuses it", async () => {
-    expect((await answer("<div>hi</div>")).startsWith("error: SyntaxError")).toBe(true);
+  test("bare JSX is refused with one line, as Node refuses it", async () => {
+    expect(await answer("<div>hi</div>")).toBe("error: SyntaxError: JSX is not supported");
   });
 });

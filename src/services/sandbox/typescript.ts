@@ -44,6 +44,10 @@ const HELPERS_REFUSAL = "SyntaxError: decorators, accessor and using are not sup
 // module statements they are.
 const TYPE_ONLY_MODULE = /^[ \t]*(?:(import)[ \t]+(?:type\b|[\w$]+[ \t]*=)|(export)(?:[ \t]+type\b|[ \t]*=))/m;
 
+// JSX: a closing tag, a fragment, a self-closing element or an attribute. A
+// type assertion such as `<number>x` has none of these, so it is not JSX.
+const JSX_LIKE = /<\/[A-Za-z]|<>|<[A-Za-z][\w.-]*(?:\s+[\w:-]+=|\s*\/>)/;
+const JSX_REFUSAL = "SyntaxError: JSX is not supported";
 
 /**
  * Removes TypeScript syntax (annotations, interfaces, generics, enums...) and
@@ -74,14 +78,14 @@ export function stripTypes(code: string): Stripped | undefined {
     output = transform(code);
   } catch (error) {
     if (!/return/i.test(errorMessage(error))) {
-      return failure(error, code);
+      return refusedJsx(code) ?? failure(error, code);
     }
 
     const wrapped = `${FUNCTION_HEAD}${code}\n})()`;
     try {
       output = transform(wrapped);
     } catch (wrappedError) {
-      return failure(wrappedError, wrapped, FUNCTION_HEAD);
+      return refusedJsx(code) ?? failure(wrappedError, wrapped, FUNCTION_HEAD);
     }
   }
 
@@ -282,6 +286,11 @@ function position(code: string, index: number): { line: number; column: number }
  * the text of the line. `source` is the text that was transpiled, and `head`
  * the wrapper put in front of the code, which is not the user's.
  */
+/** The refusal for code that is JSX, which the transpiler reads as TypeScript and fails on. */
+function refusedJsx(code: string): Stripped | undefined {
+  return JSX_LIKE.test(code) ? { refusal: { message: JSX_REFUSAL } } : undefined;
+}
+
 function failure(error: unknown, source: string, head = ""): Stripped | undefined {
   const at = (error as { position?: { line?: unknown; column?: unknown } } | null)?.position;
   if (!at || typeof at.line !== "number") {

@@ -53,6 +53,7 @@ Not supported, and refused with one line:
 - Decorators, `accessor` and `using` (`decorators, accessor and using are not supported`)
 - `import type` and `export type`, which get the same hint as `import` and `export`
 - `import x = require(...)` and `export = x`, which get the same hint as `import` and `export`
+- JSX, such as `<div />` or `<>text</>`, which gets the one line `JSX is not supported`, since the sandbox has no element syntax
 
 ## How Output Compares With Node
 

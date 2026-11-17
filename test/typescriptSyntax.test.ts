@@ -66,6 +66,10 @@ const REFUSED: Array<[string, string, string]> = [
   ["await using", "const r = { async [Symbol.asyncDispose]() {} };\n{ await using h = r; }\n1", "error: SyntaxError: decorators, accessor and using are not supported"],
   ["import equals require", 'import fs = require("fs");\n1', "error: SyntaxError: unsupported keyword: import"],
   ["export equals", "const a = 5;\nexport = a;", "error: SyntaxError: unsupported keyword: export"],
+  ["JSX self-closing element", "const x = <div/>;\nx", "error: SyntaxError: JSX is not supported"],
+  ["JSX element with text", "const x = <div>hi</div>;\nx", "error: SyntaxError: JSX is not supported"],
+  ["JSX element with an attribute", 'const x = <a href="x">y</a>;\nx', "error: SyntaxError: JSX is not supported"],
+  ["JSX fragment", "const x = <>hi</>;\nx", "error: SyntaxError: JSX is not supported"],
 ];
 
 // Declarations and directives that exist only for the types, or for tools, are
