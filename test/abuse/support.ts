@@ -13,8 +13,12 @@ export const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
  * the run's own duration below.
  */
 const HEALTHY_WALL_MS = 5_000;
-/** The guest part of a benign run takes about a millisecond; this allows for a loaded machine. */
-const HEALTHY_GUEST_MS = 200;
+/**
+ * The guest part of a benign run takes about a millisecond. A poisoned pool, such as one
+ * still collecting garbage or timers from an abusive run, is seconds slow; a few hundred
+ * milliseconds is the machine, which a full suite run under other builds can take away.
+ */
+const HEALTHY_GUEST_MS = 1_000;
 
 /**
  * What a case should end with. `time` and `memory` are the sandbox's own limits;
