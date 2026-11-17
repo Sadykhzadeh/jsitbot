@@ -22,6 +22,8 @@ export interface RunnerOptions {
   timeBudget: SandboxTimeBudget;
   timeBudgetPolicy: TimeBudgetPolicy;
   maxCodeLength: number;
+  /** Milliseconds, as performance.now reads them. Tests inject their own. */
+  clock?: () => number;
 }
 
 export interface RunMessage {
@@ -59,7 +61,7 @@ export function createRunner(options: RunnerOptions) {
       message: formatRejectionMessage(text),
     });
 
-    const rateLimit = options.rateLimiter.consume(rateKey(userId), options.rateLimitPolicy);
+    const rateLimit = options.rateLimiter.consume(rateKey(userId), options.rateLimitPolicy, options.clock?.());
     if (!rateLimit.allowed) {
       return refuse("rate-limit", `Rate limit exceeded. Try again in ${Math.ceil(rateLimit.retryAfterMs / 1000)}s.`);
     }

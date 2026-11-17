@@ -193,6 +193,8 @@ export interface PrivateAnswerer {
   sendFile(api: Api, request: Omit<PrivateRequest, "code">, document: Document): Promise<void>;
   /** Updates the answer to a message that is a code file, as `edit` does with the file's code. */
   editFile(api: Api, request: Omit<PrivateRequest, "code">, document: Document): Promise<void>;
+  /** How many users are held back from a notice right now. */
+  notified(): number;
 }
 
 /**
@@ -205,6 +207,8 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
   const replies = options.replies;
   // Users told they are over a limit, and until when they are not told again.
   const notifiedUntil = new Map<number, number>();
+  const clock = options.clock ?? (() => performance.now());
+  let nextSweepAt = 0;
 
   function isNotModified(error: unknown): boolean {
     return error instanceof GrammyError && /message is not modified/i.test(error.description);
@@ -215,14 +219,20 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
    * is refused as well, and a reply to each would be a flood of its own.
    */
   function shouldNotify(userId: number): boolean {
-    const now = performance.now();
+    const now = clock();
     if ((notifiedUntil.get(userId) ?? 0) > now) {
       return false;
     }
-    for (const [id, until] of notifiedUntil) {
-      if (until <= now) {
-        notifiedUntil.delete(id);
+    // Every entry lasts one window, so one sweep per window removes all that
+    // has expired. Sweeping on every notice would cost a pass over the whole
+    // record each time, which is quadratic under a flood of distinct users.
+    if (now >= nextSweepAt) {
+      for (const [id, until] of notifiedUntil) {
+        if (until <= now) {
+          notifiedUntil.delete(id);
+        }
       }
+      nextSweepAt = now + options.rateLimitPolicy.windowMs;
     }
     notifiedUntil.set(userId, now + options.rateLimitPolicy.windowMs);
     return true;
@@ -377,6 +387,7 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
 
   return {
     send: (api, request) => run(api, request, undefined),
+    notified: () => notifiedUntil.size,
     edit: editCode,
     sendFile: sendFileCode,
     editFile: editFileCode,
