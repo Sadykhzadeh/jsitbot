@@ -1,0 +1,115 @@
+console.log({ get a() { return 1 }, set a(v) {}, get b() { return 2 }, set c(v) {} })
+---8<---
+console.log(Object.defineProperty({}, "x", { get() { return 1 }, enumerable: true }))
+---8<---
+console.log([1, , 3])
+---8<---
+console.log(Object.assign([1, 2], { "-1": "neg", extra: true }))
+---8<---
+class Tagged { get [Symbol.toStringTag]() { return "Custom" } }
+console.log(new Tagged())
+---8<---
+console.log({ [Symbol.toStringTag]: "Tag", a: 1 })
+---8<---
+console.log(new Map([[new Map([[1, new Map([[2, 3]])]]), new Set([new Set([1])])]]))
+---8<---
+console.log({ a: { b: { c: new Map([["k", { d: 1 }]]) } } })
+---8<---
+console.log([new Number(3), new String("ab"), new Boolean(false), Object(Symbol("s")), Object(10n)])
+---8<---
+console.log(new Uint8Array([1, 2, 3]), new Float64Array([1.5, -0]), new BigInt64Array(2))
+---8<---
+const e = new Error("bad"); e.code = "E_BAD"; e.details = { x: 1 }; console.log(e.code, Object.keys(e))
+---8<---
+console.log(-0, [-0], 0n, [-5n], 1e21, 0.1 + 0.2, [1e-7, 123456789012345680000])
+---8<---
+console.log(["it's", 'say "hi"', `both ' and "`, "back`tick'\"", "\u0007\u007f"])
+---8<---
+console.log({ long1: "aaaaaaaaaaaaaaaaaaaa", long2: "bbbbbbbbbbbbbbbbbbbbbbbb", long3: "cccccccccccccccccccc" })
+---8<---
+console.log(Array.from({ length: 30 }, (_, i) => i * 1000))
+---8<---
+const o = { name: "loop" }; o.self = o; o.list = [o]; console.log(o)
+---8<---
+console.log("%s is %d years and %i days, %f", "Ada", 36.5, 12.9, "3.5")
+---8<---
+console.log("%j %o %O", { a: 1 }, [1], { b: { c: { d: 1 } } })
+---8<---
+console.log("%c styled %%", "color: red", "extra")
+---8<---
+console.log(Symbol("desc"), Symbol(), Symbol.iterator, Symbol.for("reg"))
+---8<---
+console.log(Symbol.iterator.description, Symbol().description, Symbol("").description)
+---8<---
+const wm = new WeakMap(); console.log(wm, new WeakSet())
+---8<---
+console.log(new WeakRef({ a: 1 }))
+---8<---
+function* g() { yield 1 }
+console.log(g(), g)
+---8<---
+async function* ag() { yield 1 }
+console.log(ag(), ag)
+---8<---
+console.log(Promise.resolve(4), new Promise(() => {}))
+---8<---
+const p = Promise.reject(new Error("no")); p.catch(() => {}); console.log(p)
+---8<---
+console.log(new Date("nope"), [new Date(NaN)])
+---8<---
+const r = /a(b)/gimsuy; r.lastIndex = 3; console.log(r, [/x/d])
+---8<---
+console.log(new ArrayBuffer(4), new DataView(new ArrayBuffer(2)))
+---8<---
+const n = Object.create(null); n.a = 1; console.log(n, Object.create(null))
+---8<---
+class A { static count = 2; static #p = 1; static m() {} }
+console.log(A, [A])
+---8<---
+console.log(class {}, function () {}, () => {}, async () => {}, function* () {})
+---8<---
+const fn = function named() {}; fn.prop = 1; console.log(fn)
+---8<---
+console.log(Array.from({ length: 105 }, (_, i) => i).length, Array.from({ length: 105 }, (_, i) => i))
+---8<---
+console.log("x".repeat(2100).length, ["y".repeat(120)])
+---8<---
+console.log({ ["k".repeat(90)]: 1 })
+---8<---
+console.log(1_000_000, 0b1010_1010, 0xff_ff, 1_0.5_5)
+---8<---
+const tag = (s, ...v) => [s, s.raw, v]; console.log(tag`a${1}\n${2}b`)
+---8<---
+outer: for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) { if (j === 1) continue outer; if (i === 2) break outer; console.log(i, j) } }
+---8<---
+try { throw 1 } catch { console.log("caught") }
+---8<---
+console.table([{ a: 1, b: "x" }, { a: 2 }])
+---8<---
+console.table(new Map([["k", 1]]), ["x"])
+---8<---
+console.group("G"); console.log("inside"); console.group(); console.info("deeper"); console.groupEnd(); console.groupEnd(); console.log("out")
+---8<---
+console.count(); console.count("x"); console.count(); console.countReset(); console.count()
+---8<---
+console.assert(false, "nope %s", "fmt"); console.assert(true, "hidden"); console.assert(false)
+---8<---
+console.dir({ a: { b: { c: { d: 1 } } } }, { depth: 0 })
+---8<---
+console.dir("str")
+---8<---
+console.log(Object.create({ inherited: 1 }), [Object.create(Array.prototype)])
+---8<---
+const f = Object.freeze({ a: 1 }); console.log(Object.isFrozen(f), f, Object.seal([1]))
+---8<---
+console.log(new Proxy([1], {}), new Proxy(function f() {}, {}))
+---8<---
+console.log(Reflect.ownKeys({ b: 1, 2: 1, a: 1, 1: 1, [Symbol("s")]: 1 }))
+---8<---
+console.log(Math, JSON, Reflect)
+---8<---
+console.log(globalThis === global, typeof globalThis)
+---8<---
+console.log([undefined, null], { u: undefined, n: null })
+---8<---
+console.log(new Error("top").name, String(new TypeError("t")))

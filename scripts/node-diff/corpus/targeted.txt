@@ -1,0 +1,177 @@
+console.log({ a: { b: { c: { d: {} } } } })
+---8<---
+console.log([[[[[]]]]])
+---8<---
+console.log({ a: { b: { c: { d: new Map() } } } }, { a: { b: { c: { d: new Set() } } } })
+---8<---
+console.log({ a: { b: { c: { d: new Uint8Array(0) } } } })
+---8<---
+console.log({ a: { b: { c: { d: new (class Foo {})() } } } })
+---8<---
+console.log({ a: { b: { c: { d: Object.create(null) } } } })
+---8<---
+console.log({ a: { b: { c: { d: [,] } } } })
+---8<---
+console.log({ a: { b: { c: { d: {}, e: 1 } } } })
+---8<---
+console.log({ a: { b: { c: { d: [] } } } }, { a: { b: { c: { d: new Map([[1, 2]]) } } } })
+---8<---
+console.log({ a: { b: { c: { d: [[]] } } } })
+---8<---
+console.log({ a: { b: { c: { d: new Date(0) } } } })
+---8<---
+console.log({ a: { b: { c: { d: Object.assign([], { k: 1 }) } } } })
+---8<---
+console.log({ a: { b: { c: { d: Object.setPrototypeOf({}, null) } } } })
+---8<---
+console.log({ a: { b: { c: { d: new Map([[1, { x: 1 }]]) } } } })
+---8<---
+console.log({ a: { b: { c: { d: new (class Bar extends Array {})() } } } })
+---8<---
+console.log([[[[new Set()]]]], [[[[new ArrayBuffer(0)]]]])
+---8<---
+console.log({ a: { b: { c: { d: () => {} } } } })
+---8<---
+console.log(({ a: { b: { c: { d: {} } } } }))
+---8<---
+console.log([[[[[]]]]])
+---8<---
+console.log([{ a: { b: { c: new Map() } } }, [[[new Set()]]]])
+---8<---
+console.log(({ a: { b: { c: { d: new Uint8Array(0) } } } }))
+---8<---
+console.log(({ a: { b: { c: { d: new (class Foo {})(), e: Object.create(null) } } } }))
+---8<---
+console.log(({ a: { b: { c: { d: new (class Bar extends Array {})() } } } }))
+---8<---
+console.log(({ a: { b: { c: { d: [1], e: 2 } } } }))
+---8<---
+console.log(({ a: { b: { c: { d: new Map([[1, 2]]) } } } }))
+---8<---
+class MyDate extends Date {}; console.log(new MyDate(0))
+---8<---
+class MyRe extends RegExp {}; console.log(new MyRe("ab", "g"), [new MyRe("x")])
+---8<---
+class Bar2 extends Uint8Array {}; console.log(new Bar2(2), new Bar2([1, 2, 3]))
+---8<---
+class Empty extends Uint8Array {}; console.log(new Empty(0))
+---8<---
+class F64 extends Float64Array {}; console.log(Object.assign(new F64(1), { t: 1 }))
+---8<---
+class MyDate2 extends Date {}; console.log(Object.assign(new MyDate2(NaN), { a: 1 }))
+---8<---
+console.log(new Date(0), new Uint8Array([1]), /re/)
+---8<---
+class Stamp extends Date { get [Symbol.toStringTag]() { return "T" } }; console.log(new Stamp(0))
+---8<---
+console.log(new (class extends Date {})(0))
+---8<---
+class Typed extends Int8Array {}; console.log([new Typed(2)], new (class extends Uint16Array {})(1))
+---8<---
+console.log(Object.setPrototypeOf(new Uint8Array(2), Uint16Array.prototype))
+---8<---
+class MyRe2 extends RegExp {}; console.log(Object.setPrototypeOf(/ab/, MyRe2.prototype))
+---8<---
+class MyDate extends Date {} class MyRe extends RegExp {} console.log([new MyDate(0), new MyRe("ab", "g")])
+---8<---
+class MyDate extends Date {} console.log(Object.assign(new MyDate(NaN), { a: 1 }))
+---8<---
+class MyRe extends RegExp {} console.log(Object.setPrototypeOf(/ab/, MyRe.prototype))
+---8<---
+class Stamp extends Date { get [Symbol.toStringTag]() { return "T" } } console.log(new Stamp(0))
+---8<---
+class Bar2 extends Uint8Array {} console.log([new Bar2(2), new Bar2([1, 2, 3]), new (class Empty extends Uint8Array {})(0)])
+---8<---
+console.log(Object.setPrototypeOf(new Uint8Array(2), Uint16Array.prototype))
+---8<---
+console.log(Object.setPrototypeOf(new Date(0), null), Object.setPrototypeOf(/x/, null))
+---8<---
+console.log(Date.prototype, RegExp.prototype, Object.create(Date.prototype), Object.create(RegExp.prototype))
+---8<---
+console.log(Map.prototype, Set.prototype, Promise.prototype, WeakMap.prototype, WeakSet.prototype)
+---8<---
+console.log(ArrayBuffer.prototype, DataView.prototype, Symbol.prototype, BigInt.prototype)
+---8<---
+console.log(Object.create(Map.prototype), Object.create(Set.prototype), Object.create(Promise.prototype), Object.create(ArrayBuffer.prototype))
+---8<---
+console.log(Number.prototype, String.prototype, Boolean.prototype)
+---8<---
+console.log(Uint8Array.prototype, Object.create(Uint8Array.prototype), Object.create(Date.prototype))
+---8<---
+console.log({ [Symbol.toStringTag]: "Map" }, { [Symbol.toStringTag]: "Date", a: 1 })
+---8<---
+class Fake { get [Symbol.toStringTag]() { return "Map" } }; console.log(new Fake(), [new Fake()])
+---8<---
+class FakeDate { get [Symbol.toStringTag]() { return "Date" } }; console.log(new FakeDate())
+---8<---
+console.log(Object.assign(Object.create(null), { [Symbol.toStringTag]: "Set" }))
+---8<---
+console.log(Object.setPrototypeOf({ [Symbol.toStringTag]: "Map" }, null))
+---8<---
+const fakeErr = { [Symbol.toStringTag]: "Error" }; console.log(fakeErr)
+---8<---
+const fakeArr = Object.create(Array.prototype); fakeArr[Symbol.toStringTag] = "Array"; console.log(fakeArr)
+---8<---
+console.log(Object.create(WeakMap.prototype), Object.create(WeakRef.prototype))
+---8<---
+console.log(Object.create(Function.prototype), Object.create(Error.prototype))
+---8<---
+console.log(Math, Reflect, Atomics === undefined ? "none" : "atomics", Intl)
+---8<---
+console.log(Object.create(Symbol.prototype), Object.create(BigInt.prototype), Object.create(Number.prototype))
+---8<---
+console.log(Object.create(Boolean.prototype), Object.create(String.prototype), Object.create(RegExp.prototype), RegExp.prototype)
+---8<---
+console.log(Object.create(Generator.prototype ?? Object.prototype))
+---8<---
+console.log(Object.getPrototypeOf(function* () {}).prototype, Object.getPrototypeOf(async function () {}))
+---8<---
+console.log([Map.prototype, Set.prototype, Promise.prototype, WeakMap.prototype])
+---8<---
+console.log([ArrayBuffer.prototype, DataView.prototype, Symbol.prototype, BigInt.prototype])
+---8<---
+console.log([Number.prototype, String.prototype, Boolean.prototype])
+---8<---
+console.log([Object.create(Map.prototype), Object.create(Set.prototype), Object.create(WeakMap.prototype)])
+---8<---
+console.log([Object.create(Promise.prototype), Object.create(ArrayBuffer.prototype), Object.create(Symbol.prototype), Object.create(Number.prototype)])
+---8<---
+console.log(({ [Symbol.toStringTag]: "Map" }))
+---8<---
+class Fake { get [Symbol.toStringTag]() { return "Map" } } console.log(new Fake())
+---8<---
+console.log(Object.setPrototypeOf({ [Symbol.toStringTag]: "Map" }, null))
+---8<---
+console.log(({ [Symbol.toStringTag]: "Error" }))
+---8<---
+class Anon extends (class Par {}) {} console.log(Anon)
+---8<---
+function make() { return class Base {} } class Z extends make() {} console.log(Z)
+---8<---
+class Q { m() { return (1) } } console.log(Q)
+---8<---
+class Named extends (class {}) {} console.log(Named)
+---8<---
+console.log(class extends Array {}, class {}, class Ok extends Array {})
+---8<---
+class classy { static x() {} } console.log(classy)
+---8<---
+const K = class /* note */ Keep { }; console.log(K)
+---8<---
+class Lp extends ((a) => Array)(1) {} console.log(Lp)
+---8<---
+class Tail extends Array { static v = (1) } console.log(Tail)
+---8<---
+console.log(Function.prototype)
+---8<---
+function f() {} console.log(Object.setPrototypeOf(f, null), Object.setPrototypeOf(() => {}, null))
+---8<---
+console.log(Object.setPrototypeOf(async function g() {}, Function.prototype), Object.setPrototypeOf(function* h() {}, Object.prototype))
+---8<---
+console.log([Object.setPrototypeOf(function q() {}, Array.prototype)])
+---8<---
+console.log(Object.getPrototypeOf(async function () {}), Object.getPrototypeOf(function* () {}))
+---8<---
+class C2 extends Function {}; console.log(new C2("return 1"))
+---8<---
+console.log(Object.setPrototypeOf(class Cl {}, null))

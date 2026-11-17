@@ -10,7 +10,8 @@
     "test": "bun test",
     "bench": "bun run scripts/bench.ts",
     "soak": "bun run scripts/soak.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "compat": "bun run scripts/node-diff/run.ts"
   },
   "dependencies": {
     "grammy": "^1.46.0",

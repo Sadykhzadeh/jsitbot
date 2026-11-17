@@ -1,0 +1,249 @@
+console.log({ a: { get x() { return 1 } } })
+---8<---
+class P { #secret = 1; get v() { return 2 } }; console.log(new P(), [new P()])
+---8<---
+class Q { constructor() { this.a = 1 } static s = 3 }; console.log(new Q(), Q)
+---8<---
+class Base {}; class Sub extends Base { x = 1 }; console.log(new Sub(), Sub, Base)
+---8<---
+const obj = Object.create(Object.create(null)); console.log(obj)
+---8<---
+function Ctor() { this.z = 1 }; console.log(new Ctor(), Ctor)
+---8<---
+const withTag = { constructor: { name: "Fake" }, a: 1 }; console.log(withTag)
+---8<---
+class T2 { get [Symbol.toStringTag]() { return "Tagged" } }; console.log(new T2(), [new T2()])
+---8<---
+class Named { static [Symbol.hasInstance]() { return true } }; console.log(new Named())
+---8<---
+console.log(new Map([[1, new Map([[2, new Map([[3, new Map([[4, 5]])]])]])]]))
+---8<---
+console.log(new Set([new Set([new Set([new Set([1])])])]))
+---8<---
+console.log({ m: new Map([[{ k: { deep: { x: 1 } } }, [1, [2, [3, [4]]]]]]) })
+---8<---
+console.log(new Map([[-0, "zero"], [NaN, "nan"]]))
+---8<---
+console.log(new Map(), new Set([undefined, null]), new Map([[undefined, undefined]]))
+---8<---
+const m = new Map([["a", 1]]); m.extra = 5; console.log(m)
+---8<---
+const s = new Set([1]); s.name = "x"; console.log(s)
+---8<---
+console.log(new Number(-0), new String(""), Object(1n), Object(true))
+---8<---
+const bs = new String("hey"); bs.extra = 1; console.log(bs)
+---8<---
+console.log([new String("a".repeat(30)), new Number(1e21)])
+---8<---
+console.log(Object.assign(new Number(2), { label: "two" }))
+---8<---
+console.log(new Float32Array([0.1, 1e10, -0]), new Int16Array(0))
+---8<---
+console.log(new Uint8ClampedArray([300, -5]), new BigUint64Array([5n, 6n]))
+---8<---
+console.log(Array.from({ length: 101 }, (_, i) => i % 7 === 0 ? i : "s"))
+---8<---
+console.log(new Uint8Array(120))
+---8<---
+const big = []; big[5] = 1; big.k = "v"; console.log(big)
+---8<---
+console.log([[1, 2, [3, 4, [5, [6]]]]])
+---8<---
+console.log({ a: [{ b: [{ c: 1 }] }] })
+---8<---
+console.log(Array.from({ length: 7 }, (_, i) => ({ id: i, name: "item" + i })))
+---8<---
+console.log(["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa", "lambda", "mu"])
+---8<---
+console.log(Array.from({ length: 27 }, (_, i) => String.fromCharCode(97 + (i % 26)).repeat(i % 4 + 1)))
+---8<---
+console.log({ key1: "value number one", key2: "value number two", key3: "value number three" })
+---8<---
+console.log({ a: "x".repeat(60), b: 1 })
+---8<---
+console.log("multi\nline", ["multi\nline"], { s: "tab\tand\u0000nul" })
+---8<---
+console.log(["a b", "\ud83d", "emoji😀", "\x1b[31m"])
+---8<---
+console.log(["'", "\"", "`", "'\"`", "\\"])
+---8<---
+console.log({ "key with space": 1, "ünicode": 2, "1a": 3, a1: 4, "-": 5 })
+---8<---
+const err = new RangeError("out"); err.cause = new Error("inner"); console.log({ err: err.message, cause: err.cause.message })
+---8<---
+const ae = new AggregateError([new Error("a"), new Error("b")], "many"); console.log(ae.errors.length, ae.message)
+---8<---
+class VErr extends Error { constructor(m) { super(m); this.name = "ValidationError"; this.field = "age" } }; console.log(new VErr("bad input").name, new VErr("x").field)
+---8<---
+const te = new TypeError("boom"); te.name = "Custom"; console.log(String(te))
+---8<---
+const noMsg = new Error(); console.log(String(noMsg), noMsg.message === "")
+---8<---
+console.log(-0 + "", [0.000001, 0.0000001, 1e100, 2**53, -(2**53)])
+---8<---
+console.log(12345678901234567890n * -1n, [1n, -0n], { big: 10n ** 20n })
+---8<---
+console.log((1234.5678).toFixed(2), (0.000001234).toPrecision(2), 1e21 + 1, 100 / 3)
+---8<---
+console.log("%d %i %f", 10n, "42.9", "x", "%d")
+---8<---
+console.log("%d", Symbol("s"), "%i", {})
+---8<---
+console.log("%i", 3.9, "%f", Symbol.iterator)
+---8<---
+console.log("%s", { a: 1, toString() { return "custom" } })
+---8<---
+console.log("%s|%s|%s|%s", null, undefined, 5n, Symbol("q"))
+---8<---
+console.log("%s", [1, [2, [3]]], new Error("in s"))
+---8<---
+console.log("%s", function foo() {}, class Bar {})
+---8<---
+console.log("%j", { toJSON() { return "tj" } }, "%j")
+---8<---
+const circ = { n: 1 }; circ.me = circ; console.log("%j", circ)
+---8<---
+console.log("%o", { f() {}, arr: [1, 2] })
+---8<---
+console.log("%O", { a: { b: { c: { d: { e: 1 } } } } })
+---8<---
+console.log("100%", "%", "%z", "%%")
+---8<---
+console.log("%c", "css", "after")
+---8<---
+console.log("a%sb%sc", "1")
+---8<---
+const c = { c: 1 }; c.self = c; c.arr = [c, { c }]; console.log(c)
+---8<---
+const a1 = [1]; a1.push(a1); console.log(a1)
+---8<---
+const x1 = {}, x2 = { x1 }; x1.x2 = x2; console.log([x1, x2])
+---8<---
+const map = new Map(); map.set("me", map); console.log(map)
+---8<---
+const st = new Set(); st.add(st); console.log(st)
+---8<---
+console.log(Object.keys({ __proto__: null, b: 1 }), { __proto__: { inherited: true }, own: 1 })
+---8<---
+console.log(Object.entries({ x: [1, 2], y: "z" }))
+---8<---
+console.log(new Array(3).fill({ shared: true }))
+---8<---
+console.log(Array(101).fill(0).length, Array(3).join("-"), [null, undefined].toString())
+---8<---
+console.log(new Date(0).getTime(), typeof new Date(), new Date(2020, 0, 1, 12).toISOString())
+---8<---
+console.log([new Date(1e12)], { when: new Date(-1) })
+---8<---
+console.log(Object.assign(new Date(0), { tag: 1 }))
+---8<---
+console.log(/[/]\//, new RegExp("a/b"), Object.assign(/x/, { k: 1 }))
+---8<---
+console.log(new RegExp("\n"), String(/a/y), /a/.source)
+---8<---
+const re = /a/g; re.lastIndex = 2; console.log(re, re.lastIndex)
+---8<---
+console.log(Symbol.for("app.key"), [Symbol("in arr")], { [Symbol.iterator]: 1 })
+---8<---
+console.log(Object(Symbol("boxed")), Symbol("x").toString())
+---8<---
+console.log([Symbol.asyncIterator], Symbol.keyFor(Symbol.for("k")))
+---8<---
+console.log(Object.getOwnPropertyNames(Symbol.prototype).length >= 0, Symbol.prototype[Symbol.toStringTag])
+---8<---
+function namedFn() {} Object.defineProperty(namedFn, "name", { value: "renamed" }); console.log(namedFn)
+---8<---
+const anon = (() => function () {})(); console.log(anon, [anon])
+---8<---
+const arrow = () => {}; console.log(arrow, { arrow })
+---8<---
+console.log({ method() {}, get acc() { return 1 }, async am() {}, *gen() {} })
+---8<---
+const bound = function bb() {}.bind(null); console.log(bound)
+---8<---
+console.log(Math.max, parseInt, [].map, console.log)
+---8<---
+console.log(Object.assign(() => {}, { a: 1, b: "x" }))
+---8<---
+console.log(Object.assign(class K {}, { s: 1 }))
+---8<---
+console.log(async function* () {}, async () => {})
+---8<---
+function* gen2() { const x = yield 1; return x }; const it = gen2(); console.log(it.next(), it.return(5), it)
+---8<---
+const pr = Promise.resolve({ big: [1, 2, 3] }); console.log([pr])
+---8<---
+const pe = new Promise((_, rej) => rej(42)); pe.catch(() => {}); console.log(pe)
+---8<---
+const pending = new Promise(() => {}); console.log({ pending })
+---8<---
+console.log(Promise.all([]), Promise.race([Promise.resolve(1)]))
+---8<---
+console.log(new Set([1, 2]).values(), new Map([[1, 2]]).entries(), [1].entries())
+---8<---
+console.log("abc"[Symbol.iterator](), "x".matchAll(/x/g))
+---8<---
+console.log(new WeakRef({}), new FinalizationRegistry(() => {}))
+---8<---
+console.log(globalThis.console === console, typeof console.log)
+---8<---
+console.log(Object.getOwnPropertyDescriptor({ a: 1 }, "a"))
+---8<---
+console.log(Object.getOwnPropertyDescriptors({ get g() { return 1 } }))
+---8<---
+console.log(JSON.stringify({ a: [1, { b: undefined, c: () => 1 }] }, null, 2))
+---8<---
+console.log(JSON.stringify(new Date(0)), JSON.stringify(" "), JSON.stringify([NaN]))
+---8<---
+console.log(Array.prototype, Object.prototype, Function.prototype)
+---8<---
+console.log(Number.prototype, String.prototype, Boolean.prototype)
+---8<---
+console.log(Map.prototype, Set.prototype, Promise.prototype)
+---8<---
+console.log(Error.prototype, TypeError.prototype)
+---8<---
+console.log(Object.create(Array.prototype), Object.create(Map.prototype))
+---8<---
+console.log(new (class extends Array {})(1, 2), new (class Foo extends Map {})([[1, 2]]))
+---8<---
+console.log(new (class Cls extends Set {})([3]), new (class Bar2 extends Uint8Array {})(2))
+---8<---
+console.log(new (class MyPromise extends Promise {})(() => {}))
+---8<---
+console.log([function () {}.prototype, class {}.prototype])
+---8<---
+label: { console.log("in block"); break label; }
+---8<---
+do { console.log("once") } while (false)
+---8<---
+for (const [k, v] of Object.entries({ p: 1 })) console.log(k, v)
+---8<---
+console.log(typeof undeclaredVar, void 0, null ?? "fallback", 0 || "or")
+---8<---
+console.log(1 < 2 < 3, 3 > 2 > 1, "2" + 2 * "2", [] + {}, [1] == 1)
+---8<---
+console.log(0.1 * 3, 9007199254740993, 5e-324, 1.7976931348623157e308)
+---8<---
+console.log(Number.MIN_SAFE_INTEGER, Number.EPSILON, 4.35.toFixed(1), (25).toString(2))
+---8<---
+console.log([3, 1, 10, 2].sort(), [3, 1, 10, 2].sort((a, b) => a - b))
+---8<---
+console.log("ß".toUpperCase(), "İ".toLowerCase().length, "a".localeCompare("B"))
+---8<---
+console.log(Object.groupBy([1, 2, 3], (n) => (n % 2 ? "odd" : "even")))
+---8<---
+console.log(Map.groupBy([1, 2, 3], (n) => n % 2))
+---8<---
+console.log(new Array(2).concat([3]), [..."héllo"], Array.of(7))
+---8<---
+console.log(structuredClone(new Map([[1, { a: [1] }]])), structuredClone(new Date(0)))
+---8<---
+console.log(new Set([1, 2, 3]).union(new Set([4])), new Set([1]).isSubsetOf(new Set([1, 2])))
+---8<---
+console.log(Iterator.from([1, 2, 3]).map((x) => x * 2).toArray())
+---8<---
+console.log(Array.prototype[Symbol.unscopables])
+---8<---
+console.log(Object.fromEntries([["a", 1]]), Object.is(-0, 0), Object.getPrototypeOf([]) === Array.prototype)

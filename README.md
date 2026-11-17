@@ -38,17 +38,17 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 ## How Output Compares With Node
 
-Checked on 17 November 2026 against Node 26.13.0 with 684 snippets: the inputs of the inspect and console tests, hand-picked cases, generated runs of line widths, grouping, nesting, key counts, numbers and strings, and 170 cases of template literals, console forms (no arguments, groups, assertions, counts), JSON, number and date formatting, null-prototype objects, generators, classes with private members and accessors, proxies, reflected keys, errors with custom names, weak references, namespace objects and functions. Each snippet was run once by Node with `console.log` at its default options and once with a depth of 3, which is what the sandbox uses. The sandbox matches exactly on 636 snippets against Node at depth 3 and on 620 against Node's default depth of 2.
+Measured with `bun run compat` against Node 26.13.0: 371 snippets in `scripts/node-diff/corpus`, run once by Node with `console.log` and once by the sandbox, both at a depth of 3 (what the sandbox shows; Node's own default is 2). 363 match exactly (97.8%). The corpus covers the inspect and console test inputs, hand-picked containers, errors and iterators, generated runs of line width, grouping, nesting and numbers, template literals, JSON, dates, null-prototype objects, generators, classes, proxies, reflection, weak references, namespaces, functions and the console forms. To reproduce it, see [Running the comparison](#running-the-comparison).
 
-| Group | Snippets | Exact |
+| Group (corpus file) | Snippets | Exact |
 | --- | ---: | ---: |
-| Inspect test inputs | 106 | 93 |
-| Console and sandbox test inputs | 37 | 29 |
-| Hand-picked cases (containers, errors, iterators, format specifiers) | 184 | 169 |
-| Generated (line width, grouping, nesting, numbers, strings, console forms) | 187 | 186 |
-| Templates, console forms, JSON, numbers, dates, null prototypes | 113 | 110 |
-| Generators, classes, proxies, reflection, errors, weak references, namespaces, functions | 57 | 49 |
-| Total | 684 | 636 |
+| Basic: inspect and console inputs, containers, errors, formats (`basic.txt`) | 56 | 56 |
+| Built-ins, console forms, prototypes, text and numbers (`builtins.txt`) | 125 | 122 |
+| Edge cases: prototypes, tagged objects, console table, dir, count (`edge.txt`) | 101 | 98 |
+| Targeted at single formatting rules (`targeted.txt`) | 89 | 87 |
+| Total | 371 | 363 |
+
+The 636 of 684 figure in earlier notes came from a corpus that was never committed, so it cannot be reproduced; the table above replaces it.
 
 Deliberate differences, with the reason:
 
@@ -68,6 +68,18 @@ Known gaps, not fixed yet:
 - `%o` on an error does not show its hidden properties, such as `[stack]` and `[message]`: Node prints them after the stack frames, and the sandbox shows no frames.
 - Properties added to a typed array longer than 100,000 items are not shown: listing its keys would make one for each item. Shorter ones show them after the items, as Node does.
 - A `%s` with an object whose `toString` throws is shown as the object, where Node stops the whole call. A test pins this, so it stays until it is decided.
+
+### Running the comparison
+
+`bun run compat` runs each snippet of `scripts/node-diff/corpus` in the sandbox and in Node 26, and prints how many match. It needs a Node 26 on your machine, named by `NODE26`; it is not part of `bun test` and CI does not run it.
+
+```bash
+NODE26=$HOME/.nvm/versions/node/v26.13.0/bin/node bun run compat
+NODE26=wsl:/home/user/.nvm/versions/node/v26.13.0/bin/node bun run compat   # Node inside WSL, run from Windows
+bun run compat -- --verbose    # also prints each snippet that differs, with both outputs
+```
+
+To add snippets, append them to a corpus file, separated by a line that holds only `---8<---`. Each snippet is one program; its output is what `console.log` writes.
 
 ## Security
 
@@ -145,6 +157,7 @@ The tests need no token and no network.
 | `bun run typecheck` | Type-checks `src`, `test` and `scripts` with `tsc --noEmit` |
 | `bun run bench` | Starts the sandbox the way the bot does and prints startup time, first-run latency and warm p50/p95 for a few typical programs |
 | `bun run soak` | Starts the real bot against a local stand-in for the Telegram API and prints start-up time, the memory of the bot and its sandbox process, and how a burst of messages is answered. `--limit=30` makes the stand-in refuse sends above 30 a second, as Telegram does |
+| `bun run compat` | Compares the sandbox output with Node 26 for every snippet in `scripts/node-diff/corpus`; needs `NODE26`, see [Running the comparison](#running-the-comparison) |
 
 ## Configuration
 
@@ -184,7 +197,7 @@ src/runtime/           calls to Telegram (spacing, retries), shutdown, logs
 src/services/sandbox/  the QuickJS sandbox, its child process and the guest runtime
 src/config/            limits and environment
 test/                  tests, run with bun test
-scripts/               benchmark, soak test, fake Telegram API
+scripts/               benchmark, soak test, fake Telegram API, Node comparison (scripts/node-diff)
 ```
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes how a message becomes an answer and how the sandbox is put together.

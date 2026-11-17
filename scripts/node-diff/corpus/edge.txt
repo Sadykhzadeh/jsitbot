@@ -1,0 +1,201 @@
+console.log(Symbol(""), [Symbol("")], Symbol("with space"))
+---8<---
+console.log({ [Symbol()]: 1, [Symbol("")]: 2 })
+---8<---
+class Sym { static [Symbol.for("s")] = 1 }; console.log(Sym)
+---8<---
+console.log(Symbol.prototype.toString.call(Symbol("t")), [Symbol.species])
+---8<---
+const ws = new WeakSet(); const k = {}; ws.add(k); console.log({ ws, wm: new WeakMap([[k, 1]]) })
+---8<---
+const wr = new WeakRef(function named() {}); console.log([wr], typeof wr.deref())
+---8<---
+console.log(new FinalizationRegistry(() => {}), Object.prototype.toString.call(new WeakRef({})))
+---8<---
+function* g() { return 7 } const it = g(); console.log(it.next(), it.next(), it)
+---8<---
+class G { *items() { yield 1 } static async *am() {} }; console.log(new G().items(), G.am)
+---8<---
+async function af() {} console.log(af, [af()])
+---8<---
+console.log(Promise.resolve(undefined), Promise.reject(undefined).catch(() => {}) && "ok")
+---8<---
+const rejected = Promise.reject("plain"); rejected.catch(() => {}); console.log([rejected])
+---8<---
+const nested = Promise.resolve(Promise.resolve(3)); console.log(nested)
+---8<---
+console.log({ d: new Date(NaN) }, Object.assign(new Date(NaN), { x: 1 }))
+---8<---
+class MyDate extends Date {}; console.log(new MyDate(0))
+---8<---
+console.log(/(?<year>\d{4})/u, /a/dgimsuy.flags)
+---8<---
+class MyRe extends RegExp {}; console.log(new MyRe("ab", "g"))
+---8<---
+const rx = /x/; rx.lastIndex = 9; console.log({ rx })
+---8<---
+const dv = new DataView(new ArrayBuffer(4), 1, 2); console.log(dv)
+---8<---
+const rab = new ArrayBuffer(2, { maxByteLength: 8 }); console.log(rab, rab.resizable)
+---8<---
+console.log(new Uint16Array(new ArrayBuffer(4), 2, 1))
+---8<---
+console.log(Object.setPrototypeOf(new (class Z {})(), null))
+---8<---
+console.log([Object.create(null)], { n: Object.create(null) })
+---8<---
+class St { static a = 1; static get b() { return 2 } static { this.c = 3 } }; console.log(St)
+---8<---
+class Anon extends (class Par {}) {}; console.log(Anon, class {}, [class {}])
+---8<---
+const ac = class {}; const af2 = function () {}; console.log(ac, af2)
+---8<---
+console.log(class A extends Array {}, class B extends Error {})
+---8<---
+function withProps() {} withProps.inner = { deep: { x: 1 } }; console.log(withProps)
+---8<---
+console.log(Object.assign(() => {}, { [Symbol("s")]: 1 }))
+---8<---
+const fnNamed = function inner() {}; console.log({ fnNamed, anonymousArrow: (() => () => {})() })
+---8<---
+console.log(Array.from({ length: 102 }, (_, i) => ({ i })).slice(99, 102))
+---8<---
+console.log(Array.from({ length: 101 }, (_, i) => ({ i })).length)
+---8<---
+const arr101 = Array.from({ length: 101 }, () => "x"); console.log(arr101)
+---8<---
+console.log("q".repeat(10001).length, ["z".repeat(10001)].length)
+---8<---
+console.log(["s".repeat(200)])
+---8<---
+console.log({ s: "t".repeat(5000) }.s.length)
+---8<---
+console.log({ ["long_key_" + "k".repeat(70)]: 1, short: 2 })
+---8<---
+console.log({ "a".repeat(200): true })
+---8<---
+console.log(1_0n, 0x1_0n, 1e1_0, .5_5)
+---8<---
+const t = (s) => s; console.log(t`a``b`, t`${1}`.raw)
+---8<---
+console.log(String.raw`C:\new\table${1}`, `${[1, 2]}${{}}`)
+---8<---
+a: for (;;) { b: for (;;) { break a } } console.log("after labels")
+---8<---
+try { null.x } catch { console.log("optional catch") } finally { console.log("finally") }
+---8<---
+console.table([[1, 2], [3]])
+---8<---
+console.table([{ a: 1, b: 2 }], ["b"])
+---8<---
+console.table({ r1: { c: "v" } })
+---8<---
+console.table([{ nested: { deep: 1 } }, { nested: [1, 2] }])
+---8<---
+console.table([])
+---8<---
+console.table(new Set(["s"]))
+---8<---
+console.table([{ x: "a".repeat(40) }])
+---8<---
+console.group("outer"); console.table([{ q: 1 }]); console.log({ a: 1, b: { c: [1] } }); console.groupEnd()
+---8<---
+console.group("a\nb"); console.log("line"); console.groupEnd()
+---8<---
+console.count("c"); console.count("c"); console.countReset("c"); console.countReset("missing"); console.count("c")
+---8<---
+console.assert(false, { obj: 1 }); console.assert(false, "%s-%d", "x", 2, "tail")
+---8<---
+console.assert(0); console.assert(""); console.assert(null, "null is falsy")
+---8<---
+console.dir({ a: { b: { c: { d: {} } } } }, { depth: null })
+---8<---
+console.dir([1, [2, [3, [4]]]], { depth: 1 })
+---8<---
+console.dir({ hidden: true }, { showHidden: true })
+---8<---
+console.dir([1, 2], { showHidden: true })
+---8<---
+console.log()
+---8<---
+console.log("", "")
+---8<---
+console.info(); console.debug("dbg", 1)
+---8<---
+console.warn("warned", { w: 1 })
+---8<---
+console.error("error line", [1])
+---8<---
+console.trace === undefined ? console.log("no trace") : console.log(typeof console.trace)
+---8<---
+console.log(Object.keys(console).length > 10, typeof console.table, typeof console.timeLog)
+---8<---
+console.log(new Array(1000).fill(0).length, "done")
+---8<---
+console.log({ und: undefined, fn: undefined, sym: Symbol.iterator })
+---8<---
+console.log([0, -0, 0n, "", null, undefined, NaN, false])
+---8<---
+console.log([1.0, 2.50, 1e3, 0xff, 0o17, 0b11])
+---8<---
+console.log(-1e-7, 1e-6, 123e-20, 1.5e300 * 1e10)
+---8<---
+console.log(Number("0x1f"), Number(""), Number(" 12 "), +[], +{}, Number(null))
+---8<---
+console.log(2 ** -1074, (1e21).toLocaleString(), (12.5).toString(16))
+---8<---
+console.log(new Number(1).valueOf() === 1, new Boolean(0) ? "truthy" : "falsy")
+---8<---
+console.log({ n: 1 } instanceof Object, [] instanceof Array, null == undefined)
+---8<---
+console.log(Object.getOwnPropertyNames(function f(a, b) {}).sort())
+---8<---
+console.log(typeof Symbol.dispose, typeof Symbol.asyncDispose)
+---8<---
+console.log([..."🇦🇿👨‍👩‍👧"].length, "🇦🇿👨‍👩‍👧".length)
+---8<---
+console.log("\u{1F600}", ["\u{1F600}"], "\u0301")
+---8<---
+console.log(Array.from("abc", (c) => c.charCodeAt(0)), "abc".at(-1), "a-b-c".split("-", 2))
+---8<---
+console.log(encodeURIComponent("a b&c/é"), decodeURI("%E2%82%AC"), escape("ü"))
+---8<---
+console.log(new Intl.NumberFormat("en-US").format(12345.678), (0.5).toLocaleString("en-US", { style: "percent" }))
+---8<---
+console.log(new Date(Date.UTC(2020, 1, 29)).toISOString(), new Date(8.64e15 + 1).getTime())
+---8<---
+console.log(JSON.stringify({ d: new Date(NaN) }), String(new Date(NaN)))
+---8<---
+console.log(Object.entries(new Map([[1, 2]])), Object.keys("ab"), Object.values("ab"))
+---8<---
+const big2 = {}; for (let i = 0; i < 30; i++) big2["k" + i] = i; console.log(big2)
+---8<---
+const nested2 = { level1: { level2: { level3: { level4: "deep" } }, sibling: [1, { x: [2, { y: 3 }] }] } }; console.log(nested2)
+---8<---
+console.log([[[[["bottom"]]]]], [[[[[]]]]], [{ a: [{ b: [] }] }])
+---8<---
+console.log({ a: [], b: {}, c: new Map(), d: new Set(), e: "" })
+---8<---
+const sym2 = Symbol("desc"); const holder = { [sym2]: { deep: { deeper: { deepest: 1 } } } }; console.log(holder)
+---8<---
+console.log(Object.defineProperty({}, "hidden", { value: 1, enumerable: false }), Object.defineProperty([], "h", { value: 1 }))
+---8<---
+console.log(Object.defineProperties({}, { a: { get() { return 1 }, set(v) {}, enumerable: true }, b: { set(v) {}, enumerable: true } }))
+---8<---
+const gs = { get both() { return 1 }, set both(v) {} }; console.log(gs, Object.keys(gs))
+---8<---
+const gsSpy = { get boom() { throw new Error("x") } }; console.log(gsSpy)
+---8<---
+console.log(new Error("with newline\nmessage").message.split("\n").length)
+---8<---
+console.log(Object.assign(new Error("m"), { status: 500, headers: { h: 1 } }).status)
+---8<---
+const withProps2 = new TypeError("tp"); withProps2.extra = "ex"; console.log(withProps2.extra, Object.keys(withProps2))
+---8<---
+console.log([new Error("in array")].length, { e: new SyntaxError("se") }.e.name)
+---8<---
+const errNoName = new Error("nn"); delete errNoName.name; console.log(errNoName.toString())
+---8<---
+class CustomNamed extends Error {}; CustomNamed.prototype.name = "Renamed"; console.log(new CustomNamed("cn").toString())
+---8<---
+console.log(String(Object.assign(Object.create(Error.prototype), { message: "fake" })))
