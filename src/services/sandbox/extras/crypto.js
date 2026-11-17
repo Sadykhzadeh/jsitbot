@@ -45,13 +45,16 @@
 
   class Crypto {
     getRandomValues(array) {
+      if (!ArrayBuffer.isView(array)) {
+        const error = new TypeError("Failed to execute 'getRandomValues' on 'Crypto': 1st argument is not an ArrayBufferView");
+        error.code = "ERR_INVALID_ARG_TYPE";
+        throw error;
+      }
       if (INTEGER_ARRAYS.indexOf(Object.prototype.toString.call(array)) === -1) {
-        throw new TypeError("The data argument must be an integer-type TypedArray");
+        throw new (host.extra("events").DOMException)("The data argument must be an integer-type TypedArray", "TypeMismatchError");
       }
       if (array.byteLength > 65536) {
-        const error = new Error("The requested length exceeds 65536 bytes");
-        error.name = "QuotaExceededError";
-        throw error;
+        throw new (host.extra("events").DOMException)("The requested length exceeds 65,536 bytes", "QuotaExceededError");
       }
       fill(new Uint8Array(array.buffer, array.byteOffset, array.byteLength));
       return array;

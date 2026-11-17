@@ -357,11 +357,13 @@ describe("crypto", () => {
 
   test("refuses what a browser refuses", async () => {
     expect(await value(`crypto.getRandomValues(new Float64Array(2))`)).toBe(
-      "error: TypeError: The data argument must be an integer-type TypedArray",
+      "error: DOMException [TypeMismatchError]: The data argument must be an integer-type TypedArray",
     );
-    expect(await value(`crypto.getRandomValues([1, 2])`)).toContain("TypeError");
+    expect(await value(`crypto.getRandomValues([1, 2])`)).toBe(
+      "error: TypeError: Failed to execute 'getRandomValues' on 'Crypto': 1st argument is not an ArrayBufferView",
+    );
     expect(await value(`crypto.getRandomValues(new Uint8Array(65537))`)).toBe(
-      "error: QuotaExceededError: The requested length exceeds 65536 bytes",
+      "error: DOMException [QuotaExceededError]: The requested length exceeds 65,536 bytes",
     );
     expect(await value(`return crypto.getRandomValues(new Uint8Array(65536)).length`)).toBe("65536");
   });
