@@ -103,6 +103,7 @@
   const booleanValueOf = uncurry(Boolean.prototype.valueOf);
   const bigintValueOf = uncurry(BigInt.prototype.valueOf);
   const symbolValueOf = uncurry(Symbol.prototype.valueOf);
+  const inspectCustomSymbol = Symbol.for("nodejs.util.inspect.custom");
 
   // The tag of an object whose prototype was taken away is only Object, though
   // what it is still shows in its internal slots: each of these throws for
@@ -1148,6 +1149,47 @@
     return text;
   }
 
+  // A failure in a custom inspector is not a formatting problem: it ends the run,
+  // as it ends the console call in Node.
+  function rethrowFailure(state) {
+    if (state.failure !== undefined) throw state.failure.error;
+  }
+
+  function identityStylize(text) {
+    return text;
+  }
+
+  // A value whose inspect.custom method (under Symbol.for) is a function is shown
+  // as that method returns it: a string as it is, anything else formatted in turn.
+  // The method gets the depth left, the options and an inspect function, as in Node.
+  function customText(value, depth, state) {
+    if (value === null) return undefined;
+    let custom;
+    try {
+      custom = value[inspectCustomSymbol];
+    } catch (error) {
+      state.failure = { error };
+      throw error;
+    }
+    if (typeof custom !== "function") return undefined;
+
+    const remaining = depthLimit - depth;
+    const options = { depth: remaining, showHidden, colors: false, stylize: identityStylize, compact: 3, breakLength: LINE_WIDTH };
+    const inspectValue = function inspect(item) {
+      return format(item, 0, { left: maxLogLength, cut: false, stack: [] });
+    };
+    let result;
+    try {
+      result = reflectApply(custom, value, [remaining, options, inspectValue]);
+    } catch (error) {
+      state.failure = { error };
+      throw error;
+    }
+    if (result === value) return undefined;
+    if (typeof result === "string") return result.split("\n").join("\n" + spaces(depth));
+    return format(result, depth, state);
+  }
+
   // The one entry point for turning any value into text. state.left is the
   // remaining character budget; state.cut records that something was dropped.
   function format(value, depth, state) {
@@ -1182,12 +1224,15 @@
     }
     state.stack[state.stack.length] = value;
     try {
+      const custom = customText(value, depth, state);
+      if (custom !== undefined) return custom;
       if (typeof value === "function") {
         const text = formatFunction(value);
         return withProperties(text, value, depth, state);
       }
       return formatObject(value, depth, state);
     } catch (ignored) {
+      rethrowFailure(state);
       return "[Unformattable object]";
     } finally {
       state.stack.length = state.stack.length - 1;
@@ -1200,6 +1245,7 @@
     try {
       text = raw && typeof value === "string" ? value : format(value, 0, state);
     } catch (ignored) {
+      rethrowFailure(state);
       text = "[Unformattable value]";
     }
     return { text: bound(text, limit, state), cut: state.cut };
@@ -1460,6 +1506,7 @@
           jsonFailure = undefined;
           throw thrown;
         }
+        rethrowFailure(state);
         line = "";
       }
     }
@@ -1469,6 +1516,7 @@
       try {
         piece = typeof argument === "string" && !quoteStrings ? argument : format(argument, 0, state);
       } catch (ignored) {
+        rethrowFailure(state);
         piece = "[Unformattable value]";
       }
       line += (i > 0 ? " " : "") + piece;

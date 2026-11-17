@@ -261,6 +261,61 @@ describe("thrown values", () => {
   }
 });
 
+describe("Symbol.for('nodejs.util.inspect.custom')", () => {
+  test("a method under that symbol prints what it returns, as a string as it is", async () => {
+    expect(await logged(`const sym = Symbol.for("nodejs.util.inspect.custom"); console.log({ [sym]() { return "custom text" } })`)).toEqual(["custom text"]);
+    expect(await logged(`class Money { constructor(v) { this.v = v } [Symbol.for("nodejs.util.inspect.custom")]() { return \`Money(\${this.v})\` } } console.log(new Money(5), [new Money(6)], { m: new Money(7) })`)).toEqual([
+      "Money(5) [ Money(6) ] { m: Money(7) }",
+    ]);
+  });
+
+  test("a value it returns that is not a string is printed as that value", async () => {
+    expect(await logged(`console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return ["list", 1] } })`)).toEqual(["[ 'list', 1 ]"]);
+    expect(await logged(`console.log([{ [Symbol.for("nodejs.util.inspect.custom")]() { return { replaced: true } } }])`)).toEqual(["[ { replaced: true } ]"]);
+    expect(await logged(`console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return 42 } })`)).toEqual(["42"]);
+    expect(await logged(`console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return undefined }, x: 1 })`)).toEqual(["undefined"]);
+  });
+
+  test("gets the depth left, options and an inspect function", async () => {
+    expect(await logged(`class DepthSeen { [Symbol.for("nodejs.util.inspect.custom")](depth) { return "depth " + depth } } console.log({ a: { b: { c: new DepthSeen() } } })`)).toEqual([
+      "{ a: { b: { c: depth 0 } } }",
+    ]);
+    expect(await logged(`class Quiet { [Symbol.for("nodejs.util.inspect.custom")](depth, options, inspect) { return typeof inspect } } console.log(new Quiet())`)).toEqual(["function"]);
+    expect(await logged(`class Opts { [Symbol.for("nodejs.util.inspect.custom")](depth, options) { return typeof options.stylize } } console.log(new Opts())`)).toEqual(["function"]);
+  });
+
+  test("a string with more than one line is indented under its key, as Node does", async () => {
+    expect(await logged(`class Multi { [Symbol.for("nodejs.util.inspect.custom")]() { return "line one\\nline two" } } console.log({ inner: { m: new Multi() } })`)).toEqual([
+      "{\n  inner: {\n    m: line one\n    line two\n  }\n}",
+    ]);
+  });
+
+  test("a symbol that is not the registered one, or a property that is not a function, is an ordinary key", async () => {
+    expect(await logged(`console.log({ [Symbol.for("nodejs.util.inspect.custom")]: 5, x: 1 })`)).toEqual(["{ x: 1, Symbol(nodejs.util.inspect.custom): 5 }"]);
+    expect(await logged(`console.log({ [Symbol("nodejs.util.inspect.custom")]() { return "not registered" } })`)).toEqual([
+      "{\n  Symbol(nodejs.util.inspect.custom): [Function: [nodejs.util.inspect.custom]]\n}",
+    ]);
+  });
+
+  test("a method that returns its own object is printed as the object", async () => {
+    expect(await logged(`console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return this } })`)).toEqual([
+      "{\n  Symbol(nodejs.util.inspect.custom): [Function: [nodejs.util.inspect.custom]]\n}",
+    ]);
+  });
+
+  test("a method that throws ends the run with its error", async () => {
+    const result = await sandbox.execute(`console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { throw new Error("bad inspector") } })`);
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.error).toBe("Error: bad inspector");
+  });
+
+  test("a method that never returns is stopped by the time limit like any other run", async () => {
+    const result = await sandbox.execute(`class Loop { [Symbol.for("nodejs.util.inspect.custom")]() { while (true) {} } } console.log(new Loop())`);
+    expect(result.ok).toBe(false);
+    expect(result.timedOut).toBe(true);
+  });
+});
+
 describe("console", () => {
   test("formats objects the same way results are formatted", async () => {
     expect(await logged(`console.log({ a: [1, 2] }, new Map([[1, 2]]), "plain", 5)`)).toEqual([
