@@ -1939,6 +1939,7 @@
   lazyGlobals("weakref", ["WeakRef"]);
   lazyGlobals("buffer", ["Buffer"]);
   lazyGlobals("disposable", ["DisposableStack", "AsyncDisposableStack", "SuppressedError"]);
+  lazyGlobals("blob", ["Blob", "File"]);
   lazyMethods("bytes", [
     [Uint8Array, "fromBase64", 1],
     [Uint8Array, "fromHex", 1],
