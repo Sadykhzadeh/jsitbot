@@ -99,9 +99,10 @@ export function stripTypes(code: string): Stripped | undefined {
  * transpiled line's text, or the one that shares most of it, is taken. It runs
  * only for an error, so the cost is paid rarely.
  */
-export function sourceLine(code: string, outputLine: number): number | undefined {
+export function sourceLine(code: string, outputLine: number, outputColumn?: number): number | undefined {
   // A function body is printed between its opening line and its closing one,
-  // so the first output line is the opening and is not counted.
+  // so the first output line is the opening and is not counted. The column of
+  // a line in a function body is moved by the wrapper, so it is not used there.
   const wrapped = needsFunctionBody(code);
   const target = outputLine - (wrapped ? 1 : 0);
   if (target < 1) {
@@ -109,6 +110,8 @@ export function sourceLine(code: string, outputLine: number): number | undefined
   }
 
   const lines = code.split("\n");
+  const whole = transpilePrefix(code, wrapped);
+  const text = whole?.[target - 1] ?? "";
   let before = { source: 0, output: 0 };
 
   for (let source = 1; source <= lines.length; source++) {
@@ -118,17 +121,84 @@ export function sourceLine(code: string, outputLine: number): number | undefined
     }
 
     if (output.length >= target) {
+      // Where the name under the column is on one line of the whole code, that
+      // is the line. A prefix can read as a statement of its own before the
+      // statement is over (`const a = b` and a line that starts `.map(...)`),
+      // so the chunk is only used when the column does not settle it.
+      if (outputColumn !== undefined && !wrapped) {
+        const exact = lineOfToken(lines, 1, text, outputColumn);
+        if (exact !== undefined) {
+          return exact;
+        }
+      }
+
       const stretch = lines.slice(before.source, source);
       if (stretch.length === output.length - before.output) {
         return before.source + (target - before.output);
       }
 
-      return matchingLine(stretch, before.source + 1, output[target - 1]);
+      return matchingLine(stretch, before.source + 1, text);
     }
     before = { source, output: output.length };
   }
 
   return undefined;
+}
+
+// A name, or a chain of member names such as `a.b.c`.
+const NAME_CHAIN = /[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/g;
+
+/**
+ * The line of a stretch of code that holds, once, the name or member chain that
+ * the output has at a column (counted in code points from 1). Undefined when
+ * the chain is not there, or is on more than one line.
+ */
+function lineOfToken(stretch: string[], first: number, outputText: string, column: number): number | undefined {
+  const unit = Array.from(outputText).slice(0, column - 1).join("").length;
+
+  let chain: string | undefined;
+  for (const match of outputText.matchAll(NAME_CHAIN)) {
+    const start = match.index ?? 0;
+    if (start <= unit && unit < start + match[0].length) {
+      chain = match[0];
+      break;
+    }
+  }
+  if (chain === undefined) {
+    return undefined;
+  }
+
+  // A non-null assertion is gone from the output, so it is ignored in the code.
+  const onLines = (name: string) =>
+    stretch
+      .map((text, index) => (containsName(text.replace(/!(?=[.[])/g, ""), name) ? index : -1))
+      .filter((index) => index >= 0);
+
+  const whole = onLines(chain);
+  if (whole.length === 1) {
+    return first + whole[0];
+  }
+  if (whole.length > 1) {
+    return undefined;
+  }
+
+  // The whole chain is not there, as when the transpiler dropped a cast in the
+  // middle of it: its first name decides, if that is on one line only.
+  const base = onLines(chain.split(".")[0]);
+  return base.length === 1 ? first + base[0] : undefined;
+}
+
+/** Whether a name or member chain occurs in a line as a whole, not inside a longer one. */
+function containsName(text: string, name: string): boolean {
+  for (let at = text.indexOf(name); at !== -1; at = text.indexOf(name, at + 1)) {
+    const before = text[at - 1] ?? "";
+    const after = text[at + name.length] ?? "";
+    if (!/[\w$.]/.test(before) && !/[\w$]/.test(after)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** The line of a stretch of code (numbered from `first`) whose text matches an output line best. */

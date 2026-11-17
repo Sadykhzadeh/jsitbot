@@ -1135,23 +1135,32 @@
     return { text: bound(text, limit, state), cut: state.cut };
   }
 
-  // The line of the user's code that an error came from, read off its stack.
-  function lineOf(error) {
+  // Where an error came from in the user's code, read off its stack: "line" or
+  // "line:column", and "0" when the stack does not say. The column is counted in
+  // code points from 1, as the engine counts it.
+  function whereOf(error) {
     try {
       const stack = error.stack;
-      if (typeof stack !== "string") return 0;
+      if (typeof stack !== "string") return "0";
       const at = stringIndexOf(stack, FILE + ":");
-      if (at === -1) return 0;
+      if (at === -1) return "0";
 
-      let line = 0;
-      for (let i = at + FILE.length + 1; i < stack.length && i < at + FILE.length + 8; i++) {
+      const numbers = [0, 0];
+      let field = 0;
+      for (let i = at + FILE.length + 1; i < stack.length && i < at + FILE.length + 20; i++) {
         const c = stack[i];
+        if (c === ":" && field === 0) {
+          field = 1;
+          continue;
+        }
         if (c < "0" || c > "9") break;
-        line = line * 10 + (stringCharCodeAt(c, 0) - 48);
+        numbers[field] = numbers[field] * 10 + (stringCharCodeAt(c, 0) - 48);
       }
-      return line;
+      if (numbers[0] === 0) return "0";
+
+      return numbers[1] > 0 ? numbers[0] + ":" + numbers[1] : "" + numbers[0];
     } catch (ignored) {
-      return 0;
+      return "0";
     }
   }
 
@@ -1176,20 +1185,20 @@
 
   function packError(error) {
     let text;
-    let line = 0;
+    let where = "0";
     let cutShort = false;
 
     if (isErrorLike(error)) {
       const state = { left: maxResultLength, cut: false, stack: [] };
       text = bound(errorText(error, state), maxResultLength, state);
       cutShort = state.cut;
-      line = lineOf(error);
+      where = whereOf(error);
     } else {
       const rendered = render(error, maxResultLength, false);
       text = "Uncaught " + rendered.text;
       cutShort = rendered.cut;
     }
-    return "e\n" + line + "\n" + flags(cutShort) + "\n" + text;
+    return "e\n" + where + "\n" + flags(cutShort) + "\n" + text;
   }
 
   // Settles with a packed string whether the code returned or threw.

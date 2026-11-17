@@ -35,6 +35,33 @@ describe("a runtime error reports its line in the code the user wrote", () => {
   }
 });
 
+describe("a runtime error inside a statement that spans lines", () => {
+  // The lines are the ones Node 26.13 reports for the same programs.
+  const cases: Array<[string, string, number]> = [
+    ["a call whose argument is on its own line", "const f = (a: number) => a;\nconst r = f(\n  1,\n  null.z,\n);", 4],
+    ["a member of an object literal, after a line of undefined", "const o: { a: number; b?: { c: number } } = {\n  a: 1,\n  b: undefined,\n};\nconst p = [\n  o.b,\n  o.b!.c,\n];", 7],
+    ["after a non-ASCII character on the same line", "const s: string = '\u{1F600}\u{1F600}';\nconst r = [\n  s,\n  'é' + null.w,\n];", 4],
+    ["after an emoji in a variable on an earlier line", "const emoji = '\u{1F600}';\nconst x = {\n  e: emoji.length,\n  v: null.q,\n};", 4],
+    ["a chain with a non-null assertion, reflowed into one line", "const items: number[] = [1];\nconst total = items\n  .map((n: number) => n * 2)\n  .concat(null!.missing as any);", 4],
+    ["an undefined name in an object literal", "const label: string = 'x';\nconst data = {\n  name: label,\n  nested: { deep: 1 },\n  value: data_missing_fn(),\n};", 5],
+    ["a reflowed sum that reads a null", "const arr: number[] = [\n  1,\n  2,\n];\nlet t: number = 0;\nt += arr[0] +\n  arr[1] +\n  null!.x;", 8],
+    ["a property chain after a line of values", "const cfg: { a: { b: number } } = {\n  a: { b: 1 },\n};\nconst tr = [\n  cfg.a.b,\n  cfg.missing.x,\n  'tail',\n];", 6],
+    ["a call after non-ASCII items on its line", "const ascii = 'x';\nconst mixed = [\n  'ü', 'ß', ascii,\n  'é'.toFixedNope(),\n];", 4],
+    ["a lookup after an emoji pair on an earlier line", "const pairs: Array<[string, number]> = [\n  ['\u{1F600}\u{1F4A9}', 1],\n  ['b', 2],\n];\nconst found = pairs.find(([k]) => k === 'b')!;\nconst value = {\n  key: found[0],\n  miss: found[9].length,\n};", 8],
+  ];
+
+  for (const [name, code, line] of cases) {
+    test(name, async () => {
+      const execution = await sandbox.execute(code);
+
+      expect(execution.ok).toBe(false);
+      if (!execution.ok) {
+        expect(execution.line).toBe(line);
+      }
+    });
+  }
+});
+
 describe("a syntax error in typed code points at its column", () => {
   const cases: Array<[string, string, number]> = [
     ["plain", "const a: number = 1;\nlet b: number = ;", 2],
@@ -107,7 +134,7 @@ describe("the line map of the transpiler", () => {
     expect(sourceLine(code, 5)).toBe(4);
   });
 
-  test("a call the transpiler prints on one line gives the line its statement starts on", () => {
+  test("without the column, a call the transpiler prints on one line gives the line its statement starts on", () => {
     expect(sourceLine("const f = (a: number) => a;\nconst r = f(\n  1,\n  null.z,\n);", 2)).toBe(2);
   });
 

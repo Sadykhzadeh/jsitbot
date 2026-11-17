@@ -62,6 +62,8 @@ interface Packed {
   line?: number;
   /** Column, counted in code points from 1, of a syntax error on that line. */
   column?: number;
+  /** Column, counted in code points from 1, that a runtime error was thrown from on its line. */
+  throwColumn?: number;
   truncated: boolean;
 }
 
@@ -88,9 +90,17 @@ function unpack(raw: string): Packed | undefined {
   }
 
   const status = raw.slice(0, firstBreak);
-  const line = Number(raw.slice(firstBreak + 1, secondBreak));
+  // "line" or "line:column", where the column is the place the error was thrown from.
+  const where = raw.slice(firstBreak + 1, secondBreak).split(":");
+  const line = Number(where[0]);
+  const column = where.length > 1 ? Number(where[1]) : 0;
   const flags = Number(raw.slice(secondBreak + 1, thirdBreak));
-  if ((status !== "o" && status !== "e") || !Number.isInteger(line) || !Number.isInteger(flags)) {
+  if (
+    (status !== "o" && status !== "e") ||
+    !Number.isInteger(line) ||
+    !Number.isInteger(column) ||
+    !Number.isInteger(flags)
+  ) {
     return undefined;
   }
 
@@ -98,6 +108,7 @@ function unpack(raw: string): Packed | undefined {
     ok: status === "o",
     text: raw.slice(thirdBreak + 1),
     line: line > 0 ? line : undefined,
+    throwColumn: line > 0 && column > 0 ? column : undefined,
     truncated: (flags & (FLAG_RESULT_CUT | FLAG_LOGS_CUT)) !== 0,
   };
 }
@@ -137,7 +148,12 @@ function isFurtherOn(error: { line?: number; column?: number }, other: Packed): 
 
 /** A runtime error of the stripped code, moved to the line of the user's code it came from. */
 function atSourceLine(packed: Packed, code: string): Packed {
-  return { ...packed, line: packed.line === undefined ? undefined : sourceLine(code, packed.line) };
+  // The column is the engine's place in the code it ran. That is the transpiled
+  // text unless the code awaits at its top level, which runs it inside a wrapper.
+  const column = awaitsAtTopLevel(code) ? undefined : packed.throwColumn;
+  const line = packed.line === undefined ? undefined : sourceLine(code, packed.line, column);
+
+  return { ...packed, line, throwColumn: undefined };
 }
 
 function isSyntaxError(packed: Packed): boolean {
