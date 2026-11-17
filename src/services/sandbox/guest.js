@@ -953,7 +953,8 @@
     }
 
     if (parts.length === 0) currentDepth = before;
-    const shown = depth === 0 ? text : "[" + text + "]";
+    // Inside a container the lines after the first are indented to the depth, as Node does.
+    const shown = depth === 0 ? text : "[" + text.split("\n").join("\n" + spaces(depth)) + "]";
     return parts.length === 0 ? shown : layout(reference(error, state) + shown + " ", "{", parts, "}", depth, BASE);
   }
 

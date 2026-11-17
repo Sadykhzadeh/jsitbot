@@ -209,6 +209,32 @@ describe("result formatting", () => {
   }
 });
 
+describe("errors with several lines inside containers", () => {
+  test("the lines after the first of an error message inside an object are indented", async () => {
+    expect(await logged("console.log({ e: new Error(\"multi\\nline message\") })")).toEqual(["{\n  e: [Error: multi\n  line message]\n}"]);
+  });
+
+  test("the lines of an error inside an array of objects are indented to its depth", async () => {
+    expect(await logged("console.log([{ x: new Error(\"a\\nb\\nc\") }])")).toEqual(["[\n  {\n    x: [Error: a\n    b\n    c]\n  }\n]"]);
+  });
+
+  test("an error several levels down is indented to its depth", async () => {
+    expect(await logged("console.log({ a: { b: { c: new Error(\"deep\\ntext\") } } })")).toEqual(["{\n  a: {\n    b: {\n      c: [Error: deep\n      text]\n    }\n  }\n}"]);
+  });
+
+  test("an error in an array is indented under the bracket", async () => {
+    expect(await logged("console.log([new Error(\"arr\\nitem\")])")).toEqual(["[\n  [Error: arr\n  item]\n]"]);
+  });
+
+  test("errors of two keys each keep their own indentation", async () => {
+    expect(await logged("console.log({ e: new TypeError(\"one\\ntwo\") }, { f: new RangeError(\"x\\ny\") })")).toEqual(["{\n  e: [TypeError: one\n  two]\n} {\n  f: [RangeError: x\n  y]\n}"]);
+  });
+
+  test("an error in a map is indented under its key", async () => {
+    expect(await logged("console.log(new Map([[\"k\", new Error(\"in\\nmap\")]]))")).toEqual(["Map(1) {\n  'k' => [Error: in\n  map]\n}"]);
+  });
+});
+
 describe("thrown values", () => {
   const cases: Array<[string, string, string]> = [
     ["an error", `throw new Error("thrown")`, "error: Error: thrown"],
