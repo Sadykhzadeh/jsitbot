@@ -165,15 +165,68 @@ function atSourceLine(packed: Packed, code: string): Packed {
   return { ...packed, line, throwColumn: undefined };
 }
 
-function isSyntaxError(packed: Packed): boolean {
-  return !packed.ok && packed.text.startsWith("SyntaxError");
+/** Code points before a line and column, both counted from 1, in the code as the user wrote it. */
+function offsetOf(code: string, line: number, column: number): number {
+  const lines = code.split("\n");
+  let offset = 0;
+  for (let index = 0; index < line - 1 && index < lines.length; index++) {
+    offset += Array.from(lines[index]).length + 1;
+  }
+  return offset + column - 1;
 }
 
-/** Whether a position lies after the last character of the code, where the code ran out. */
-function isAfterCode(code: string, line: number, column: number): boolean {
-  const lines = code.split("\n");
+/**
+ * Input that simply stops too early, worded as Node words it. The position is
+ * the engine's, in the code as the user wrote it; the message is the engine's
+ * too, JavaScript or TypeScript. Whatever comes after the last character of the
+ * code is whitespace, so an error there means the code ended. An unclosed
+ * template ends the input; an unclosed string or comment is an invalid token,
+ * at the place where the literal or comment opens. Returns undefined for any
+ * other error, which keeps the engine's wording.
+ */
+function unfinished(code: string, line: number, column: number, message: string): Packed | undefined {
+  const trimmed = code.trimEnd();
+  const trimmedLines = trimmed.split("\n");
+  const end = { line: trimmedLines.length, column: Array.from(trimmedLines.at(-1) ?? "").length + 1 };
+  const endOfInput = { ok: false, text: "SyntaxError: Unexpected end of input", line: end.line, column: end.column, truncated: false } as const;
 
-  return line === lines.length && column > Array.from(lines[line - 1]).length;
+  if (offsetOf(code, line, column) >= Array.from(trimmed).length || /end of file|found end of/.test(message)) {
+    return endOfInput;
+  }
+
+  // An odd number of unescaped backticks means a template is still open. The
+  // engine does not always say which kind of literal it stopped in.
+  const backticks = (code.match(/(?<!\\)`/g) ?? []).length;
+  if (/unexpected end of string|unterminated string literal/i.test(message)) {
+    return backticks % 2 === 1 ? endOfInput : invalidToken(code, line, column);
+  }
+  if (/unexpected end of comment|terminate multi-line comment/i.test(message)) {
+    return invalidToken(code, ...commentStart(code, line, column));
+  }
+
+  return undefined;
+}
+
+/** The wordings the engine does not give, which Node gives for input that stops early. */
+const NODE_WORDED = new Set(["SyntaxError: Unexpected end of input", "SyntaxError: Invalid or unexpected token"]);
+
+function invalidToken(code: string, line: number, column: number): Packed {
+  return { ok: false, text: "SyntaxError: Invalid or unexpected token", line, column, truncated: false };
+}
+
+/** Where an unclosed comment opens, when the code has one; otherwise the position given. */
+function commentStart(code: string, line: number, column: number): [number, number] {
+  const opening = code.lastIndexOf("/*");
+  if (opening < 0 || code.indexOf("*/", opening + 2) !== -1) {
+    return [line, column];
+  }
+
+  const before = code.slice(0, opening).split("\n");
+  return [before.length, Array.from(before.at(-1) ?? "").length + 1];
+}
+
+function isSyntaxError(packed: Packed): boolean {
+  return !packed.ok && packed.text.startsWith("SyntaxError");
 }
 
 function readString(context: QuickJSContext, handle: QuickJSHandle): string | undefined {
@@ -420,12 +473,16 @@ export class QuickJsSandboxService implements SandboxService {
     // Both failed. The JavaScript parser stops at the first type annotation, so
     // when the TypeScript parser got further, its error is the one that matters.
     const javaScript = this.locateSyntaxError(context, code, direct.parseError);
-    if (stripped && "error" in stripped && isFurtherOn(stripped.error, javaScript)) {
-      return {
+    // Input that stops early is worded the same whichever parser saw it, and
+    // the JavaScript reading has already decided that.
+    const decided = NODE_WORDED.has(javaScript.text);
+    if (stripped && "error" in stripped && !decided && isFurtherOn(stripped.error, javaScript)) {
+      const { message, line, column } = stripped.error;
+      return unfinished(code, line ?? 1, column ?? 1, message) ?? {
         ok: false,
-        text: `SyntaxError: ${stripped.error.message}`,
-        line: stripped.error.line,
-        column: stripped.error.column,
+        text: `SyntaxError: ${message}`,
+        line,
+        column,
         truncated: false,
       };
     }
@@ -445,7 +502,7 @@ export class QuickJsSandboxService implements SandboxService {
     }
 
     const error = compiled.error;
-    const described = context.dump(error) as { stack?: unknown } | null;
+    const described = context.dump(error) as { message?: unknown; stack?: unknown } | null;
     error.dispose();
 
     const stack = typeof described?.stack === "string" ? described.stack : "";
@@ -456,9 +513,8 @@ export class QuickJsSandboxService implements SandboxService {
 
     const line = Number(at[1]);
     const column = Number(at[2]);
-    // The engine says it found an empty token there, or the wrapper's closing bracket, which the user did not write.
-    const ranOut = isSyntaxError(packed) && isAfterCode(code, line, column);
-    return { ...packed, line, column, text: ranOut ? "SyntaxError: unexpected end of input" : packed.text };
+    const message = typeof described?.message === "string" ? described.message : "";
+    return unfinished(code, line, column, message) ?? { ...packed, line, column };
   }
 
   /**

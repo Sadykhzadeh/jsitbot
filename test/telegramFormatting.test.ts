@@ -237,7 +237,7 @@ describe("syntax error carets", () => {
   });
 
   test("places a caret after the last character of a line with no line break", () => {
-    const message = formatExecutionMessage(syntaxFailure(2, 12, "SyntaxError: unexpected end of input"), "const a = 1;\nlet b = 2 +");
+    const message = formatExecutionMessage(syntaxFailure(2, 12, "SyntaxError: Unexpected end of input"), "const a = 1;\nlet b = 2 +");
 
     expect(message.text).toContain("let b = 2 +\n           ^\n");
   });
