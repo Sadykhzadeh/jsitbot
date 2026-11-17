@@ -845,6 +845,23 @@
     return layout(reference(promise, state) + prefix, "{", [part], "}", depth);
   }
 
+  // An empty object, array, map, set or typed array is shown as it is even past
+  // the depth limit, since there is nothing in it to go down into.
+  function isEmptyContainer(value, tag) {
+    if (getKeys(value).length !== 0) return false;
+    const symbols = getOwnPropertySymbols(value);
+    for (let i = 0; i < symbols.length; i++) {
+      if (isEnumerable(value, symbols[i])) return false;
+    }
+    if (isArray(value)) return value.length === 0;
+    if (tag === "[object Map]") return mapSize(value) === 0;
+    if (tag === "[object Set]") return setSize(value) === 0;
+    for (let i = 0; i < TYPED_ARRAYS.length; i++) {
+      if (tag === "[object " + TYPED_ARRAYS[i] + "]") return typedArrayLength(value) === 0;
+    }
+    return true;
+  }
+
   function formatObject(value, depth, state) {
     // What is left to read from these cannot be seen without taking it, so only
     // the kind is shown. Its prototype tells what it is, without running a tag.
@@ -879,7 +896,7 @@
     const name = constructorName(value);
     const label = name === null ? "[Object: null prototype]" : name;
 
-    if (depth > depthLimit) {
+    if (depth > depthLimit && !isEmptyContainer(value, tag)) {
       if (name === null) return "[" + (isArray(value) ? "Array" : stringSlice(tag, 8, tag.length - 1)) + ": null prototype]";
       return "[" + (isArray(value) ? "Array" : label) + "]";
     }
