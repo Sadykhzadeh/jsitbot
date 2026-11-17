@@ -14,6 +14,7 @@ describe("a runtime error reports its line in the code the user wrote", () => {
     ["after an interface above it", "const a: number = 1;\ninterface N { n: number }\ntype T = string;\nnull.name", 4],
     ["after a multi-line interface", "interface Big {\n  a: number;\n  b: string;\n}\n\nconst v: Big = { a: 1, b: 'x' };\nv.missing.deep", 7],
     ["inside a typed function", "function f(a: number): number {\n  const q: number = a;\n  return q.x.y;\n}\n\nf(1)", 3],
+    ["inside a function whose body the transpiler reflows", "function g(x: number): number {\n  if (x > 0) return x;\n  const y: number = 1;\n  return null.q;\n}\ng(0)", 4],
     ["after tabs", "const a: number = 1;\n\tconst b: number = a;\n\n\tnull.name", 4],
     ["with CRLF line ends", "const a: number = 1;\r\ninterface N {}\r\nnull.name", 3],
     ["after an enum, which the transpiler expands", "enum E { A }\nconst v: number = 2;\nnull.name", 3],
@@ -97,6 +98,16 @@ describe("the line map of the transpiler", () => {
   test("maps the lines of a statement the transpiler expanded to the statement's line", () => {
     expect(sourceLine("enum E { A }\nE.A", 4)).toBe(1);
     expect(sourceLine("enum E { A }\nE.A", 5)).toBe(2);
+  });
+
+  test("finds the line of a statement inside a function body that the transpiler reflowed", () => {
+    const code = "function g(x: number): number {\n  if (x > 0) return x;\n  const y: number = 1;\n  return null.q;\n}\ng(0)";
+
+    expect(sourceLine(code, 5)).toBe(4);
+  });
+
+  test("a call the transpiler prints on one line gives the line its statement starts on", () => {
+    expect(sourceLine("const f = (a: number) => a;\nconst r = f(\n  1,\n  null.z,\n);", 2)).toBe(2);
   });
 
   test("has no line past the end of the output", () => {

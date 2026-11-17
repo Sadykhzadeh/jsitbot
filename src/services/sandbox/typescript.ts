@@ -94,9 +94,10 @@ export function stripTypes(code: string): Stripped | undefined {
  * keep line numbers, so the code is read again one more line at a time: where
  * a prefix of the code reads as a program of its own, the lines its transpiled
  * text has so far are the lines of the code up to there. Within a stretch of
- * code that spans lines the transpiled lines are paired with the code's lines
- * when there are as many of each, and the stretch's last line is taken when
- * there are not. It runs only for an error, so the cost is paid rarely.
+ * code that spans lines, the transpiled lines are paired with the code's lines
+ * when there are as many of each; otherwise the code line whose text is the
+ * transpiled line's text, or the one that shares most of it, is taken. It runs
+ * only for an error, so the cost is paid rarely.
  */
 export function sourceLine(code: string, outputLine: number): number | undefined {
   const wrapped = needsFunctionBody(code);
@@ -109,15 +110,49 @@ export function sourceLine(code: string, outputLine: number): number | undefined
       continue;
     }
 
-    const output = countLines(text);
-    if (output >= outputLine) {
-      const sameCount = source - before.source === output - before.output;
-      return sameCount ? before.source + (outputLine - before.output) : source;
+    const output = outputLines(text);
+    if (output.length >= outputLine) {
+      const stretch = lines.slice(before.source, source);
+      if (stretch.length === output.length - before.output) {
+        return before.source + (outputLine - before.output);
+      }
+
+      return matchingLine(stretch, before.source + 1, output[outputLine - 1]);
     }
-    before = { source, output };
+    before = { source, output: output.length };
   }
 
   return undefined;
+}
+
+/** The line of a stretch of code (numbered from `first`) whose text matches an output line best. */
+function matchingLine(stretch: string[], first: number, outputText: string): number {
+  const wanted = squash(outputText);
+  let best = first + stretch.length - 1;
+  let bestScore = 0;
+
+  for (let i = 0; i < stretch.length; i++) {
+    const own = squash(stretch[i]);
+    if (own === "") {
+      continue;
+    }
+    if (own === wanted) {
+      return first + i;
+    }
+
+    const score = own.includes(wanted) ? wanted.length : wanted.includes(own) ? own.length : 0;
+    if (score > bestScore) {
+      best = first + i;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+/** A line of code without its spaces, semicolons and commas, which the transpiler moves or adds. */
+function squash(line: string): string {
+  return line.replace(/[\s;,]/g, "");
 }
 
 function needsFunctionBody(code: string): boolean {
@@ -137,8 +172,8 @@ function transpilePrefix(prefix: string, wrapped: boolean): string | undefined {
   }
 }
 
-function countLines(text: string): number {
-  return text.trim() === "" ? 0 : text.replace(/\n+$/, "").split("\n").length;
+function outputLines(text: string): string[] {
+  return text.trim() === "" ? [] : text.replace(/\n+$/, "").split("\n");
 }
 
 function errorMessage(error: unknown): string {
