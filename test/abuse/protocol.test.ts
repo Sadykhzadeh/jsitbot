@@ -69,6 +69,28 @@ describe("messages with no code", () => {
   });
 });
 
+describe("edits", () => {
+  test("an edit burst of twenty is answered with its latest version, in one message", async () => {
+    const h = harness({ concurrency });
+
+    void h.sendMessage("1", 1, 7);
+    for (let i = 2; i <= 21; i++) {
+      void h.editMessage(`${i} * 2`, 1, 7);
+    }
+    await h.settled();
+    await pause(100);
+    await h.settled();
+
+    expect(h.callsTo("sendMessage")).toHaveLength(1);
+    const edits = h.callsTo("editMessageText");
+    expect(edits.length).toBeGreaterThanOrEqual(1);
+    expect(edits.length).toBeLessThanOrEqual(20);
+    const last = (edits.at(-1) ?? h.callsTo("sendMessage").at(-1))!;
+    expect(String(last.payload.text)).toContain("42");
+    await expectHealthy(pool);
+  });
+});
+
 describe("many users", () => {
   test("fifty users at once each get their own answer, none of them limited", async () => {
     const h = harness({ concurrency, maxRequests: 5 });

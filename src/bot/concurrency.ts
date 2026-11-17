@@ -127,9 +127,6 @@ export function handleConcurrently<C extends Context>(
     }
 
     const place = earlier ? earlier.then(takePlace) : takePlace();
-    if (!earlier) {
-      await place;
-    }
 
     const finished = place
       .then(() => (edit && edit.latest !== arrival ? undefined : next()))
@@ -145,8 +142,13 @@ export function handleConcurrently<C extends Context>(
         release();
       });
 
+    // Recorded before the wait below: a later update of this user has to queue
+    // behind this one even when it arrives while this one is still waiting.
     if (own) {
       own.tail = finished;
+    }
+    if (!earlier) {
+      await place;
     }
   };
 
