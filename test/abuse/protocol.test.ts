@@ -1,8 +1,12 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test as baseTest } from "bun:test";
 
 import { createHarness, type HarnessOptions } from "../helpers/botHarness";
 import { markdownV2Problem } from "../helpers/markdownV2";
 import { createPool, expectHealthy } from "./support";
+
+// A case here waits on the process sandbox, which a busy machine can slow down,
+// so each one gets more than bun's five-second default.
+const test = (name: string, body: () => Promise<void>) => baseTest(name, body, 20_000);
 
 // Messages as Telegram would deliver them, through the real handlers, with the
 // process sandbox behind them and the API replaced by the harness's recorder.
@@ -137,7 +141,7 @@ describe("output as sent to Telegram", () => {
         expect(markdownV2Problem(text)).toBeUndefined();
       }
       await expectHealthy(pool);
-    }, 20_000);
+    });
   }
 });
 

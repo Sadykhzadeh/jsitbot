@@ -6,8 +6,15 @@ import type { SandboxExecution } from "../../src/services/sandbox/types";
 export const TIME_LIMIT_MESSAGE = "Sandbox execution timed out.";
 export const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
 
-/** A benign run after an abusive one, from a pool that may have just replaced a killed process, comes back within this. */
-const HEALTHY_WALL_MS = 2_000;
+/**
+ * A benign run after an abusive one comes back within this, counting the start
+ * of a replacement process after a kill. On a busy machine that start can take
+ * seconds, so this only catches a pool that is stuck; a slow guest is caught by
+ * the run's own duration below.
+ */
+const HEALTHY_WALL_MS = 5_000;
+/** The guest part of a benign run takes about a millisecond; this allows for a loaded machine. */
+const HEALTHY_GUEST_MS = 200;
 
 /**
  * What a case should end with. `time` and `memory` are the sandbox's own limits;
@@ -118,6 +125,7 @@ export async function expectHealthy(pool: ProcessSandboxService): Promise<void> 
   if (next.ok) {
     expect(next.result).toBe("42");
     expect(next.timedOut).toBe(false);
+    expect(next.durationMs).toBeLessThan(HEALTHY_GUEST_MS);
   }
   expect(wallMs).toBeLessThan(HEALTHY_WALL_MS);
 }
