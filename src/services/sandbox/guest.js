@@ -1729,6 +1729,36 @@
     }
   }
 
+  // Methods the engine does not have, each taken from an extra. Each one is a stub
+  // until the program calls one of them: then the extra is evaluated once and
+  // every method it returns takes the place of its stub.
+  function lazyMethods(module, entries) {
+    let exported;
+
+    function load() {
+      if (exported === undefined) {
+        exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions);
+        for (let i = 0; i < entries.length; i++) {
+          const [owner, name] = entries[i];
+          defineProperty(owner, name, { value: exported[name], writable: true, configurable: true, enumerable: false });
+        }
+      }
+      return exported;
+    }
+
+    for (let i = 0; i < entries.length; i++) {
+      const [owner, name, length] = entries[i];
+      const stub = {
+        [name]() {
+          load();
+          return reflectApply(owner[name], this, arguments);
+        },
+      }[name];
+      defineProperty(stub, "length", { value: length, configurable: true });
+      defineProperty(owner, name, { value: stub, writable: true, configurable: true, enumerable: false });
+    }
+  }
+
   // A built-in method that is replaced by one from an extra, evaluated the
   // first time the method is called.
   function lazyMethod(module, owner, name) {
@@ -1872,6 +1902,14 @@
   lazyGlobals("crypto", ["crypto"]);
   lazyGlobals("intl", ["Intl"]);
   lazyGlobals("events", ["DOMException", "Event", "CustomEvent", "EventTarget", "AbortController", "AbortSignal"]);
+  lazyMethods("bytes", [
+    [Uint8Array, "fromBase64", 1],
+    [Uint8Array, "fromHex", 1],
+    [Uint8Array.prototype, "toBase64", 0],
+    [Uint8Array.prototype, "toHex", 0],
+    [Uint8Array.prototype, "setFromBase64", 1],
+    [Uint8Array.prototype, "setFromHex", 1],
+  ]);
 
   // The symbols for explicit resource management, which the engine has not got.
   for (const name of ["dispose", "asyncDispose"]) {
