@@ -23,7 +23,7 @@ import {
 } from "./types";
 import { truncateText } from "../../utils/markdownV2";
 import { zoneInfo } from "./timeZone";
-import { stripTypes } from "./typescript";
+import { sourceLine, stripTypes } from "./typescript";
 import { createCappedModule, isHeapExhausted, isHeapGrown, isHeapNearlyFull } from "./wasmHeap";
 
 const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
@@ -125,6 +125,19 @@ interface Prepared {
   guest: Guest;
   /** Where the guest's console output goes; set once per run. */
   logs: string[];
+}
+
+/** Whether a syntax error is later in the code than another, by line and then by column. */
+function isFurtherOn(error: { line?: number; column?: number }, other: Packed): boolean {
+  const line = error.line ?? 0;
+  const otherLine = other.line ?? 0;
+
+  return line > otherLine || (line === otherLine && (error.column ?? 0) > (other.column ?? 0));
+}
+
+/** A runtime error of the stripped code, moved to the line of the user's code it came from. */
+function atSourceLine(packed: Packed, code: string): Packed {
+  return { ...packed, line: packed.line === undefined ? undefined : sourceLine(code, packed.line) };
 }
 
 function isSyntaxError(packed: Packed): boolean {
@@ -351,27 +364,35 @@ export class QuickJsSandboxService implements SandboxService {
 
     const stripped = stripTypes(code);
     if (stripped && "refusal" in stripped) {
-      return { ok: false, text: stripped.refusal.message, truncated: false };
+      return {
+        ok: false,
+        text: stripped.refusal.message,
+        line: stripped.refusal.line,
+        column: stripped.refusal.column,
+        truncated: false,
+      };
     }
     if (stripped && "code" in stripped) {
       const typed = this.readCode(context, runtime, guest, stripped.code, expired);
       if (typed.settled) {
-        return typed.packed && { ...typed.packed, line: undefined };
+        return typed.packed && atSourceLine(typed.packed, code);
       }
     }
 
     // Both failed. The JavaScript parser stops at the first type annotation, so
     // when the TypeScript parser got further, its error is the one that matters.
-    if (stripped && "error" in stripped && stripped.error.line > (direct.parseError.line ?? 0)) {
+    const javaScript = this.locateSyntaxError(context, code, direct.parseError);
+    if (stripped && "error" in stripped && isFurtherOn(stripped.error, javaScript)) {
       return {
         ok: false,
         text: `SyntaxError: ${stripped.error.message}`,
         line: stripped.error.line,
+        column: stripped.error.column,
         truncated: false,
       };
     }
 
-    return this.locateSyntaxError(context, code, direct.parseError);
+    return javaScript;
   }
 
   /**

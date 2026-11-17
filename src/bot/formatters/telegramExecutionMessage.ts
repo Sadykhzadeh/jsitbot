@@ -63,7 +63,8 @@ function describeError(execution: SandboxExecution, code: string): string {
  * several of them: for a one-liner the location is obvious.
  */
 function locateError(execution: SandboxExecutionFailure, code: string): string {
-  const sourceLines = code.split("\n");
+  // A line break from a Windows keyboard leaves a carriage return at the end of its line.
+  const sourceLines = code.split("\n").map((line) => line.replace(/\r$/, ""));
   if (execution.column && execution.line && execution.line <= sourceLines.length) {
     // Shown the way Node shows a syntax error: the line, a caret under the
     // column, then the message.

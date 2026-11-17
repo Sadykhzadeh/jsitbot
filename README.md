@@ -40,6 +40,8 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 A snippet that does not run as JavaScript is read as TypeScript, and its types are removed before it runs. Code that runs as JavaScript is never changed. Types are not checked: `const n: number = "a"` runs and gives `a`.
 
+Errors point at what you wrote: a runtime error gives the line of your code, and a syntax error shows that line with a caret under its column, also when types come before it.
+
 Supported, with the same meaning as in `tsc`:
 
 - Annotations, `interface`, `type`, generics on functions, classes and calls, `as`, `satisfies`, `!`, `let x!: T`, optional parameters, overload signatures, `declare`, `abstract` classes and members, index signatures, `unique symbol`, `asserts`, `infer`, template literal types, `this` parameters, `implements`, `override` and `readonly`, `<T,>(x: T) => x` and `<number>value`

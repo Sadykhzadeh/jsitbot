@@ -53,13 +53,13 @@ describe("JavaScript comes first", () => {
     }
   });
 
-  test("a runtime error in typed code has no line, since the layout changed", async () => {
+  test("a runtime error in typed code reports its line in the typed code", async () => {
     const execution = await sandbox.execute("const a: number = 1;\ninterface Noise { n: number }\nnull.name");
 
     expect(execution.ok).toBe(false);
     if (!execution.ok) {
       expect(execution.error.startsWith("TypeError")).toBe(true);
-      expect(execution.line).toBeUndefined();
+      expect(execution.line).toBe(3);
     }
   });
 
@@ -91,7 +91,7 @@ name`;
 
   test("are refused by the type stripper", () => {
     expect(stripTypes(macro("arch()"))).toEqual({
-      error: { message: "Macros are disabled", line: 2 },
+      error: { message: "Macros are disabled", line: 2, column: 22 },
     });
   });
 });
@@ -109,7 +109,7 @@ describe("stripTypes", () => {
 
   test("says where it gave up on code it cannot parse", () => {
     expect(stripTypes("const a: number = 1;\nlet b = ;")).toEqual({
-      error: { message: "Unexpected ;", line: 2 },
+      error: { message: "Unexpected ;", line: 2, column: 9 },
     });
   });
 

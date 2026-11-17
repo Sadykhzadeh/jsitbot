@@ -511,11 +511,13 @@ describe("syntax error carets in a message, from a real run", () => {
   });
 
   test("a character outside the BMP before the error takes two cells, as it does in a monospace font", async () => {
+    // The `!` after a string is a non-null assertion as TypeScript reads it, so
+    // the error is the `1` after it: three emoji before it take three extra cells.
     const code = '"😀😀😀" ! 1';
     const message = formatExecutionMessage(await sandbox.execute(code), code);
     const { caret } = caretPair(message.text);
 
-    expect(caret.indexOf("^")).toBe(9);
+    expect(caret.indexOf("^")).toBe(11);
   });
 
   test("the caret stays under the error when the source has backticks that are escaped in the message", async () => {

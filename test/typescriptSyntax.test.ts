@@ -49,6 +49,7 @@ const TYPE_ONLY: Array<[string, string, string]> = [
   ["parameter properties", "class Pt { constructor(public x: number, private y: number) {} }\nnew Pt(3, 4)", "Pt { x: 3, y: 4 }"],
   ["class instance name", "class K { a: number = 1; }\nnew K()", "K { a: 1 }"],
   ["top-level await", "const v: number = await Promise.resolve(3);\nv", "3"],
+  ["types are not checked", "const n: number = 'a';\nn", "a"],
 ];
 
 // The transpiler lowers enums, namespaces and parameter properties to plain
