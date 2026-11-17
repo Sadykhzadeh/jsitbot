@@ -358,12 +358,28 @@
     return descriptor !== undefined && typeof descriptor.value === "string" ? descriptor.value : "Object";
   }
 
+  // Node tells a class from a function by its source. The head of a class has no
+  // parenthesis before its body, unless it matches a plain head once comments are
+  // taken out, so `class A extends (B) {}` and `class A extends f() {}` are functions.
+  const classHeadRegExp = /^(\s+[^(]*?)\s*{/;
+  const commentRegExp = /(\/\/.*?\n)|(\/\*(.|\n)*?\*\/)/g;
+  const regExpTest = uncurry(RegExp.prototype.test);
+  const stringReplace = uncurry(String.prototype.replace);
+
+  function isClassSource(source) {
+    if (!startsWith(source, "class") || !endsWith(source, "}")) return false;
+    const head = stringSlice(source, 5, source.length - 1);
+    const bracket = stringIndexOf(head, "{");
+    if (bracket === -1) return false;
+    if (stringIndexOf(stringSlice(head, 0, bracket), "(") === -1) return true;
+    return regExpTest(classHeadRegExp, stringReplace(head, commentRegExp, ""));
+  }
+
   function formatFunction(fn) {
     const nameDescriptor = getOwnPropertyDescriptor(fn, "name");
     const name = nameDescriptor && typeof nameDescriptor.value === "string" ? stringSlice(nameDescriptor.value, 0, 100) : "";
-    const source = stringSlice(functionToString(fn), 0, 6);
 
-    if (source === "class " || source === "class{") {
+    if (isClassSource(functionToString(fn))) {
       const parent = getPrototypeOf(fn);
       let extended = "";
       if (typeof parent === "function" && parent !== functionPrototype) {
