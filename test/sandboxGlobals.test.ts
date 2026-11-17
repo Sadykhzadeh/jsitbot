@@ -130,7 +130,9 @@ describe("structuredClone", () => {
     expect(await value(`structuredClone({ f() {} })`)).toContain("DataCloneError");
     expect(await value(`structuredClone(Symbol("s"))`)).toBe("error: DOMException [DataCloneError]: Symbol(s) could not be cloned.");
     expect(await value(`structuredClone(new WeakMap())`)).toContain("DataCloneError");
-    expect(await value(`structuredClone()`)).toBe("error: TypeError: The value argument is required");
+    expect(await value(`structuredClone()`)).toBe(
+      'error: TypeError: The "The value argument must be specified" argument must be specified',
+    );
   });
 
   test("a structure nested too deep is the run's own stack overflow", async () => {

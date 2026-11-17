@@ -74,6 +74,7 @@
   const mapGet = uncurry(Map.prototype.get);
   const mapSet = uncurry(Map.prototype.set);
   const weakMapGet = uncurry(WeakMap.prototype.get);
+  const weakMapHas = uncurry(WeakMap.prototype.has);
   const weakMapSet = uncurry(WeakMap.prototype.set);
   const setForEach = uncurry(Set.prototype.forEach);
   const mapSize = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
@@ -1697,6 +1698,7 @@
       weakMapSet(proxyTargets, proxy, target);
     },
     now: performance.now,
+    isProxy: (value) => weakMapHas(proxyTargets, value),
     extra: (module) => loaders[module](),
   };
 
