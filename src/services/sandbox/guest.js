@@ -378,11 +378,14 @@
   function formatFunction(fn) {
     const nameDescriptor = getOwnPropertyDescriptor(fn, "name");
     const name = nameDescriptor && typeof nameDescriptor.value === "string" ? stringSlice(nameDescriptor.value, 0, 100) : "";
+    const constructor = constructorName(fn);
 
     if (isClassSource(functionToString(fn))) {
       const parent = getPrototypeOf(fn);
       let extended = "";
-      if (typeof parent === "function" && parent !== functionPrototype) {
+      if (constructor === null) {
+        extended = " extends [null prototype]";
+      } else if (typeof parent === "function" && parent !== functionPrototype) {
         const parentName = getOwnPropertyDescriptor(parent, "name");
         if (parentName && typeof parentName.value === "string" && parentName.value) {
           extended = " extends " + stringSlice(parentName.value, 0, 100);
@@ -396,7 +399,10 @@
       : tag === "[object GeneratorFunction]" ? "GeneratorFunction"
       : tag === "[object AsyncGeneratorFunction]" ? "AsyncGeneratorFunction"
       : "Function";
-    return name ? "[" + kind + ": " + name + "]" : "[" + kind + " (anonymous)]";
+    let text = "[" + kind + (constructor === null ? " (null prototype)" : "") + (name ? ": " + name : " (anonymous)") + "]";
+    // A function whose constructor is not its kind names that constructor after it.
+    if (constructor !== null && constructor !== kind) text += " " + constructor;
+    return text;
   }
 
   function startsWith(text, prefix) {
