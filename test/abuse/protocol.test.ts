@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 
 import { createHarness, type HarnessOptions } from "../helpers/botHarness";
+import { markdownV2Problem } from "../helpers/markdownV2";
 import { createPool, expectHealthy } from "./support";
 
 // Messages as Telegram would deliver them, through the real handlers, with the
@@ -104,6 +105,40 @@ describe("floods", () => {
     expect(sent.filter((text) => text.includes("Rate limit exceeded"))).toHaveLength(1);
     await expectHealthy(pool);
   });
+});
+
+describe("output as sent to Telegram", () => {
+  const hostile: Record<string, string> = {
+    "markup and fences in the result": "'<b>x</b> `code` ](http://evil) *_~|' + '```' + '\\\\'",
+    "markup in a console line": "console.log('<b>x</b> `code` ](http://evil) *_~|'); 1",
+    "a long line of markup": "'`*[]()'.repeat(600)",
+    "sixty lines with markup": "for (let i = 0; i < 60; i++) console.log('line ' + i + ' *bold* _it_ [l](u)'); 1",
+    "an error message with markup": "throw new Error('`' + '<b>' + '](' + '\\\\')",
+    "keys that are markup": "({ '`': 1, '](x)': { '*': '_' } })",
+    "a result of five thousand newlines": "'\\n'.repeat(5000)",
+    "a result with NUL and a lone surrogate": "'a\\0b' + '\\ud83d'",
+    "a syntax error with a backtick and a caret": "1\n`\n(",
+    "a right-to-left override in a result": "'\\u202Eevil\\u202C'",
+    "a megabyte of output": "console.log('z'.repeat(1024 * 1024)); 1",
+  };
+
+  for (const [name, code] of Object.entries(hostile)) {
+    test(`is valid MarkdownV2 within the message limit: ${name}`, async () => {
+      const h = harness();
+
+      await h.sendMessage(code, 1);
+
+      const sent = h.callsTo("sendMessage");
+      expect(sent.length).toBeGreaterThan(0);
+      for (const call of sent) {
+        const text = String(call.payload.text);
+        expect(call.payload.parse_mode).toBe("MarkdownV2");
+        expect(text.length).toBeLessThanOrEqual(4_000);
+        expect(markdownV2Problem(text)).toBeUndefined();
+      }
+      await expectHealthy(pool);
+    }, 20_000);
+  }
 });
 
 describe("many users", () => {
