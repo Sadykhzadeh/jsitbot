@@ -63,10 +63,30 @@ const REFUSED: Array<[string, string, string]> = [
   ["using", "const r = { [Symbol.dispose]() {} };\n{ using h = r; }\n1", "error: SyntaxError: decorators, accessor and using are not supported"],
   ["import type", "import type { X } from './x';\nconst y = 1;\ny", "error: SyntaxError: unsupported keyword: import"],
   ["export type", "export type T = number;\n1", "error: SyntaxError: unsupported keyword: export"],
+  ["await using", "const r = { async [Symbol.asyncDispose]() {} };\n{ await using h = r; }\n1", "error: SyntaxError: decorators, accessor and using are not supported"],
+  ["import equals require", 'import fs = require("fs");\n1', "error: SyntaxError: unsupported keyword: import"],
+  ["export equals", "const a = 5;\nexport = a;", "error: SyntaxError: unsupported keyword: export"],
+];
+
+// Declarations and directives that exist only for the types, or for tools, are
+// erased, so the code runs and its last value is the result.
+const ERASED: Array<[string, string, string]> = [
+  ["declare module", 'declare module "x" { export const a: number; }\n1', "1"],
+  ["declare global", "declare global { interface Window { a: 1 } }\n1", "1"],
+  ["triple-slash directive", '/// <reference types="node" />\n1', "1"],
+  ["type assertion that looks like a tag", "const q: unknown = 5;\n<number>q", "5"],
 ];
 
 describe("type-only syntax disappears", () => {
   for (const [name, code, expected] of TYPE_ONLY) {
+    test(name, async () => {
+      expect(await answer(code)).toBe(expected);
+    });
+  }
+});
+
+describe("declarations that are erased", () => {
+  for (const [name, code, expected] of ERASED) {
     test(name, async () => {
       expect(await answer(code)).toBe(expected);
     });

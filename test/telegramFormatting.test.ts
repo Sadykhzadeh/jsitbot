@@ -366,6 +366,8 @@ describe("import and export", () => {
       "export function f() {}",
       'import type { A } from "a";\nconst b: A = 1;\nb',
       "const a: number = 1;\nexport type T = number;\na",
+      'import fs = require("fs");\nfs',
+      "const a = 5;\nexport = a;",
     ]) {
       const message = formatExecutionMessage(await sandbox.execute(code), code);
 

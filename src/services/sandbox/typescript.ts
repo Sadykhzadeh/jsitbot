@@ -39,8 +39,11 @@ const NEEDS_HELPERS = 'from "bun:wrap"';
 const HELPERS_REFUSAL = "SyntaxError: decorators, accessor and using are not supported";
 
 // An import or an export that only exists for types is erased by the
-// transpiler, so the code would run. It is refused as the module statement it is.
-const TYPE_ONLY_MODULE = /^[ \t]*(import|export)[ \t]+type\b/m;
+// transpiler, so the code would run. So is `import x = require(...)` and
+// `export = x`, which would run as a call of require. They are refused as the
+// module statements they are.
+const TYPE_ONLY_MODULE = /^[ \t]*(?:(import)[ \t]+(?:type\b|[\w$]+[ \t]*=)|(export)(?:[ \t]+type\b|[ \t]*=))/m;
+
 
 /**
  * Removes TypeScript syntax (annotations, interfaces, generics, enums...) and
@@ -55,9 +58,10 @@ export function stripTypes(code: string): Stripped | undefined {
   const moduleStatement = TYPE_ONLY_MODULE.exec(code);
   if (moduleStatement) {
     const keywordAt = moduleStatement.index + moduleStatement[0].length - moduleStatement[0].trimStart().length;
+    const keyword = moduleStatement[1] ?? moduleStatement[2];
     return {
       refusal: {
-        message: `SyntaxError: unsupported keyword: ${moduleStatement[1]}`,
+        message: `SyntaxError: unsupported keyword: ${keyword}`,
         ...position(code, keywordAt),
       },
     };

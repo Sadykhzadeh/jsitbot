@@ -46,11 +46,13 @@ Supported, with the same meaning as in `tsc`:
 
 - Annotations, `interface`, `type`, generics on functions, classes and calls, `as`, `satisfies`, `!`, `let x!: T`, optional parameters, overload signatures, `declare`, `abstract` classes and members, index signatures, `unique symbol`, `asserts`, `infer`, template literal types, `this` parameters, `implements`, `override` and `readonly`, `<T,>(x: T) => x` and `<number>value`
 - `enum` (regular, `const`, string and computed members, reverse mapping), `namespace` with exported members, and parameter properties such as `constructor(private x: number)`
+- `declare module`, `declare global` and triple-slash directives, which are erased and so run
 
 Not supported, and refused with one line:
 
 - Decorators, `accessor` and `using` (`decorators, accessor and using are not supported`)
 - `import type` and `export type`, which get the same hint as `import` and `export`
+- `import x = require(...)` and `export = x`, which get the same hint as `import` and `export`
 
 ## How Output Compares With Node
 
