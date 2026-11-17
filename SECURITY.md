@@ -19,6 +19,18 @@ Only the latest commit on `master` is supported.
 
 Run your own instance (see the README) and attack that. Do not run exploits, floods or long-running loops against the public [@jsitbot](https://t.me/jsitbot).
 
+## Abuse suite
+
+`test/abuse` runs hostile input through the process sandbox and the bot's handlers on every `bun test`, which CI runs on every pull request and on every push to master. Each case is a snippet and the outcome it must end with: a result, the time limit, the memory limit, or a named error. After every case the same pool must answer a benign run correctly within two seconds, and the output must stay within its bounds. The suite covers:
+
+- CPU: loops, unbounded recursion, catastrophic regular expressions, huge joins and repeats, BigInt towers, comparators that loop or throw, deep stringify, generators, proxies and getters that call themselves, and loops inside printing.
+- Memory: doubling arrays, strings and typed arrays, huge maps and buffers, closures that keep data alive, and WebAssembly, which the guest does not have.
+- Output: a million lines, a 10 MB string, escape sequences, markup, lone surrogates, NUL bytes, errors whose parts throw, and the MarkdownV2 of every message the bot sends for them.
+- Escapes: the constructor and Function routes to the global object, eval, dynamic import and require, `Atomics.wait`, `Error.prepareStackTrace`, and changes to built-ins that must not reach the next run.
+- Protocol: code at and one character over the length limit, whitespace and comment-only messages, bursts of edits, fifty users at once, a flood from one user, inline queries with hostile text, and commands in odd places.
+
+It does not cover: input that is generated rather than written down (there is no fuzzing), the real Telegram API (the suite uses fakes), the behaviour of Bun, QuickJS or the Emscripten build beyond the cases listed, memory exhaustion of the machine beyond the 64 MB cap, timing side channels, or load beyond fifty users. Its time limits are the production values, so one case that prints a million lines may end at the time limit on a busy machine; it still has to keep its output bounded and leave the pool healthy. No one outside this project has reviewed the suite or the cases.
+
 ## In scope
 
 - **Guest escape.** Code in a message or inline query that reaches anything outside the QuickJS context: the host process, its modules, files, environment, network, or the bot's token or configuration. This includes the step that strips TypeScript types before the code runs.
