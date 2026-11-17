@@ -95,6 +95,9 @@
   const dataViewOffset = uncurry(getOwnPropertyDescriptor(DataView.prototype, "byteOffset").get);
   const dataViewBuffer = uncurry(getOwnPropertyDescriptor(DataView.prototype, "buffer").get);
   const NativeUint8Array = Uint8Array;
+  const NativeRegExp = RegExp;
+  const regExpPrototype = RegExp.prototype;
+  const regExpSourceOf = uncurry(getOwnPropertyDescriptor(RegExp.prototype, "source").get);
   const numberValueOf = uncurry(Number.prototype.valueOf);
   const stringValueOf = uncurry(String.prototype.valueOf);
   const booleanValueOf = uncurry(Boolean.prototype.valueOf);
@@ -586,7 +589,7 @@
     for (let i = 0; numeric && i < parts.length; i++) {
       numeric = typeof array[i] === "number" || typeof array[i] === "bigint";
     }
-    const prefix = getPrototypeOf(array) === null ? "[" + name + "(" + length + "): null prototype] " : name + "(" + length + ") ";
+    const prefix = prefixFor(constructorName(array), name, name, "(" + length + ")");
     return layout(reference(array, state) + prefix, "[", parts, "]", depth, ARRAY, numeric);
   }
 
@@ -845,6 +848,60 @@
     return layout(reference(promise, state) + prefix, "{", [part], "}", depth);
   }
 
+  // The prefix Node puts before an object: its constructor name, then its tag when
+  // the tag is another name, then the size. A null prototype is said so.
+  function prefixFor(name, tag, fallback, size) {
+    if (name === null) {
+      return "[" + fallback + size + ": null prototype] " + (tag !== "" && tag !== fallback ? "[" + tag + "] " : "");
+    }
+    if (tag !== "" && name !== tag) return name + size + " [" + tag + "] ";
+    return name + size + " ";
+  }
+
+  // The tag an object shows after its name: its Symbol.toStringTag, unless the
+  // program made it an own enumerable property, which is shown as a property.
+  function tagOf(value) {
+    try {
+      const tag = value[Symbol.toStringTag];
+      if (typeof tag !== "string" || isEnumerable(value, Symbol.toStringTag)) return "";
+      return tag;
+    } catch (ignored) {
+      return "";
+    }
+  }
+
+  // Whether a value is a Date or a RegExp by its internal slots, which a tag
+  // the program sets cannot change. The RegExp prototype is not one of them.
+  function slotKindOf(value) {
+    try {
+      dateTimeOf(value);
+      return "Date";
+    } catch (ignored) {}
+    if (value !== regExpPrototype) {
+      try {
+        regExpSourceOf(value);
+        return "RegExp";
+      } catch (ignored) {}
+    }
+    return "";
+  }
+
+  function formatDate(value, depth, state) {
+    let text = "Invalid Date";
+    try { text = dateToISOString(value); } catch (ignored) {}
+    const prefix = prefixFor(constructorName(value), tagOf(value), "Date", "");
+    return withProperties(prefix === "Date " ? text : prefix + text, value, depth, state);
+  }
+
+  // A RegExp without a prototype has no source or flags to read through one, so
+  // it is printed from a copy made with the same pattern and flags.
+  function formatRegExp(value, depth, state) {
+    const name = constructorName(value);
+    const text = regExpToString(name === null ? new NativeRegExp(value) : value);
+    const prefix = prefixFor(name, tagOf(value), "RegExp", "");
+    return withProperties(prefix === "RegExp " ? text : prefix + text, value, depth, state);
+  }
+
   // An empty object, array, map, set or typed array is shown as it is even past
   // the depth limit, since there is nothing in it to go down into.
   function isEmptyContainer(value, tag) {
@@ -873,13 +930,9 @@
 
     const tag = brandOf(value, objectToString(value));
 
-    if (tag === "[object Date]") {
-      let text = "Invalid Date";
-      try { text = dateToISOString(value); } catch (ignored) {}
-      if (getPrototypeOf(value) === null) text = "[Date: null prototype] " + text;
-      return withProperties(text, value, depth, state);
-    }
-    if (tag === "[object RegExp]") return withProperties(regExpToString(value), value, depth, state);
+    const slot = slotKindOf(value);
+    if (slot === "Date") return formatDate(value, depth, state);
+    if (slot === "RegExp") return formatRegExp(value, depth, state);
     if (tag === "[object Error]" || tag === "[object DOMException]") return formatError(value, depth, state);
     if (tag === "[object Number]") return withProperties("[Number: " + formatNumber(numberValueOf(value)) + "]", value, depth, state);
     if (tag === "[object String]") return withProperties("[String: " + quote(stringValueOf(value), state) + "]", value, depth, state, true);

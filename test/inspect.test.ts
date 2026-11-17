@@ -149,7 +149,14 @@ describe("result formatting", () => {
     ["properties added to a date and a regular expression", `[Object.assign(new Date(0), { a: 1 }), Object.assign(/x/, { b: 2 })]`, "[ 1970-01-01T00:00:00.000Z { a: 1 }, /x/ { b: 2 } ]"],
     ["a subclass of Array", `class Stack extends Array {} Stack.from([1, 2])`, "Stack(2) [ 1, 2 ]"],
     ["an empty subclass of Array", `class Stack extends Array {} new Stack()`, "Stack(0) []"],
-    ["subclasses of Map and Set", `class Registry extends Map {} class Tags extends Set {} [new Registry([[1, 2]]), new Tags([3])]`, "[ Registry(1) [Map] { 1 => 2 }, Tags(1) [Set] { 3 } ]"],
+    ["subclasses of Date and RegExp keep their name", `class MyDate extends Date {} class MyRe extends RegExp {} [new MyDate(0), new MyRe("ab", "g")]`, "[ MyDate 1970-01-01T00:00:00.000Z, MyRe /ab/g ]"],
+    ["a subclass of Date that is invalid", `class MyDate extends Date {} Object.assign(new MyDate(NaN), { a: 1 })`, "MyDate Invalid Date { a: 1 }"],
+    ["a prototype swapped onto a regular expression names the class", `class MyRe extends RegExp {} Object.setPrototypeOf(/ab/, MyRe.prototype)`, "MyRe /ab/"],
+    ["a date with a tag of its own shows the tag after its name", `class Stamp extends Date { get [Symbol.toStringTag]() { return "T" } } new Stamp(0)`, "Stamp [T] 1970-01-01T00:00:00.000Z"],
+    ["subclasses of typed arrays keep their name and show the array type", `class Bar2 extends Uint8Array {} [new Bar2(2), new Bar2([1, 2, 3]), new (class Empty extends Uint8Array {})(0)]`, "[\n  Bar2(2) [Uint8Array] [ 0, 0 ],\n  Bar2(3) [Uint8Array] [ 1, 2, 3 ],\n  Empty(0) [Uint8Array] []\n]"],
+    ["a regular expression without a prototype", `Object.setPrototypeOf(/x/, null)`, "[RegExp: null prototype] /x/"],
+    ["a typed array given another prototype shows both names", `Object.setPrototypeOf(new Uint8Array(2), Uint16Array.prototype)`, "Uint16Array(2) [Uint8Array] [ 0, 0 ]"],
+    ["subclasses of Map and Set",`class Registry extends Map {} class Tags extends Set {} [new Registry([[1, 2]]), new Tags([3])]`, "[ Registry(1) [Map] { 1 => 2 }, Tags(1) [Set] { 3 } ]"],
     ["a function that holds itself", `const f = () => {}; f.self = f; f`, "<ref *1> [Function: f] { self: [Circular *1] }"],
   ];
 
