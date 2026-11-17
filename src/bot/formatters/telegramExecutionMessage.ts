@@ -25,6 +25,11 @@ const MODULE_ERROR = /^SyntaxError: (?:expecting '\('|unsupported keyword: expor
 const MODULE_STATEMENT = /^\s*(?:import\s*[\w${*"']|export\b)/m;
 const MODULE_HINT = "Hint: this runs as a script, not a module, so import and export do not work.";
 
+// Node programs call require, read process or fetch a URL. The sandbox has none of
+// them, and the engine says only that the name is not defined.
+const HOST_ERROR = /^ReferenceError: '?(?:require|module|exports|process|fetch|fs|__dirname|__filename)'? is not defined$/;
+const HOST_HINT = "Hint: the sandbox has no require, process, fetch or file system: it runs JavaScript with no access to files or the network.";
+
 // A program can print half of a surrogate pair. Telegram cannot store that, so
 // it is shown as the replacement character. This runs on the text that is
 // about to be sent, after the cut: a whole megabyte of output is never scanned.
@@ -45,6 +50,9 @@ function describeError(execution: SandboxExecution, code: string): string {
   }
   if (MODULE_ERROR.test(execution.error) && MODULE_STATEMENT.test(code)) {
     return located + "\n" + MODULE_HINT;
+  }
+  if (HOST_ERROR.test(execution.error)) {
+    return located + "\n" + HOST_HINT;
   }
 
   return located;

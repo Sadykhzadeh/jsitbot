@@ -380,6 +380,33 @@ describe("import and export", () => {
   });
 });
 
+describe("host APIs the sandbox does not have", () => {
+  const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
+
+  test("a program that calls require, process, fetch or module is told there is no host", async () => {
+    for (const code of [
+      "require('fs')",
+      "const fs = require('fs'); fs.readFileSync('x')",
+      "process.env.TOKEN",
+      "fetch('https://example.com')",
+      "module.exports = 1",
+      "console.log(__dirname)",
+    ]) {
+      const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+      expect(message.text).toContain("Hint: the sandbox has no require, process, fetch or file system");
+    }
+  });
+
+  test("a program that defines its own name, or reads one that is there, gets no hint", async () => {
+    for (const code of ["const process = 1; process + 1", "const require = (x) => x; require(2)", "typeof fetch"]) {
+      const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+      expect(message.text).not.toContain("Hint");
+    }
+  });
+});
+
 describe("output that needs a file", () => {
   const run = (logs: string[], result = "1") => ({
     ok: true as const,
