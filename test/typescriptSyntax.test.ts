@@ -80,3 +80,20 @@ describe("syntax the sandbox refuses", () => {
     });
   }
 });
+
+describe("results of typed programs", () => {
+  test("the last expression is the result, and console output is kept apart", async () => {
+    const execution = await sandbox.execute("const x: number = 1;\nconsole.log('seen');\nx");
+
+    expect(execution.ok && execution.result).toBe("1");
+    expect(execution.logs).toEqual(["seen"]);
+  });
+
+  test("an async arrow with annotations resolves when awaited", async () => {
+    expect(await answer("const f = async (): Promise<number> => 4;\nawait f()")).toBe("4");
+  });
+
+  test("a typed script that only declares types has no result", async () => {
+    expect(await answer("type A = number;\ninterface B { a: A }")).toBe("undefined");
+  });
+});
