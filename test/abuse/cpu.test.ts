@@ -25,7 +25,7 @@ const cases: AbuseCase[] = [
     outcome: timeLimit,
   },
   { name: "huge Array join", code: `Array(1e9).join("x").length`, outcome: timeLimit },
-  { name: "string repeated to 2^30", code: `"x".repeat(2 ** 30).length`, outcome: failsWith(/invalid string length/) },
+  { name: "string repeated to 2^30", code: `"x".repeat(2 ** 30).length`, outcome: failsWith(/invalid string length/i) },
   {
     name: "BigInt power tower",
     code: `(2n ** (2n ** 30n)).toString().length`,
