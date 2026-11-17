@@ -91,6 +91,21 @@ describe("edits", () => {
   });
 });
 
+describe("floods", () => {
+  test("a user over the limit gets one notice, not one for every message", async () => {
+    const h = harness({ maxRequests: 5 });
+
+    for (let i = 1; i <= 30; i++) {
+      await h.sendMessage(`${i} + 1`, i, 42);
+    }
+
+    const sent = texts(h.callsTo("sendMessage"));
+    expect(sent.filter((text) => text.includes("*Result*"))).toHaveLength(5);
+    expect(sent.filter((text) => text.includes("Rate limit exceeded"))).toHaveLength(1);
+    await expectHealthy(pool);
+  });
+});
+
 describe("many users", () => {
   test("fifty users at once each get their own answer, none of them limited", async () => {
     const h = harness({ concurrency, maxRequests: 5 });

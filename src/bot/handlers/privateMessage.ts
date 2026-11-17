@@ -49,9 +49,29 @@ export interface PrivateAnswerer {
 export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyTracker }): PrivateAnswerer {
   const runCode = createRunner(options);
   const replies = options.replies;
+  // Users told they are over a limit, and until when they are not told again.
+  const notifiedUntil = new Map<number, number>();
 
   function isNotModified(error: unknown): boolean {
     return error instanceof GrammyError && /message is not modified/i.test(error.description);
+  }
+
+  /**
+   * A user over a limit is told once per window. Every message sent meanwhile
+   * is refused as well, and a reply to each would be a flood of its own.
+   */
+  function shouldNotify(userId: number): boolean {
+    const now = Date.now();
+    if ((notifiedUntil.get(userId) ?? 0) > now) {
+      return false;
+    }
+    for (const [id, until] of notifiedUntil) {
+      if (until <= now) {
+        notifiedUntil.delete(id);
+      }
+    }
+    notifiedUntil.set(userId, now + options.rateLimitPolicy.windowMs);
+    return true;
   }
 
   async function answerFor(request: PrivateRequest): Promise<Answer | undefined> {
@@ -64,6 +84,9 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
     }
 
     const outcome = await runCode(request.userId, request.code);
+    if (!outcome.ran && outcome.refusal !== "too-long" && !shouldNotify(request.userId)) {
+      return undefined;
+    }
 
     return {
       text: outcome.message.text,
