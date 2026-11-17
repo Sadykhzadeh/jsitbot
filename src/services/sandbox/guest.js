@@ -375,9 +375,21 @@
     return regExpTest(classHeadRegExp, stringReplace(head, commentRegExp, ""));
   }
 
+  // A function's name as Node shows it: a string as it is, a symbol as its
+  // description, and a number, boolean, bigint, null or undefined as it reads.
+  // Anything else is no name, and an empty name is anonymous.
+  function functionNameText(value) {
+    if (typeof value === "string") return stringSlice(value, 0, 100);
+    if (typeof value === "symbol") return stringSlice(symbolToString(value), 0, 100);
+    if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint" || value === null || value === undefined) {
+      return toText(value);
+    }
+    return "";
+  }
+
   function formatFunction(fn) {
     const nameDescriptor = getOwnPropertyDescriptor(fn, "name");
-    const name = nameDescriptor && typeof nameDescriptor.value === "string" ? stringSlice(nameDescriptor.value, 0, 100) : "";
+    const name = nameDescriptor === undefined ? "" : functionNameText(nameDescriptor.value);
     const constructor = constructorName(fn);
 
     if (isClassSource(functionToString(fn))) {
