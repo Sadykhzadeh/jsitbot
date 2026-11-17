@@ -674,13 +674,46 @@
   // Prototype -> function that lists what to show of an instance of a class the
   // extras define (URL and the like), whose state is not in visible properties.
   const inspectors = new Map();
+  // The classes whose subclasses are shown the same way, such as Buffer.
+  const inheritedInspectors = new Map();
+  // The classes whose instances %s turns into text with their own toString, as Node
+  // does for a Buffer.
+  const textClasses = new Map();
+  let anyInherited = false;
 
-  function registerInspector(Class, inspect) {
+  function registerInspector(Class, inspect, inherit, asText) {
     mapSet(inspectors, Class.prototype, inspect);
+    if (inherit) {
+      mapSet(inheritedInspectors, Class.prototype, inspect);
+      anyInherited = true;
+    }
+    if (asText) mapSet(textClasses, Class.prototype, true);
+  }
+
+  function isTextClass(value) {
+    if (!anyInherited) return false;
+    for (let proto = getPrototypeOf(value); proto !== null; proto = getPrototypeOf(proto)) {
+      if (mapGet(textClasses, proto) === true) return true;
+    }
+    return false;
+  }
+
+  // The inspector of an object: the one of its own class, or of a class it
+  // inherits from when that one was registered for its subclasses.
+  function findInspector(value) {
+    const own = getPrototypeOf(value);
+    const inspect = mapGet(inspectors, own);
+    if (inspect !== undefined || !anyInherited) return inspect;
+    for (let proto = own; proto !== null; proto = getPrototypeOf(proto)) {
+      const inherited = mapGet(inheritedInspectors, proto);
+      if (inherited !== undefined) return inherited;
+    }
+    return undefined;
   }
 
   function formatInspected(inspect, name, value, depth, state) {
     const described = inspect(value);
+    if (described.text !== undefined) return described.text;
     const entries = described.entries;
     const parts = [];
     const before = enter(depth);
@@ -851,7 +884,7 @@
       return "[" + (isArray(value) ? "Array" : label) + "]";
     }
 
-    const inspect = mapGet(inspectors, getPrototypeOf(value));
+    const inspect = findInspector(value);
     if (inspect !== undefined) return formatInspected(inspect, label, value, depth, state);
 
     if (isArray(value)) return formatArray(value, depth, state);
@@ -1064,7 +1097,7 @@
         if (typeof argument === "function") return toText(argument);
         if (typeof argument !== "object" || argument === null) return format(argument, 0, state);
 
-        if (!hasBuiltInToString(argument)) {
+        if (!hasBuiltInToString(argument) || isTextClass(argument)) {
           try {
             return toText(argument);
           } catch (ignored) {}
@@ -1904,6 +1937,7 @@
   lazyGlobals("intl", ["Intl"]);
   lazyGlobals("events", ["DOMException", "Event", "CustomEvent", "EventTarget", "AbortController", "AbortSignal"]);
   lazyGlobals("weakref", ["WeakRef"]);
+  lazyGlobals("buffer", ["Buffer"]);
   lazyMethods("bytes", [
     [Uint8Array, "fromBase64", 1],
     [Uint8Array, "fromHex", 1],
