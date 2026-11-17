@@ -647,6 +647,21 @@
     return name + "(" + size + ") " + (base === "Array" ? "" : "[" + base + "] ");
   }
 
+  // An accessor is shown as what it is, without running it; a data property as its value.
+  function accessorText(descriptor) {
+    return descriptor.get ? (descriptor.set ? "[Getter/Setter]" : "[Getter]") : "[Setter]";
+  }
+
+  function propertyText(descriptor, depth, state) {
+    if (descriptor.get || descriptor.set) return accessorText(descriptor);
+    return nested(descriptor.value, depth, state);
+  }
+
+  // An element of an array, read from its descriptor so that an accessor is not run.
+  function elementText(array, index, depth, state) {
+    return propertyText(getOwnPropertyDescriptor(array, index), depth, state);
+  }
+
   function formatArray(array, depth, state) {
     const parts = [];
     const length = array.length;
@@ -657,7 +672,7 @@
     // An array that runs out of room keeps a tenth of the budget for its "more items" line and its bracket.
     while (index < length && parts.length < MAX_ENTRIES && state.left > state.room) {
       if (hasOwn(array, index)) {
-        const part = nested(array[index], depth + 1, state);
+        const part = elementText(array, index, depth + 1, state);
         parts[parts.length] = part;
         state.left -= part.length;
         index++;
@@ -683,7 +698,9 @@
 
     let numeric = true;
     for (let i = 0; numeric && i < parts.length; i++) {
-      numeric = typeof array[i] === "number" || typeof array[i] === "bigint";
+      const descriptor = getOwnPropertyDescriptor(array, i);
+      const value = descriptor !== undefined && hasOwn(descriptor, "value") ? descriptor.value : undefined;
+      numeric = typeof value === "number" || typeof value === "bigint";
     }
     return layout(reference(array, state) + subclassPrefix(array, "Array", length), "[", parts, "]", depth, ARRAY, numeric);
   }
@@ -910,12 +927,7 @@
           : key === "__proto__" ? "['__proto__']"
           : isIdentifier(key) ? key
           : quote(key, state);
-        let value;
-        if (descriptor.get || descriptor.set) {
-          value = descriptor.get ? (descriptor.set ? "[Getter/Setter]" : "[Getter]") : "[Setter]";
-        } else {
-          value = nested(descriptor.value, depth + 1, state);
-        }
+        const value = propertyText(descriptor, depth + 1, state);
         const part = (hidden ? "[" + label + "]" : label) + ": " + value;
         parts[parts.length] = part;
         state.left -= part.length;
