@@ -156,6 +156,15 @@ describe("result formatting", () => {
     ["subclasses of typed arrays keep their name and show the array type", `class Bar2 extends Uint8Array {} [new Bar2(2), new Bar2([1, 2, 3]), new (class Empty extends Uint8Array {})(0)]`, "[\n  Bar2(2) [Uint8Array] [ 0, 0 ],\n  Bar2(3) [Uint8Array] [ 1, 2, 3 ],\n  Empty(0) [Uint8Array] []\n]"],
     ["a regular expression without a prototype", `Object.setPrototypeOf(/x/, null)`, "[RegExp: null prototype] /x/"],
     ["a typed array given another prototype shows both names", `Object.setPrototypeOf(new Uint8Array(2), Uint16Array.prototype)`, "Uint16Array(2) [Uint8Array] [ 0, 0 ]"],
+    ["built-in prototypes are shown by their tag, not as collections", `[Map.prototype, Set.prototype, Promise.prototype, WeakMap.prototype]`, "[\n  Object [Map] {},\n  Object [Set] {},\n  Object [Promise] {},\n  Object [WeakMap] {}\n]"],
+    ["the prototypes of binary data and of primitives", `[ArrayBuffer.prototype, DataView.prototype, Symbol.prototype, BigInt.prototype]`, "[\n  Object [ArrayBuffer] {},\n  Object [DataView] {},\n  Object [Symbol] {},\n  Object [BigInt] {}\n]"],
+    ["the prototypes of the wrappers of primitives are plain objects", `[Number.prototype, String.prototype, Boolean.prototype]`, "[ {}, {}, {} ]"],
+    ["objects made from a collection prototype are named after it", `[Object.create(Map.prototype), Object.create(Set.prototype), Object.create(WeakMap.prototype)]`, "[ Map {}, Set {}, WeakMap {} ]"],
+    ["objects made from other prototypes of built-ins are named after them", `[Object.create(Promise.prototype), Object.create(ArrayBuffer.prototype), Object.create(Symbol.prototype), Object.create(Number.prototype)]`, "[ Promise {}, ArrayBuffer {}, Symbol {}, Number {} ]"],
+    ["an object with a tag of a collection is not one", `({ [Symbol.toStringTag]: "Map" })`, "{ Symbol(Symbol.toStringTag): 'Map' }"],
+    ["a class instance with a tag of a collection shows the tag", `class Fake { get [Symbol.toStringTag]() { return "Map" } } new Fake()`, "Fake [Map] {}"],
+    ["an object without a prototype is named by its own tag", `Object.setPrototypeOf({ [Symbol.toStringTag]: "Map" }, null)`, "[Map: null prototype] { Symbol(Symbol.toStringTag): 'Map' }"],
+    ["an object with a tag of an error is not an error", `({ [Symbol.toStringTag]: "Error" })`, "{ Symbol(Symbol.toStringTag): 'Error' }"],
     ["subclasses of Map and Set",`class Registry extends Map {} class Tags extends Set {} [new Registry([[1, 2]]), new Tags([3])]`, "[ Registry(1) [Map] { 1 => 2 }, Tags(1) [Set] { 3 } ]"],
     ["a function that holds itself", `const f = () => {}; f.self = f; f`, "<ref *1> [Function: f] { self: [Circular *1] }"],
   ];
@@ -222,6 +231,12 @@ describe("console", () => {
       console.info("info"); console.warn("warn"); console.error("error");
       console.debug("debug"); console.dir({ x: 1 });
     `)).toEqual(["info", "warn", "error", "debug", "{ x: 1 }"]);
+  });
+
+  test("a promise, a weak reference and a lazily installed global format in one run", async () => {
+    expect(await logged(`console.log(Promise.resolve(1), new WeakRef({ a: 1 }).deref(), typeof structuredClone)`)).toEqual([
+      "Promise { 1 } { a: 1 } function",
+    ]);
   });
 
   test("logging nothing gives an empty line", async () => {

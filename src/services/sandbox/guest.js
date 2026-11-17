@@ -80,6 +80,8 @@
   const mapSize = uncurry(getOwnPropertyDescriptor(Map.prototype, "size").get);
   const setSize = uncurry(getOwnPropertyDescriptor(Set.prototype, "size").get);
   const errorPrototype = Error.prototype;
+  const arrayBufferPrototype = ArrayBuffer.prototype;
+  const dataViewPrototype = DataView.prototype;
   const mapIteratorPrototype = getPrototypeOf(new Map().keys());
   const setIteratorPrototype = getPrototypeOf(new Set().values());
   const TypedArray = getPrototypeOf(Uint8Array);
@@ -89,8 +91,6 @@
   const typedArrayBuffer = uncurry(getOwnPropertyDescriptor(TypedArray.prototype, "buffer").get);
   const arrayBufferLength = uncurry(getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get);
   const sharedArrayBufferLength = uncurry(getOwnPropertyDescriptor(SharedArrayBuffer.prototype, "byteLength").get);
-  const arrayBufferPrototype = ArrayBuffer.prototype;
-  const dataViewPrototype = DataView.prototype;
   const dataViewLength = uncurry(getOwnPropertyDescriptor(DataView.prototype, "byteLength").get);
   const dataViewOffset = uncurry(getOwnPropertyDescriptor(DataView.prototype, "byteOffset").get);
   const dataViewBuffer = uncurry(getOwnPropertyDescriptor(DataView.prototype, "buffer").get);
@@ -112,20 +112,75 @@
   const dateTimeOf = uncurry(Date.prototype.getTime);
   const typedArrayNameOf = uncurry(getOwnPropertyDescriptor(getPrototypeOf(Uint8Array.prototype), Symbol.toStringTag).get);
 
-  function brandOf(value, tag) {
-    if (tag !== "[object Object]" || getPrototypeOf(value) !== null) return tag;
-    try { mapSizeOf(value); return "[object Map]"; } catch (ignored) {}
-    try { setSizeOf(value); return "[object Set]"; } catch (ignored) {}
-    try { dateTimeOf(value); return "[object Date]"; } catch (ignored) {}
-    const typed = typedArrayNameOf(value);
-    return typed === undefined ? tag : "[object " + typed + "]";
-  }
-
   const TYPED_ARRAYS = [
     "Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array",
     "Int32Array", "Uint32Array", "Float32Array", "Float64Array",
     "BigInt64Array", "BigUint64Array",
   ];
+
+  // What the internal slots of a value say it is, for the tags that name one.
+  // A program can give any object a tag, so the tag alone is not trusted: each
+  // of these reads a slot and throws for anything else. The prototypes of the
+  // wrappers have the slots and are not counted, as Node does not count them.
+  const knownTags = new Map();
+  const knownNames = ["Object", "Map", "Set", "WeakMap", "WeakSet", "Promise", "Array", "Function", "Error", "Arguments",
+    "Number", "String", "Boolean", "BigInt", "Symbol", "ArrayBuffer", "SharedArrayBuffer", "DataView"].concat(TYPED_ARRAYS);
+  for (let i = 0; i < knownNames.length; i++) mapSet(knownTags, "[object " + knownNames[i] + "]", true);
+  const numberPrototype = Number.prototype;
+  const stringPrototype = String.prototype;
+  const booleanPrototype = Boolean.prototype;
+  const weakSetHas = uncurry(WeakSet.prototype.has);
+  const isPrototypeOfObject = uncurry(Object.prototype.isPrototypeOf);
+  const brandProbe = {};
+
+  function hasSlotsOf(value, tag) {
+    try {
+      switch (tag) {
+        case "[object Map]": mapSizeOf(value); return true;
+        case "[object Set]": setSizeOf(value); return true;
+        case "[object WeakMap]": weakMapHas(value, brandProbe); return true;
+        case "[object WeakSet]": weakSetHas(value, brandProbe); return true;
+        case "[object Date]": dateTimeOf(value); return true;
+        case "[object RegExp]": regExpSourceOf(value); return value !== regExpPrototype;
+        case "[object Error]": return isPrototypeOfObject(errorPrototype, value);
+        case "[object Number]": numberValueOf(value); return value !== numberPrototype;
+        case "[object String]": stringValueOf(value); return value !== stringPrototype;
+        case "[object Boolean]": booleanValueOf(value); return value !== booleanPrototype;
+        case "[object BigInt]": bigintValueOf(value); return true;
+        case "[object Symbol]": symbolValueOf(value); return true;
+        case "[object ArrayBuffer]": arrayBufferLength(value); return true;
+        case "[object SharedArrayBuffer]": sharedArrayBufferLength(value); return true;
+        case "[object DataView]": dataViewLength(value); return true;
+        case "[object Promise]": {
+          // The host reports a value that is not a promise as settled with itself.
+          const settled = promiseState(value);
+          return !(settled[0] === "fulfilled" && settled[1] === value);
+        }
+      }
+      for (let i = 0; i < TYPED_ARRAYS.length; i++) {
+        if (tag === "[object " + TYPED_ARRAYS[i] + "]") return typedArrayNameOf(value) === TYPED_ARRAYS[i];
+      }
+    } catch (ignored) {
+      return false;
+    }
+    return true;
+  }
+
+  // The tag an object is treated as having: the one it reports when its slots
+  // back it up, and Object otherwise. An object without a prototype that is a
+  // collection, a date or a typed array does not report its tag, so those are
+  // looked for too.
+  function kindOf(value, tag) {
+    if (tag === "[object Object]") {
+      if (getPrototypeOf(value) !== null) return tag;
+      if (hasSlotsOf(value, "[object Map]")) return "[object Map]";
+      if (hasSlotsOf(value, "[object Set]")) return "[object Set]";
+      if (hasSlotsOf(value, "[object Date]")) return "[object Date]";
+      const typed = typedArrayNameOf(value);
+      return typed === undefined ? tag : "[object " + typed + "]";
+    }
+    return hasSlotsOf(value, tag) ? tag : "[object Object]";
+  }
   const ELEMENT_BYTES = {
     Int8Array: 1, Uint8Array: 1, Uint8ClampedArray: 1, Int16Array: 2, Uint16Array: 2,
     Int32Array: 4, Uint32Array: 4, Float32Array: 4, Float64Array: 8, BigInt64Array: 8, BigUint64Array: 8,
@@ -270,20 +325,37 @@
     return n === 0 && 1 / n < 0 ? "-0" : toText(n);
   }
 
+  // The name of the constructor an object is an instance of, found along its
+  // prototype chain: the first named constructor that the object is an instance
+  // of, so the prototype of a class is not named after its own class.
   function constructorName(value) {
     let proto = value;
-    for (let hops = 0; hops < 20; hops++) {
-      proto = getPrototypeOf(proto);
-      if (proto === null) return null;
+    for (let hops = 0; hops < 20 && proto !== null; hops++) {
       const descriptor = getOwnPropertyDescriptor(proto, "constructor");
       if (descriptor && typeof descriptor.value === "function") {
         const nameDescriptor = getOwnPropertyDescriptor(descriptor.value, "name");
-        if (nameDescriptor && typeof nameDescriptor.value === "string" && nameDescriptor.value) {
+        if (nameDescriptor && typeof nameDescriptor.value === "string" && nameDescriptor.value && isInstanceOf(value, descriptor.value)) {
           return stringSlice(nameDescriptor.value, 0, 100);
         }
       }
+      proto = getPrototypeOf(proto);
     }
     return null;
+  }
+
+  function isInstanceOf(value, Class) {
+    try {
+      return Class.prototype !== undefined && isPrototypeOfObject(Class.prototype, value);
+    } catch (ignored) {
+      return false;
+    }
+  }
+
+  // The name a prefix gives an object without a prototype: its own tag when it
+  // has one, as V8 names it, and Object otherwise.
+  function nullPrototypeName(value) {
+    const descriptor = getOwnPropertyDescriptor(value, Symbol.toStringTag);
+    return descriptor !== undefined && typeof descriptor.value === "string" ? descriptor.value : "Object";
   }
 
   function formatFunction(fn) {
@@ -872,7 +944,11 @@
 
   // Whether a value is a Date or a RegExp by its internal slots, which a tag
   // the program sets cannot change. The RegExp prototype is not one of them.
-  function slotKindOf(value) {
+  // A date or a regular expression reports its own tag unless the program changed
+  // it. Only those and tags nothing else reports are looked at: the checks throw
+  // for anything else, and a throw is slow to make.
+  function slotKindOf(value, reported) {
+    if (reported !== "[object Date]" && reported !== "[object RegExp]" && mapGet(knownTags, reported) !== undefined) return "";
     try {
       dateTimeOf(value);
       return "Date";
@@ -923,14 +999,21 @@
     // What is left to read from these cannot be seen without taking it, so only
     // the kind is shown. Its prototype tells what it is, without running a tag.
     const prototype = getPrototypeOf(value);
+    // Buffers are told apart before their tag is read, since a program can make
+    // reading that run its code.
+    if (prototype === arrayBufferPrototype && hasSlotsOf(value, "[object ArrayBuffer]")) {
+      return depth > depthLimit ? "[ArrayBuffer]" : formatArrayBuffer(value, depth, state);
+    }
+    if (prototype === dataViewPrototype && hasSlotsOf(value, "[object DataView]")) {
+      return depth > depthLimit ? "[DataView]" : formatDataView(value, depth, state);
+    }
     if (prototype === mapIteratorPrototype) return "[Map Iterator] { <items unknown> }";
     if (prototype === setIteratorPrototype) return "[Set Iterator] { <items unknown> }";
-    if (prototype === arrayBufferPrototype) return depth > depthLimit ? "[ArrayBuffer]" : formatArrayBuffer(value, depth, state);
-    if (prototype === dataViewPrototype) return depth > depthLimit ? "[DataView]" : formatDataView(value, depth, state);
 
-    const tag = brandOf(value, objectToString(value));
+    const reported = objectToString(value);
+    const tag = kindOf(value, reported);
 
-    const slot = slotKindOf(value);
+    const slot = slotKindOf(value, reported);
     if (slot === "Date") return formatDate(value, depth, state);
     if (slot === "RegExp") return formatRegExp(value, depth, state);
     if (tag === "[object Error]" || tag === "[object DOMException]") return formatError(value, depth, state);
@@ -947,10 +1030,10 @@
     if (tag === "[object DataView]") return depth > depthLimit ? "[DataView]" : formatDataView(value, depth, state);
 
     const name = constructorName(value);
-    const label = name === null ? "[Object: null prototype]" : name;
+    const label = name === null ? "[" + (tag === "[object Object]" ? nullPrototypeName(value) : stringSlice(tag, 8, tag.length - 1)) + ": null prototype]" : name;
 
     if (depth > depthLimit && !isEmptyContainer(value, tag)) {
-      if (name === null) return "[" + (isArray(value) ? "Array" : stringSlice(tag, 8, tag.length - 1)) + ": null prototype]";
+      if (name === null) return isArray(value) ? "[Array: null prototype]" : label;
       return "[" + (isArray(value) ? "Array" : label) + "]";
     }
 
@@ -965,9 +1048,9 @@
     }
 
     // A tag the object has as an own property is shown as a property already.
-    const tagName = tag === "[object Object]" || isEnumerable(value, Symbol.toStringTag) ? "" : stringSlice(tag, 8, tag.length - 1);
+    const tagName = tagOf(value);
     let prefix = (name === null ? label : name) + " ";
-    if (tagName === "Arguments" && name === "Object") prefix = "[Arguments] ";
+    if (reported === "[object Arguments]" && name === "Object") prefix = "[Arguments] ";
     else if (tagName !== "" && tagName !== name) prefix += "[" + tagName + "] ";
     else if (name === "Object") prefix = "";
     return formatProperties(value, prefix, depth, state);
