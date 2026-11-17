@@ -1,0 +1,51 @@
+console.dir([1, 2], { showHidden: true })
+---8<---
+console.dir({ a: 1 }, { showHidden: true })
+---8<---
+console.dir(Object.defineProperty({}, "h", { value: 1 }), { showHidden: true })
+---8<---
+console.dir(new Uint8Array([1]), { showHidden: true })
+---8<---
+console.dir(new Map([[1, 2]]), { showHidden: true })
+---8<---
+console.dir(function f(a) {}, { showHidden: true })
+---8<---
+console.dir({ a: { b: { c: { d: 1 } } } }, { depth: 1 })
+---8<---
+console.dir({ a: { b: { c: { d: 1 } } } }, { depth: null })
+---8<---
+console.dir({ a: { b: { c: { d: 1 } } } }, { depth: 0 })
+---8<---
+console.dir([[1, [2, [3]]]], { depth: 2, showHidden: false })
+---8<---
+console.dir("str", { showHidden: true })
+---8<---
+console.dir(Object.create(null), { showHidden: true })
+---8<---
+console.dir([1, 2, 3], { showHidden: true, depth: 0 })
+---8<---
+console.dir({ a: { b: { c: { d: {} } } } }, { depth: 0 })
+---8<---
+console.dir({ a: { b: 1 } }, { depth: -1 })
+---8<---
+console.dir({ a: { b: 1 } }, { depth: "x" })
+---8<---
+console.dir(new Set([1]), { showHidden: true })
+---8<---
+console.dir(Object.assign([1], { tag: "t" }), { showHidden: true })
+---8<---
+console.dir({ a: { b: { c: { d: { e: 1 } } } } }, { depth: NaN })
+---8<---
+console.dir({ a: { b: { c: { d: { e: 1 } } } } }, { depth: "x" })
+---8<---
+console.dir({ a: { b: { c: { d: { e: 1 } } } } }, { depth: -1 })
+---8<---
+console.dir({ a: { b: 1 } }, { depth: Infinity })
+---8<---
+console.dir({ a: { b: { c: { d: { e: 1 } } } } }, { depth: 1.5 })
+---8<---
+console.dir(function f(a) {}, { showHidden: false })
+---8<---
+console.dir({ a: [1, { b: 2 }] }, { showHidden: true, depth: 1 })
+---8<---
+console.dir([1], { showHidden: true }); console.log([1])

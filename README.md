@@ -38,15 +38,16 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 ## How Output Compares With Node
 
-Measured with `bun run compat` against Node 26.13.0: 371 snippets in `scripts/node-diff/corpus`, run once by Node with `console.log` and once by the sandbox, both at a depth of 3 (what the sandbox shows; Node's own default is 2). 363 match exactly (97.8%). The corpus covers the inspect and console test inputs, hand-picked containers, errors and iterators, generated runs of line width, grouping, nesting and numbers, template literals, JSON, dates, null-prototype objects, generators, classes, proxies, reflection, weak references, namespaces, functions and the console forms. To reproduce it, see [Running the comparison](#running-the-comparison).
+Measured with `bun run compat` against Node 26.13.0: 397 snippets in `scripts/node-diff/corpus`, run once by Node with `console.log` and once by the sandbox, both at a depth of 3 (what the sandbox shows; Node's own default is 2). 390 match exactly (98.2%). The corpus covers the inspect and console test inputs, hand-picked containers, errors and iterators, generated runs of line width, grouping, nesting and numbers, template literals, JSON, dates, null-prototype objects, generators, classes, proxies, reflection, weak references, namespaces, functions and the console forms. To reproduce it, see [Running the comparison](#running-the-comparison).
 
 | Group (corpus file) | Snippets | Exact |
 | --- | ---: | ---: |
 | Basic: inspect and console inputs, containers, errors, formats (`basic.txt`) | 56 | 56 |
 | Built-ins, console forms, prototypes, text and numbers (`builtins.txt`) | 125 | 122 |
-| Edge cases: prototypes, tagged objects, console table, dir, count (`edge.txt`) | 101 | 98 |
+| Options of console.dir: depth and showHidden (`console-options.txt`) | 26 | 26 |
+| Edge cases: prototypes, tagged objects, console table, dir, count (`edge.txt`) | 101 | 99 |
 | Targeted at single formatting rules (`targeted.txt`) | 89 | 87 |
-| Total | 371 | 363 |
+| Total | 397 | 390 |
 
 The 636 of 684 figure in earlier notes came from a corpus that was never committed, so it cannot be reproduced; the table above replaces it.
 
@@ -68,6 +69,10 @@ Known gaps, not fixed yet:
 - `%o` on an error does not show its hidden properties, such as `[stack]` and `[message]`: Node prints them after the stack frames, and the sandbox shows no frames.
 - Properties added to a typed array longer than 100,000 items are not shown: listing its keys would make one for each item. Shorter ones show them after the items, as Node does.
 - A `%s` with an object whose `toString` throws is shown as the object, where Node stops the whole call. A test pins this, so it stays until it is decided.
+- The iterator of `Map.prototype.entries()` and of `Set.prototype.entries()` is named `Map Iterator` and `Set Iterator`, where Node says `Map Entries` and `Set Entries`: the sandbox cannot tell the kind without using the iterator.
+- An object whose prototype chain has no constructor, such as `Object.create(Object.create(null))`, is shown as a null-prototype object, where Node adds the prototype after `Object <…>`.
+- A class instance whose prototype was removed prints as `[Object: null prototype]`; Node names the class it was made by, which the engine does not keep.
+- An async or generator function whose prototype is not the one of its kind is shown as a plain function, where Node names its kind.
 
 ### Running the comparison
 
