@@ -17,6 +17,7 @@ const HEALTHY_WALL_MS = 2_000;
  */
 export type Outcome =
   | { kind: "result"; value: string | RegExp; truncated?: boolean }
+  | { kind: "result-or-time"; value: string | RegExp; truncated?: boolean }
   | { kind: "time" }
   | { kind: "memory" }
   | { kind: "limit" }
@@ -29,6 +30,8 @@ export interface AbuseCase {
 }
 
 export const result = (value: string | RegExp, truncated?: boolean): Outcome => ({ kind: "result", value, truncated });
+/** A run that prints a lot may also reach the time limit on a loaded machine: either ending is within the limits. */
+export const resultOrTime = (value: string | RegExp, truncated?: boolean): Outcome => ({ kind: "result-or-time", value, truncated });
 export const timeLimit: Outcome = { kind: "time" };
 export const memoryLimit: Outcome = { kind: "memory" };
 export const eitherLimit: Outcome = { kind: "limit" };
@@ -65,6 +68,14 @@ export function expectOutcome(execution: SandboxExecution, outcome: Outcome): vo
       if (outcome.truncated !== undefined) {
         expect(execution.truncated).toBe(outcome.truncated);
       }
+      return;
+    }
+    case "result-or-time": {
+      if (!execution.ok && execution.timedOut) {
+        expectOutcome(execution, timeLimit);
+        return;
+      }
+      expectOutcome(execution, { kind: "result", value: outcome.value, truncated: outcome.truncated });
       return;
     }
     case "time": {
