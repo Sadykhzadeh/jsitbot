@@ -222,8 +222,16 @@
       const write = hasDate && !hasTime ? Date.prototype.toLocaleDateString
         : hasTime && !hasDate ? Date.prototype.toLocaleTimeString
         : Date.prototype.toLocaleString;
-      // the arguments are checked now, as a constructor does, not at the first format
-      write.call(new Date(0), locales, given);
+      // the arguments are checked now, as a constructor does, not at the first format;
+      // the value a method refuses is named for this constructor, as Node names it
+      try {
+        write.call(new Date(0), locales, given);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          throw new RangeError(error.message.replace(/ for Date\.prototype\.\w+ options/, " for Intl.DateTimeFormat options"));
+        }
+        throw error;
+      }
 
       const format = (date) => {
         const when = new Date(date === undefined ? Date.now() : Number(date));

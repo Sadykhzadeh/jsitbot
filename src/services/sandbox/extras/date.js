@@ -49,12 +49,12 @@
     short: { month: "numeric", day: "numeric", year: "2-digit" },
   };
 
-  function choice(options, name, allowed) {
+  function choice(options, name, allowed, owner) {
     const given = options[name];
     if (given === undefined) return undefined;
     const text = String(given);
     if (allowed.indexOf(text) === -1) {
-      throw new RangeError("Value " + text + " out of range for Intl.DateTimeFormat options property " + name);
+      throw new RangeError("Value " + text + " out of range for " + owner + " options property " + name);
     }
     return text;
   }
@@ -73,29 +73,33 @@
   // What to write, from the options and the method that was called: the fields
   // with their widths, and how the time is counted. Null for what is left to the
   // engine.
-  function resolve(options, required, defaults) {
+  function resolve(options, required, defaults, owner) {
     if (options === null) throw new TypeError("Cannot convert undefined or null to object");
     options = options === undefined ? {} : Object(options);
 
     const f = {
-      weekday: choice(options, "weekday", ["narrow", "short", "long"]),
-      year: choice(options, "year", ["2-digit", "numeric"]),
-      month: choice(options, "month", ["2-digit", "numeric", "narrow", "short", "long"]),
-      day: choice(options, "day", ["2-digit", "numeric"]),
-      hour: choice(options, "hour", ["2-digit", "numeric"]),
-      minute: choice(options, "minute", ["2-digit", "numeric"]),
-      second: choice(options, "second", ["2-digit", "numeric"]),
+      weekday: choice(options, "weekday", ["narrow", "short", "long"], owner),
+      year: choice(options, "year", ["2-digit", "numeric"], owner),
+      month: choice(options, "month", ["2-digit", "numeric", "narrow", "short", "long"], owner),
+      day: choice(options, "day", ["2-digit", "numeric"], owner),
+      hour: choice(options, "hour", ["2-digit", "numeric"], owner),
+      minute: choice(options, "minute", ["2-digit", "numeric"], owner),
+      second: choice(options, "second", ["2-digit", "numeric"], owner),
       fractionalSecondDigits: undefined,
-      timeZoneName: choice(options, "timeZoneName", ["short", "long", "shortOffset", "longOffset", "shortGeneric", "longGeneric"]),
+      timeZoneName: choice(options, "timeZoneName", ["short", "long", "shortOffset", "longOffset", "shortGeneric", "longGeneric"], owner),
     };
     if (options.fractionalSecondDigits !== undefined) {
       const digits = Number(options.fractionalSecondDigits);
       if (!(digits >= 1 && digits <= 3)) throw new RangeError("fractionalSecondDigits value is out of range.");
       f.fractionalSecondDigits = Math.floor(digits);
     }
-    const hourCycle = choice(options, "hourCycle", ["h11", "h12", "h23", "h24"]);
-    const dateStyle = choice(options, "dateStyle", STYLES);
-    const timeStyle = choice(options, "timeStyle", STYLES);
+    const hourCycle = choice(options, "hourCycle", ["h11", "h12", "h23", "h24"], owner);
+    const dateStyle = choice(options, "dateStyle", STYLES, owner);
+    const timeStyle = choice(options, "timeStyle", STYLES, owner);
+    choice(options, "era", ["narrow", "short", "long"], owner);
+    choice(options, "dayPeriod", ["narrow", "short", "long"], owner);
+    choice(options, "formatMatcher", ["basic", "best fit"], owner);
+    choice(options, "localeMatcher", ["lookup", "best fit"], owner);
 
     let utc = false;
     let zone;
@@ -227,13 +231,13 @@
     return text;
   }
 
-  function format(date, locales, options, required, defaults) {
+  function format(date, locales, options, required, defaults, owner) {
     checkLocales(locales);
     const tag = Array.isArray(locales) ? locales[0] : locales;
     if (tag !== undefined && !ENGLISH.test(String(tag))) return original.call(date, locales, options);
 
     const time = Date.prototype.getTime.call(date);
-    const resolved = resolve(options, required, defaults);
+    const resolved = resolve(options, required, defaults, owner);
     if (resolved === null) return original.call(date, locales, options);
     if (time !== time) return "Invalid Date";
 
@@ -278,13 +282,13 @@
 
   const methods = {
     toLocaleString(locales, options) {
-      return format(this, locales, options, "any", "all");
+      return format(this, locales, options, "any", "all", "Date.prototype.toLocaleString");
     },
     toLocaleDateString(locales, options) {
-      return format(this, locales, options, "date", "date");
+      return format(this, locales, options, "date", "date", "Date.prototype.toLocaleDateString");
     },
     toLocaleTimeString(locales, options) {
-      return format(this, locales, options, "time", "time");
+      return format(this, locales, options, "time", "time", "Date.prototype.toLocaleTimeString");
     },
   };
 

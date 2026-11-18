@@ -201,3 +201,31 @@ describe("Intl.Collator options, checked against Node 26.13", () => {
     expect(await value(`return JSON.stringify(new Intl.Collator("en", { caseFirst: false }).resolvedOptions().caseFirst)`)).toBe('"false"');
   });
 });
+
+describe("Intl.DateTimeFormat and toLocale* options, checked against Node 26.13", () => {
+  test("refuses an era, day period or matcher value Node refuses, and names the method", async () => {
+    const cases: Array<[string, string]> = [
+      [`new Intl.DateTimeFormat("en", { era: "bogus" })`, "RangeError: Value bogus out of range for Intl.DateTimeFormat options property era"],
+      [`new Intl.DateTimeFormat("en", { dayPeriod: "bogus" })`, "RangeError: Value bogus out of range for Intl.DateTimeFormat options property dayPeriod"],
+      [`new Intl.DateTimeFormat("en", { formatMatcher: "bogus" })`, "RangeError: Value bogus out of range for Intl.DateTimeFormat options property formatMatcher"],
+      [`new Intl.DateTimeFormat("en", { localeMatcher: "bogus" })`, "RangeError: Value bogus out of range for Intl.DateTimeFormat options property localeMatcher"],
+      [`new Date(0).toLocaleString("en", { era: "bogus" })`, "RangeError: Value bogus out of range for Date.prototype.toLocaleString options property era"],
+      [`new Date(0).toLocaleDateString("en", { dayPeriod: "bogus" })`, "RangeError: Value bogus out of range for Date.prototype.toLocaleDateString options property dayPeriod"],
+      [`new Date(0).toLocaleTimeString("en", { formatMatcher: "bogus" })`, "RangeError: Value bogus out of range for Date.prototype.toLocaleTimeString options property formatMatcher"],
+      [`new Date(0).toLocaleTimeString("en", { localeMatcher: "bogus" })`, "RangeError: Value bogus out of range for Date.prototype.toLocaleTimeString options property localeMatcher"],
+    ];
+
+    for (const [call, expected] of cases) {
+      expect(await value(`try { ${call}; return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(expected);
+    }
+  });
+
+  test("takes the values Node takes for them, and leaves the matchers out of resolvedOptions", async () => {
+    expect(
+      await value(`return new Intl.DateTimeFormat("en-US", { formatMatcher: "basic", localeMatcher: "lookup", year: "numeric" }).format(new Date(0))`),
+    ).toBe("1970");
+    expect(
+      await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", era: "narrow", dayPeriod: "long", formatMatcher: "best fit", localeMatcher: "best fit", year: "numeric" }).resolvedOptions())`),
+    ).toBe('{"locale":"en-US","calendar":"gregory","numberingSystem":"latn","timeZone":"UTC","era":"narrow","year":"numeric","dayPeriod":"long"}');
+  });
+});
