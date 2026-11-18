@@ -51,7 +51,7 @@ describe("Intl", () => {
   test("is there, and has only the classes it has", async () => {
     expect(await value(`return [typeof Intl, Object.prototype.toString.call(Intl)].join()`)).toBe("object,[object Intl]");
     expect(await value(`return Object.getOwnPropertyNames(Intl).join()`)).toBe(
-      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter,DisplayNames,supportedValuesOf",
+      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter,DisplayNames,Locale,supportedValuesOf",
     );
   });
 
@@ -324,6 +324,61 @@ describe("Intl.DisplayNames, checked against Node 26.13", () => {
       [`new Intl.DisplayNames("en", { type: "region" }).of()`, "RangeError: invalid_argument"],
       [`new Intl.DisplayNames("en", { type: "currency" }).of("US")`, "RangeError: invalid_argument"],
       [`new Intl.DisplayNames("en", { type: "language" }).of("en_US")`, "RangeError: invalid_argument"],
+    ];
+
+    for (const [call, expected] of cases) {
+      expect(await value(`try { ${call}; return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(expected);
+    }
+  });
+});
+
+describe("Intl.Locale, checked against Node 26.13", () => {
+  test("parses a tag into its language, script and region, in Node's case", async () => {
+    expect(await value(`const l = new Intl.Locale("EN-us"); return [l.language, l.script, l.region, l.baseName, l.toString()].join("|")`)).toBe(
+      "en||US|en-US|en-US",
+    );
+    expect(await value(`const l = new Intl.Locale("zh-hant-tw"); return [l.language, l.script, l.region, l.baseName, String(l)].join("|")`)).toBe(
+      "zh|Hant|TW|zh-Hant-TW|zh-Hant-TW",
+    );
+    expect(await value(`return String(new Intl.Locale("en-latn-us"))`)).toBe("en-Latn-US");
+    expect(await value(`return [new Intl.Locale("en").region, new Intl.Locale("en").script, String(new Intl.Locale("en").region)].join("|")`)).toBe(
+      "||undefined",
+    );
+  });
+
+  test("keeps the extensions in toString and leaves them out of baseName", async () => {
+    expect(await value(`const l = new Intl.Locale("EN-US-U-CA-BUDDHIST"); return [l.toString(), l.baseName, l.language, l.region].join("|")`)).toBe(
+      "en-US-u-ca-buddhist|en-US|en|US",
+    );
+    expect(await value(`return [new Intl.Locale("en-x-private").toString(), new Intl.Locale("en-x-private").baseName].join("|")`)).toBe("en-x-private|en");
+    expect(await value(`return new Intl.Locale("en-u-ca-buddhist").region`)).toBe("undefined");
+  });
+
+  test("sorts the variants as Node does", async () => {
+    expect(await value(`return new Intl.Locale("sl-rozaj-biske").toString()`)).toBe("sl-biske-rozaj");
+    expect(await value(`return new Intl.Locale("de-1996").toString()`)).toBe("de-1996");
+    expect(await value(`return [new Intl.Locale("und").language, new Intl.Locale("und-Latn").toString()].join("|")`)).toBe("und|und-Latn");
+  });
+
+  test("takes the language, script and region options over the tag", async () => {
+    expect(await value(`return new Intl.Locale("en", { region: "gb" }).toString()`)).toBe("en-GB");
+    expect(await value(`return new Intl.Locale("en-US", { region: "GB" }).toString()`)).toBe("en-GB");
+    expect(await value(`return new Intl.Locale("en", { script: "latn" }).toString()`)).toBe("en-Latn");
+    expect(await value(`return new Intl.Locale("en", { language: "fr" }).toString()`)).toBe("fr");
+  });
+
+  test("refuses what Node refuses, with its messages", async () => {
+    const cases: Array<[string, string]> = [
+      [`new Intl.Locale("en_US")`, "RangeError: Incorrect locale information provided"],
+      [`new Intl.Locale("en--US")`, "RangeError: Incorrect locale information provided"],
+      [`new Intl.Locale("e")`, "RangeError: Incorrect locale information provided"],
+      [`new Intl.Locale("123")`, "RangeError: Incorrect locale information provided"],
+      [`new Intl.Locale("")`, "RangeError: First argument to Intl.Locale constructor can't be empty or missing"],
+      [`new Intl.Locale()`, "TypeError: First argument to Intl.Locale constructor can't be empty or missing"],
+      [`Intl.Locale("en")`, "TypeError: Constructor Intl.Locale requires 'new'"],
+      [`new Intl.Locale("en", { region: "U" })`, "RangeError: Incorrect locale information provided"],
+      [`new Intl.Locale("en", { script: "lat" })`, "RangeError: Incorrect locale information provided"],
+      [`new Intl.Locale("en", null)`, "TypeError: Intl.Locale called on null or undefined"],
     ];
 
     for (const [call, expected] of cases) {

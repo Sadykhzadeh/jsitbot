@@ -857,14 +857,102 @@
 
   Object.defineProperty(DisplayNames.prototype, Symbol.toStringTag, { value: "Intl.DisplayNames", configurable: true });
 
-  // Node has the constructor refuse a call without new
-  function DisplayNamesConstructor(locales, options) {
-    if (new.target === undefined) throw new TypeError("Constructor Intl.DisplayNames requires 'new'");
-    return new DisplayNames(locales, options);
+  // A constructor that Node has refuse a call without new
+  function requiresNew(Class, name) {
+    const wrapper = function (locales, options) {
+      if (new.target === undefined) throw new TypeError("Constructor Intl." + name + " requires 'new'");
+      return new Class(locales, options);
+    };
+    wrapper.prototype = Class.prototype;
+    define(Class.prototype, "constructor", wrapper);
+    define(wrapper, "name", name);
+    return wrapper;
   }
-  DisplayNamesConstructor.prototype = DisplayNames.prototype;
-  define(DisplayNames.prototype, "constructor", DisplayNamesConstructor);
-  define(DisplayNamesConstructor, "name", "DisplayNames");
+
+  function titleCase(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  class Locale {
+    #language;
+    #script;
+    #region;
+    #variants;
+    #rest;
+
+    constructor(tag, options) {
+      if (tag === undefined || String(tag) === "") {
+        throw tag === undefined
+          ? new TypeError("First argument to Intl.Locale constructor can't be empty or missing")
+          : new RangeError("First argument to Intl.Locale constructor can't be empty or missing");
+      }
+      const text = String(tag);
+      const singletons = text.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
+      if (!LANGUAGE_TAG.test(text) || new Set(singletons).size !== singletons.length) {
+        throw new RangeError("Incorrect locale information provided");
+      }
+      if (options === null) throw new TypeError("Intl.Locale called on null or undefined");
+      const given = options === undefined ? {} : Object(options);
+
+      const parts = text.toLowerCase().split("-");
+      let at = 1;
+      let script;
+      let region;
+      if (/^[a-z]{4}$/.test(parts[at] || "")) script = titleCase(parts[at++]);
+      if (/^(?:[a-z]{2}|\d{3})$/.test(parts[at] || "")) region = parts[at++].toUpperCase();
+      const variants = [];
+      while (at < parts.length && parts[at].length !== 1) variants.push(parts[at++]);
+      const rest = parts.slice(at);
+
+      this.#language = parts[0];
+      this.#script = script;
+      this.#region = region;
+      this.#variants = variants.sort();
+      this.#rest = rest;
+      if (given.language !== undefined) {
+        const language = String(given.language).toLowerCase();
+        if (!/^(?:[a-z]{2,3}|[a-z]{5,8})$/.test(language)) throw new RangeError("Incorrect locale information provided");
+        this.#language = language;
+      }
+      if (given.script !== undefined) {
+        if (!/^[a-z]{4}$/i.test(String(given.script))) throw new RangeError("Incorrect locale information provided");
+        this.#script = titleCase(String(given.script).toLowerCase());
+      }
+      if (given.region !== undefined) {
+        if (!/^(?:[a-z]{2}|\d{3})$/i.test(String(given.region))) throw new RangeError("Incorrect locale information provided");
+        this.#region = String(given.region).toUpperCase();
+      }
+    }
+
+    get language() {
+      return this.#language;
+    }
+
+    get script() {
+      return this.#script;
+    }
+
+    get region() {
+      return this.#region;
+    }
+
+    get baseName() {
+      return this.#baseParts().join("-");
+    }
+
+    toString() {
+      return this.#baseParts().concat(this.#rest).join("-");
+    }
+
+    #baseParts() {
+      const parts = [this.#language];
+      if (this.#script !== undefined) parts.push(this.#script);
+      if (this.#region !== undefined) parts.push(this.#region);
+      return parts.concat(this.#variants);
+    }
+  }
+
+  Object.defineProperty(Locale.prototype, Symbol.toStringTag, { value: "Intl.Locale", configurable: true });
 
   // What Intl.supportedValuesOf lists, as Node 26.13 lists it
   const SUPPORTED_VALUES = {
@@ -1015,7 +1103,8 @@
   define(Intl, "ListFormat", ListFormat);
   define(Intl, "RelativeTimeFormat", RelativeTimeFormat);
   define(Intl, "Segmenter", Segmenter);
-  define(Intl, "DisplayNames", DisplayNamesConstructor);
+  define(Intl, "DisplayNames", requiresNew(DisplayNames, "DisplayNames"));
+  define(Intl, "Locale", requiresNew(Locale, "Locale"));
   define(Intl, "supportedValuesOf", supportedValuesOf);
   Object.defineProperty(Intl, Symbol.toStringTag, { value: "Intl", configurable: true });
 
