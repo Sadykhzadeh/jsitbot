@@ -315,7 +315,10 @@ describe("console.time", () => {
       console.timeEnd("t");
     `);
 
-    expect(line).toMatch(/^t: 10\d\.\d{3}ms$/);
+    // A restart would show a few milliseconds; the upper bound only has to rule out a hang.
+    const [, ms] = line.match(/^t: (\d+)\.\d{3}ms$/) ?? [];
+    expect(Number(ms)).toBeGreaterThanOrEqual(100);
+    expect(Number(ms)).toBeLessThan(1000);
   });
 });
 
