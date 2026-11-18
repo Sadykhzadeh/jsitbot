@@ -51,7 +51,7 @@ describe("Intl", () => {
   test("is there, and has only the classes it has", async () => {
     expect(await value(`return [typeof Intl, Object.prototype.toString.call(Intl)].join()`)).toBe("object,[object Intl]");
     expect(await value(`return Object.getOwnPropertyNames(Intl).join()`)).toBe(
-      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter,supportedValuesOf",
+      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter,DisplayNames,supportedValuesOf",
     );
   });
 
@@ -265,5 +265,69 @@ describe("Intl.supportedValuesOf, checked against Node 26.13", () => {
       "RangeError: Invalid key : undefined",
     );
     expect(await value(`return [Intl.supportedValuesOf.name, Intl.supportedValuesOf.length].join()`)).toBe("supportedValuesOf,1");
+  });
+});
+
+describe("Intl.DisplayNames, checked against Node 26.13", () => {
+  test("names regions, currencies and base languages in English", async () => {
+    expect(
+      await value(`const r = new Intl.DisplayNames("en", { type: "region" }); return [r.of("US"), r.of("GB"), r.of("419"), r.of("ZZ"), r.of("XX"), r.of("001")].join("|")`),
+    ).toBe("United States|United Kingdom|Latin America|Unknown Region|XX|world");
+    expect(
+      await value(`const c = new Intl.DisplayNames("en", { type: "currency" }); return [c.of("USD"), c.of("EUR"), c.of("JPY"), c.of("usd"), c.of("XXX"), c.of("xyz")].join("|")`),
+    ).toBe("US Dollar|Euro|Japanese Yen|US Dollar|Unknown Currency|xyz");
+    expect(
+      await value(`const l = new Intl.DisplayNames("en", { type: "language" }); return [l.of("en"), l.of("fr"), l.of("zh"), l.of("EN")].join("|")`),
+    ).toBe("English|French|Chinese|English");
+  });
+
+  test("gives the short region names for the ten regions that have one", async () => {
+    expect(
+      await value(`const s = new Intl.DisplayNames("en", { type: "region", style: "short" }); return [s.of("US"), s.of("GB"), s.of("HK"), s.of("CA")].join("|")`),
+    ).toBe("US|UK|Hong Kong|Canada");
+    expect(
+      await value(`const n = new Intl.DisplayNames("en", { type: "region", style: "narrow" }); return [n.of("GB"), n.of("US")].join("|")`),
+    ).toBe("UK|US");
+  });
+
+  test("answers an unknown code with the code, or with nothing for fallback none", async () => {
+    expect(await value(`return new Intl.DisplayNames("en", { type: "region" }).of("XX")`)).toBe("XX");
+    expect(await value(`return String(new Intl.DisplayNames("en", { type: "region", fallback: "none" }).of("XX"))`)).toBe("undefined");
+    expect(await value(`return String(new Intl.DisplayNames("en", { type: "currency", fallback: "none" }).of("xyz"))`)).toBe("undefined");
+  });
+
+  test("reports its options as Node does", async () => {
+    expect(await value(`return JSON.stringify(new Intl.DisplayNames("en", { type: "region" }).resolvedOptions())`)).toBe(
+      '{"locale":"en","style":"long","type":"region","fallback":"code"}',
+    );
+    expect(await value(`return JSON.stringify(new Intl.DisplayNames("en", { type: "language" }).resolvedOptions())`)).toBe(
+      '{"locale":"en","style":"long","type":"language","fallback":"code","languageDisplay":"dialect"}',
+    );
+    expect(await value(`return new Intl.DisplayNames(undefined, { type: "region" }).resolvedOptions().locale`)).toBe("en-US");
+    expect(await value(`return Object.prototype.toString.call(new Intl.DisplayNames("en", { type: "region" }))`)).toBe("[object Intl.DisplayNames]");
+  });
+
+  test("refuses another language rather than answer it in English", async () => {
+    expect(await value(`try { new Intl.DisplayNames("de", { type: "region" }); return "ok" } catch (e) { return e.name }`)).toBe("RangeError");
+  });
+
+  test("refuses what Node refuses, with its messages", async () => {
+    const cases: Array<[string, string]> = [
+      [`Intl.DisplayNames("en", { type: "region" })`, "TypeError: Constructor Intl.DisplayNames requires 'new'"],
+      [`new Intl.DisplayNames("en")`, "TypeError: invalid_argument"],
+      [`new Intl.DisplayNames("en", null)`, "TypeError: invalid_argument"],
+      [`new Intl.DisplayNames("en", { type: "bogus" })`, "RangeError: Value bogus out of range for Intl.DisplayNames options property type"],
+      [`new Intl.DisplayNames("en", { type: "region", style: "bogus" })`, "RangeError: Value bogus out of range for Intl.DisplayNames options property style"],
+      [`new Intl.DisplayNames("en", { type: "region", fallback: "bogus" })`, "RangeError: Value bogus out of range for Intl.DisplayNames options property fallback"],
+      [`new Intl.DisplayNames("en", { type: "region", languageDisplay: "bogus" })`, "RangeError: Value bogus out of range for Intl.DisplayNames options property languageDisplay"],
+      [`new Intl.DisplayNames("en", { type: "region" }).of("USA")`, "RangeError: invalid_argument"],
+      [`new Intl.DisplayNames("en", { type: "region" }).of()`, "RangeError: invalid_argument"],
+      [`new Intl.DisplayNames("en", { type: "currency" }).of("US")`, "RangeError: invalid_argument"],
+      [`new Intl.DisplayNames("en", { type: "language" }).of("en_US")`, "RangeError: invalid_argument"],
+    ];
+
+    for (const [call, expected] of cases) {
+      expect(await value(`try { ${call}; return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(expected);
+    }
   });
 });

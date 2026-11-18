@@ -524,6 +524,348 @@
     return wrapper;
   }
 
+  // Names Intl.DisplayNames gives in English, as Node 26.13 gives them. A region
+  // with a numeric code is a UN M.49 area. Only base languages are named.
+  const REGION_NAMES = {
+    "AC": "Ascension Island", "AD": "Andorra", "AE": "United Arab Emirates",
+    "AF": "Afghanistan", "AG": "Antigua & Barbuda", "AI": "Anguilla",
+    "AL": "Albania", "AM": "Armenia", "AN": "Cura\u00e7ao",
+    "AO": "Angola", "AQ": "Antarctica", "AR": "Argentina",
+    "AS": "American Samoa", "AT": "Austria", "AU": "Australia",
+    "AW": "Aruba", "AX": "\u00c5land Islands", "AZ": "Azerbaijan",
+    "BA": "Bosnia & Herzegovina", "BB": "Barbados", "BD": "Bangladesh",
+    "BE": "Belgium", "BF": "Burkina Faso", "BG": "Bulgaria",
+    "BH": "Bahrain", "BI": "Burundi", "BJ": "Benin",
+    "BL": "St. Barth\u00e9lemy", "BM": "Bermuda", "BN": "Brunei",
+    "BO": "Bolivia", "BQ": "Caribbean Netherlands", "BR": "Brazil",
+    "BS": "Bahamas", "BT": "Bhutan", "BU": "Myanmar (Burma)",
+    "BV": "Bouvet Island", "BW": "Botswana", "BY": "Belarus",
+    "BZ": "Belize", "CA": "Canada", "CC": "Cocos (Keeling) Islands",
+    "CD": "Congo - Kinshasa", "CF": "Central African Republic", "CG": "Congo - Brazzaville",
+    "CH": "Switzerland", "CI": "C\u00f4te d\u2019Ivoire", "CK": "Cook Islands",
+    "CL": "Chile", "CM": "Cameroon", "CN": "China",
+    "CO": "Colombia", "CP": "Clipperton Island", "CQ": "Sark",
+    "CR": "Costa Rica", "CS": "Serbia", "CU": "Cuba",
+    "CV": "Cape Verde", "CW": "Cura\u00e7ao", "CX": "Christmas Island",
+    "CY": "Cyprus", "CZ": "Czechia", "DD": "Germany",
+    "DE": "Germany", "DG": "Diego Garcia", "DJ": "Djibouti",
+    "DK": "Denmark", "DM": "Dominica", "DO": "Dominican Republic",
+    "DY": "Benin", "DZ": "Algeria", "EA": "Ceuta & Melilla",
+    "EC": "Ecuador", "EE": "Estonia", "EG": "Egypt",
+    "EH": "Western Sahara", "ER": "Eritrea", "ES": "Spain",
+    "ET": "Ethiopia", "EU": "European Union", "EZ": "Eurozone",
+    "FI": "Finland", "FJ": "Fiji", "FK": "Falkland Islands",
+    "FM": "Micronesia", "FO": "Faroe Islands", "FR": "France",
+    "FX": "France", "GA": "Gabon", "GB": "United Kingdom",
+    "GD": "Grenada", "GE": "Georgia", "GF": "French Guiana",
+    "GG": "Guernsey", "GH": "Ghana", "GI": "Gibraltar",
+    "GL": "Greenland", "GM": "Gambia", "GN": "Guinea",
+    "GP": "Guadeloupe", "GQ": "Equatorial Guinea", "GR": "Greece",
+    "GS": "South Georgia & South Sandwich Islands", "GT": "Guatemala", "GU": "Guam",
+    "GW": "Guinea-Bissau", "GY": "Guyana", "HK": "Hong Kong SAR China",
+    "HM": "Heard & McDonald Islands", "HN": "Honduras", "HR": "Croatia",
+    "HT": "Haiti", "HU": "Hungary", "HV": "Burkina Faso",
+    "IC": "Canary Islands", "ID": "Indonesia", "IE": "Ireland",
+    "IL": "Israel", "IM": "Isle of Man", "IN": "India",
+    "IO": "British Indian Ocean Territory", "IQ": "Iraq", "IR": "Iran",
+    "IS": "Iceland", "IT": "Italy", "JE": "Jersey",
+    "JM": "Jamaica", "JO": "Jordan", "JP": "Japan",
+    "KE": "Kenya", "KG": "Kyrgyzstan", "KH": "Cambodia",
+    "KI": "Kiribati", "KM": "Comoros", "KN": "St. Kitts & Nevis",
+    "KP": "North Korea", "KR": "South Korea", "KW": "Kuwait",
+    "KY": "Cayman Islands", "KZ": "Kazakhstan", "LA": "Laos",
+    "LB": "Lebanon", "LC": "St. Lucia", "LI": "Liechtenstein",
+    "LK": "Sri Lanka", "LR": "Liberia", "LS": "Lesotho",
+    "LT": "Lithuania", "LU": "Luxembourg", "LV": "Latvia",
+    "LY": "Libya", "MA": "Morocco", "MC": "Monaco",
+    "MD": "Moldova", "ME": "Montenegro", "MF": "St. Martin",
+    "MG": "Madagascar", "MH": "Marshall Islands", "MK": "North Macedonia",
+    "ML": "Mali", "MM": "Myanmar (Burma)", "MN": "Mongolia",
+    "MO": "Macao SAR China", "MP": "Northern Mariana Islands", "MQ": "Martinique",
+    "MR": "Mauritania", "MS": "Montserrat", "MT": "Malta",
+    "MU": "Mauritius", "MV": "Maldives", "MW": "Malawi",
+    "MX": "Mexico", "MY": "Malaysia", "MZ": "Mozambique",
+    "NA": "Namibia", "NC": "New Caledonia", "NE": "Niger",
+    "NF": "Norfolk Island", "NG": "Nigeria", "NH": "Vanuatu",
+    "NI": "Nicaragua", "NL": "Netherlands", "NO": "Norway",
+    "NP": "Nepal", "NR": "Nauru", "NU": "Niue",
+    "NZ": "New Zealand", "OM": "Oman", "PA": "Panama",
+    "PE": "Peru", "PF": "French Polynesia", "PG": "Papua New Guinea",
+    "PH": "Philippines", "PK": "Pakistan", "PL": "Poland",
+    "PM": "St. Pierre & Miquelon", "PN": "Pitcairn Islands", "PR": "Puerto Rico",
+    "PS": "Palestinian Territories", "PT": "Portugal", "PW": "Palau",
+    "PY": "Paraguay", "QA": "Qatar", "QO": "Outlying Oceania",
+    "RE": "R\u00e9union", "RH": "Zimbabwe", "RO": "Romania",
+    "RS": "Serbia", "RU": "Russia", "RW": "Rwanda",
+    "SA": "Saudi Arabia", "SB": "Solomon Islands", "SC": "Seychelles",
+    "SD": "Sudan", "SE": "Sweden", "SG": "Singapore",
+    "SH": "St. Helena", "SI": "Slovenia", "SJ": "Svalbard & Jan Mayen",
+    "SK": "Slovakia", "SL": "Sierra Leone", "SM": "San Marino",
+    "SN": "Senegal", "SO": "Somalia", "SR": "Suriname",
+    "SS": "South Sudan", "ST": "S\u00e3o Tom\u00e9 & Pr\u00edncipe", "SU": "Russia",
+    "SV": "El Salvador", "SX": "Sint Maarten", "SY": "Syria",
+    "SZ": "Eswatini", "TA": "Tristan da Cunha", "TC": "Turks & Caicos Islands",
+    "TD": "Chad", "TF": "French Southern Territories", "TG": "Togo",
+    "TH": "Thailand", "TJ": "Tajikistan", "TK": "Tokelau",
+    "TL": "Timor-Leste", "TM": "Turkmenistan", "TN": "Tunisia",
+    "TO": "Tonga", "TP": "Timor-Leste", "TR": "T\u00fcrkiye",
+    "TT": "Trinidad & Tobago", "TV": "Tuvalu", "TW": "Taiwan",
+    "TZ": "Tanzania", "UA": "Ukraine", "UG": "Uganda",
+    "UK": "United Kingdom", "UM": "U.S. Outlying Islands", "UN": "United Nations",
+    "US": "United States", "UY": "Uruguay", "UZ": "Uzbekistan",
+    "VA": "Vatican City", "VC": "St. Vincent & Grenadines", "VD": "Vietnam",
+    "VE": "Venezuela", "VG": "British Virgin Islands", "VI": "U.S. Virgin Islands",
+    "VN": "Vietnam", "VU": "Vanuatu", "WF": "Wallis & Futuna",
+    "WS": "Samoa", "XA": "Pseudo-Accents", "XB": "Pseudo-Bidi",
+    "XK": "Kosovo", "YD": "Yemen", "YE": "Yemen",
+    "YT": "Mayotte", "YU": "Serbia", "ZA": "South Africa",
+    "ZM": "Zambia", "ZR": "Congo - Kinshasa", "ZW": "Zimbabwe",
+    "ZZ": "Unknown Region", "001": "world", "002": "Africa",
+    "003": "North America", "005": "South America", "009": "Oceania",
+    "011": "Western Africa", "013": "Central America", "014": "Eastern Africa",
+    "015": "Northern Africa", "017": "Middle Africa", "018": "Southern Africa",
+    "019": "Americas", "021": "Northern America", "029": "Caribbean",
+    "030": "Eastern Asia", "034": "Southern Asia", "035": "Southeast Asia",
+    "039": "Southern Europe", "053": "Australasia", "054": "Melanesia",
+    "057": "Micronesian Region", "061": "Polynesia", "142": "Asia",
+    "143": "Central Asia", "145": "Western Asia", "150": "Europe",
+    "151": "Eastern Europe", "154": "Northern Europe", "155": "Western Europe",
+    "202": "Sub-Saharan Africa", "419": "Latin America",
+  };
+
+  const SHORT_REGION_NAMES = {
+    "BA": "Bosnia", "CC": "Cocos Islands", "GB": "UK",
+    "HK": "Hong Kong", "MM": "Myanmar", "MO": "Macao",
+    "PN": "Pitcairn", "PS": "Palestine", "UN": "UN",
+    "US": "US",
+  };
+
+  const CURRENCY_NAMES = {
+    "ADP": "Andorran Peseta", "AED": "United Arab Emirates Dirham", "AFA": "Afghan Afghani (1927\u20132002)",
+    "AFN": "Afghan Afghani", "ALK": "Albanian Lek (1946\u20131965)", "ALL": "Albanian Lek",
+    "AMD": "Armenian Dram", "ANG": "Netherlands Antillean Guilder", "AOA": "Angolan Kwanza",
+    "AOK": "Angolan Kwanza (1977\u20131991)", "AON": "Angolan New Kwanza (1990\u20132000)", "AOR": "Angolan Readjusted Kwanza (1995\u20131999)",
+    "ARA": "Argentine Austral", "ARL": "Argentine Peso Ley (1970\u20131983)", "ARM": "Argentine Peso (1881\u20131970)",
+    "ARP": "Argentine Peso (1983\u20131985)", "ARS": "Argentine Peso", "ATS": "Austrian Schilling",
+    "AUD": "Australian Dollar", "AWG": "Aruban Florin", "AZM": "Azerbaijani Manat (1993\u20132006)",
+    "AZN": "Azerbaijani Manat", "BAD": "Bosnia-Herzegovina Dinar (1992\u20131994)", "BAM": "Bosnia-Herzegovina Convertible Mark",
+    "BAN": "Bosnia-Herzegovina New Dinar (1994\u20131997)", "BBD": "Barbadian Dollar", "BDT": "Bangladeshi Taka",
+    "BEC": "Belgian Franc (convertible)", "BEF": "Belgian Franc", "BEL": "Belgian Franc (financial)",
+    "BGL": "Bulgarian Hard Lev", "BGM": "Bulgarian Socialist Lev", "BGN": "Bulgarian Lev",
+    "BGO": "Bulgarian Lev (1879\u20131952)", "BHD": "Bahraini Dinar", "BIF": "Burundian Franc",
+    "BMD": "Bermudan Dollar", "BND": "Brunei Dollar", "BOB": "Bolivian Boliviano",
+    "BOL": "Bolivian Boliviano (1863\u20131963)", "BOP": "Bolivian Peso", "BOV": "Bolivian Mvdol",
+    "BRB": "Brazilian New Cruzeiro (1967\u20131986)", "BRC": "Brazilian Cruzado (1986\u20131989)", "BRE": "Brazilian Cruzeiro (1990\u20131993)",
+    "BRL": "Brazilian Real", "BRN": "Brazilian New Cruzado (1989\u20131990)", "BRR": "Brazilian Cruzeiro (1993\u20131994)",
+    "BRZ": "Brazilian Cruzeiro (1942\u20131967)", "BSD": "Bahamian Dollar", "BTN": "Bhutanese Ngultrum",
+    "BUK": "Burmese Kyat", "BWP": "Botswanan Pula", "BYB": "Belarusian Ruble (1994\u20131999)",
+    "BYN": "Belarusian Ruble", "BYR": "Belarusian Ruble (2000\u20132016)", "BZD": "Belize Dollar",
+    "CAD": "Canadian Dollar", "CDF": "Congolese Franc", "CHE": "WIR Euro",
+    "CHF": "Swiss Franc", "CHW": "WIR Franc", "CLE": "Chilean Escudo",
+    "CLF": "Chilean Unit of Account (UF)", "CLP": "Chilean Peso", "CNH": "Chinese Yuan (offshore)",
+    "CNX": "Chinese People\u2019s Bank Dollar", "CNY": "Chinese Yuan", "COP": "Colombian Peso",
+    "COU": "Colombian Real Value Unit", "CRC": "Costa Rican Col\u00f3n", "CSD": "Serbian Dinar (2002\u20132006)",
+    "CSK": "Czechoslovak Hard Koruna", "CUC": "Cuban Convertible Peso", "CUP": "Cuban Peso",
+    "CVE": "Cape Verdean Escudo", "CYP": "Cypriot Pound", "CZK": "Czech Koruna",
+    "DDM": "East German Mark", "DEM": "German Mark", "DJF": "Djiboutian Franc",
+    "DKK": "Danish Krone", "DOP": "Dominican Peso", "DZD": "Algerian Dinar",
+    "ECS": "Ecuadorian Sucre", "ECV": "Ecuadorian Unit of Constant Value", "EEK": "Estonian Kroon",
+    "EGP": "Egyptian Pound", "ERN": "Eritrean Nakfa", "ESA": "Spanish Peseta (A account)",
+    "ESB": "Spanish Peseta (convertible account)", "ESP": "Spanish Peseta", "ETB": "Ethiopian Birr",
+    "EUR": "Euro", "FIM": "Finnish Markka", "FJD": "Fijian Dollar",
+    "FKP": "Falkland Islands Pound", "FRF": "French Franc", "GBP": "British Pound",
+    "GEK": "Georgian Kupon Larit", "GEL": "Georgian Lari", "GHC": "Ghanaian Cedi (1979\u20132007)",
+    "GHS": "Ghanaian Cedi", "GIP": "Gibraltar Pound", "GMD": "Gambian Dalasi",
+    "GNF": "Guinean Franc", "GNS": "Guinean Syli", "GQE": "Equatorial Guinean Ekwele",
+    "GRD": "Greek Drachma", "GTQ": "Guatemalan Quetzal", "GWE": "Portuguese Guinea Escudo",
+    "GWP": "Guinea-Bissau Peso", "GYD": "Guyanaese Dollar", "HKD": "Hong Kong Dollar",
+    "HNL": "Honduran Lempira", "HRD": "Croatian Dinar", "HRK": "Croatian Kuna",
+    "HTG": "Haitian Gourde", "HUF": "Hungarian Forint", "IDR": "Indonesian Rupiah",
+    "IEP": "Irish Pound", "ILP": "Israeli Pound", "ILR": "Israeli Shekel (1980\u20131985)",
+    "ILS": "Israeli New Shekel", "INR": "Indian Rupee", "IQD": "Iraqi Dinar",
+    "IRR": "Iranian Rial", "ISJ": "Icelandic Kr\u00f3na (1918\u20131981)", "ISK": "Icelandic Kr\u00f3na",
+    "ITL": "Italian Lira", "JMD": "Jamaican Dollar", "JOD": "Jordanian Dinar",
+    "JPY": "Japanese Yen", "KES": "Kenyan Shilling", "KGS": "Kyrgyz Som",
+    "KHR": "Cambodian Riel", "KMF": "Comorian Franc", "KPW": "North Korean Won",
+    "KRH": "South Korean Hwan (1953\u20131962)", "KRO": "South Korean Won (1945\u20131953)", "KRW": "South Korean Won",
+    "KWD": "Kuwaiti Dinar", "KYD": "Cayman Islands Dollar", "KZT": "Kazakhstani Tenge",
+    "LAK": "Laotian Kip", "LBP": "Lebanese Pound", "LKR": "Sri Lankan Rupee",
+    "LRD": "Liberian Dollar", "LSL": "Lesotho Loti", "LTL": "Lithuanian Litas",
+    "LTT": "Lithuanian Talonas", "LUC": "Luxembourgian Convertible Franc", "LUF": "Luxembourgian Franc",
+    "LUL": "Luxembourg Financial Franc", "LVL": "Latvian Lats", "LVR": "Latvian Ruble",
+    "LYD": "Libyan Dinar", "MAD": "Moroccan Dirham", "MAF": "Moroccan Franc",
+    "MCF": "Monegasque Franc", "MDC": "Moldovan Cupon", "MDL": "Moldovan Leu",
+    "MGA": "Malagasy Ariary", "MGF": "Malagasy Franc", "MKD": "Macedonian Denar",
+    "MKN": "Macedonian Denar (1992\u20131993)", "MLF": "Malian Franc", "MMK": "Myanmar Kyat",
+    "MNT": "Mongolian Tugrik", "MOP": "Macanese Pataca", "MRO": "Mauritanian Ouguiya (1973\u20132017)",
+    "MRU": "Mauritanian Ouguiya", "MTL": "Maltese Lira", "MTP": "Maltese Pound",
+    "MUR": "Mauritian Rupee", "MVP": "Maldivian Rupee (1947\u20131981)", "MVR": "Maldivian Rufiyaa",
+    "MWK": "Malawian Kwacha", "MXN": "Mexican Peso", "MXP": "Mexican Silver Peso (1861\u20131992)",
+    "MXV": "Mexican Investment Unit", "MYR": "Malaysian Ringgit", "MZE": "Mozambican Escudo",
+    "MZM": "Mozambican Metical (1980\u20132006)", "MZN": "Mozambican Metical", "NAD": "Namibian Dollar",
+    "NGN": "Nigerian Naira", "NIC": "Nicaraguan C\u00f3rdoba (1988\u20131991)", "NIO": "Nicaraguan C\u00f3rdoba",
+    "NLG": "Dutch Guilder", "NOK": "Norwegian Krone", "NPR": "Nepalese Rupee",
+    "NZD": "New Zealand Dollar", "OMR": "Omani Rial", "PAB": "Panamanian Balboa",
+    "PEI": "Peruvian Inti", "PEN": "Peruvian Sol", "PES": "Peruvian Sol (1863\u20131965)",
+    "PGK": "Papua New Guinean Kina", "PHP": "Philippine Peso", "PKR": "Pakistani Rupee",
+    "PLN": "Polish Zloty", "PLZ": "Polish Zloty (1950\u20131995)", "PTE": "Portuguese Escudo",
+    "PYG": "Paraguayan Guarani", "QAR": "Qatari Riyal", "RHD": "Rhodesian Dollar",
+    "ROL": "Romanian Leu (1952\u20132006)", "RON": "Romanian Leu", "RSD": "Serbian Dinar",
+    "RUB": "Russian Ruble", "RUR": "Russian Ruble (1991\u20131998)", "RWF": "Rwandan Franc",
+    "SAR": "Saudi Riyal", "SBD": "Solomon Islands Dollar", "SCR": "Seychellois Rupee",
+    "SDD": "Sudanese Dinar (1992\u20132007)", "SDG": "Sudanese Pound", "SDP": "Sudanese Pound (1957\u20131998)",
+    "SEK": "Swedish Krona", "SGD": "Singapore Dollar", "SHP": "St. Helena Pound",
+    "SIT": "Slovenian Tolar", "SKK": "Slovak Koruna", "SLE": "Sierra Leonean Leone",
+    "SLL": "Sierra Leonean Leone (1964\u20142022)", "SOS": "Somali Shilling", "SRD": "Surinamese Dollar",
+    "SRG": "Surinamese Guilder", "SSP": "South Sudanese Pound", "STD": "S\u00e3o Tom\u00e9 & Pr\u00edncipe Dobra (1977\u20132017)",
+    "STN": "S\u00e3o Tom\u00e9 & Pr\u00edncipe Dobra", "SUR": "Soviet Rouble", "SVC": "Salvadoran Col\u00f3n",
+    "SYP": "Syrian Pound", "SZL": "Swazi Lilangeni", "THB": "Thai Baht",
+    "TJR": "Tajikistani Ruble", "TJS": "Tajikistani Somoni", "TMM": "Turkmenistani Manat (1993\u20132009)",
+    "TMT": "Turkmenistani Manat", "TND": "Tunisian Dinar", "TOP": "Tongan Pa\u02bbanga",
+    "TPE": "Timorese Escudo", "TRL": "Turkish Lira (1922\u20132005)", "TRY": "Turkish Lira",
+    "TTD": "Trinidad & Tobago Dollar", "TWD": "New Taiwan Dollar", "TZS": "Tanzanian Shilling",
+    "UAH": "Ukrainian Hryvnia", "UAK": "Ukrainian Karbovanets", "UGS": "Ugandan Shilling (1966\u20131987)",
+    "UGX": "Ugandan Shilling", "USD": "US Dollar", "USN": "US Dollar (Next day)",
+    "USS": "US Dollar (Same day)", "UYI": "Uruguayan Peso (Indexed Units)", "UYP": "Uruguayan Peso (1975\u20131993)",
+    "UYU": "Uruguayan Peso", "UYW": "Uruguayan Nominal Wage Index Unit", "UZS": "Uzbekistani Som",
+    "VEB": "Venezuelan Bol\u00edvar (1871\u20132008)", "VED": "Bol\u00edvar Soberano", "VEF": "Venezuelan Bol\u00edvar (2008\u20132018)",
+    "VES": "Venezuelan Bol\u00edvar", "VND": "Vietnamese Dong", "VNN": "Vietnamese Dong (1978\u20131985)",
+    "VUV": "Vanuatu Vatu", "WST": "Samoan Tala", "XAF": "Central African CFA Franc",
+    "XAG": "Silver", "XAU": "Gold", "XBA": "European Composite Unit",
+    "XBB": "European Monetary Unit", "XBC": "European Unit of Account (XBC)", "XBD": "European Unit of Account (XBD)",
+    "XCD": "East Caribbean Dollar", "XCG": "Caribbean guilder", "XDR": "Special Drawing Rights",
+    "XEU": "European Currency Unit", "XFO": "French Gold Franc", "XFU": "French UIC-Franc",
+    "XOF": "West African CFA Franc", "XPD": "Palladium", "XPF": "CFP Franc",
+    "XPT": "Platinum", "XRE": "RINET Funds", "XSU": "Sucre",
+    "XTS": "Testing Currency Code", "XUA": "ADB Unit of Account", "XXX": "Unknown Currency",
+    "YDD": "Yemeni Dinar", "YER": "Yemeni Rial", "YUD": "Yugoslavian Hard Dinar (1966\u20131990)",
+    "YUM": "Yugoslavian New Dinar (1994\u20132002)", "YUN": "Yugoslavian Convertible Dinar (1990\u20131992)", "YUR": "Yugoslavian Reformed Dinar (1992\u20131993)",
+    "ZAL": "South African Rand (financial)", "ZAR": "South African Rand", "ZMK": "Zambian Kwacha (1968\u20132012)",
+    "ZMW": "Zambian Kwacha", "ZRN": "Zairean New Zaire (1993\u20131998)", "ZRZ": "Zairean Zaire (1971\u20131993)",
+    "ZWD": "Zimbabwean Dollar (1980\u20132008)", "ZWG": "Zimbabwean Gold", "ZWL": "Zimbabwean Dollar (2009\u20132024)",
+    "ZWR": "Zimbabwean Dollar (2008)",
+  };
+
+  const LANGUAGE_NAMES = {
+    "aa": "Afar", "ab": "Abkhazian", "ae": "Avestan",
+    "af": "Afrikaans", "ak": "Akan", "am": "Amharic",
+    "an": "Aragonese", "ar": "Arabic", "as": "Assamese",
+    "av": "Avaric", "ay": "Aymara", "az": "Azerbaijani",
+    "ba": "Bashkir", "be": "Belarusian", "bg": "Bulgarian",
+    "bh": "Bhojpuri", "bi": "Bislama", "bm": "Bambara",
+    "bn": "Bangla", "bo": "Tibetan", "br": "Breton",
+    "bs": "Bosnian", "ca": "Catalan", "ce": "Chechen",
+    "ch": "Chamorro", "co": "Corsican", "cr": "Cree",
+    "cs": "Czech", "cu": "Church Slavic", "cv": "Chuvash",
+    "cy": "Welsh", "da": "Danish", "de": "German",
+    "dv": "Divehi", "dz": "Dzongkha", "ee": "Ewe",
+    "el": "Greek", "en": "English", "eo": "Esperanto",
+    "es": "Spanish", "et": "Estonian", "eu": "Basque",
+    "fa": "Persian", "ff": "Fula", "fi": "Finnish",
+    "fj": "Fijian", "fo": "Faroese", "fr": "French",
+    "fy": "Western Frisian", "ga": "Irish", "gd": "Scottish Gaelic",
+    "gl": "Galician", "gn": "Guarani", "gu": "Gujarati",
+    "gv": "Manx", "ha": "Hausa", "he": "Hebrew",
+    "hi": "Hindi", "ho": "Hiri Motu", "hr": "Croatian",
+    "ht": "Haitian Creole", "hu": "Hungarian", "hy": "Armenian",
+    "hz": "Herero", "ia": "Interlingua", "id": "Indonesian",
+    "ie": "Interlingue", "ig": "Igbo", "ii": "Sichuan Yi",
+    "ik": "Inupiaq", "in": "Indonesian", "io": "Ido",
+    "is": "Icelandic", "it": "Italian", "iu": "Inuktitut",
+    "iw": "Hebrew", "ja": "Japanese", "ji": "Yiddish",
+    "jv": "Javanese", "jw": "Javanese", "ka": "Georgian",
+    "kg": "Kongo", "ki": "Kikuyu", "kj": "Kuanyama",
+    "kk": "Kazakh", "kl": "Kalaallisut", "km": "Khmer",
+    "kn": "Kannada", "ko": "Korean", "kr": "Kanuri",
+    "ks": "Kashmiri", "ku": "Kurdish", "kv": "Komi",
+    "kw": "Cornish", "ky": "Kyrgyz", "la": "Latin",
+    "lb": "Luxembourgish", "lg": "Ganda", "li": "Limburgish",
+    "ln": "Lingala", "lo": "Lao", "lt": "Lithuanian",
+    "lu": "Luba-Katanga", "lv": "Latvian", "mg": "Malagasy",
+    "mh": "Marshallese", "mi": "M\u0101ori", "mk": "Macedonian",
+    "ml": "Malayalam", "mn": "Mongolian", "mo": "Romanian",
+    "mr": "Marathi", "ms": "Malay", "mt": "Maltese",
+    "my": "Burmese", "na": "Nauru", "nb": "Norwegian Bokm\u00e5l",
+    "nd": "North Ndebele", "ne": "Nepali", "ng": "Ndonga",
+    "nl": "Dutch", "nn": "Norwegian Nynorsk", "no": "Norwegian",
+    "nr": "South Ndebele", "nv": "Navajo", "ny": "Nyanja",
+    "oc": "Occitan", "oj": "Ojibwa", "om": "Oromo",
+    "or": "Odia", "os": "Ossetic", "pa": "Punjabi",
+    "pi": "Pali", "pl": "Polish", "ps": "Pashto",
+    "pt": "Portuguese", "qu": "Quechua", "rm": "Romansh",
+    "rn": "Rundi", "ro": "Romanian", "ru": "Russian",
+    "rw": "Kinyarwanda", "sa": "Sanskrit", "sc": "Sardinian",
+    "sd": "Sindhi", "se": "Northern Sami", "sg": "Sango",
+    "sh": "Serbian (Latin)", "si": "Sinhala", "sk": "Slovak",
+    "sl": "Slovenian", "sm": "Samoan", "sn": "Shona",
+    "so": "Somali", "sq": "Albanian", "sr": "Serbian",
+    "ss": "Swati", "st": "Southern Sotho", "su": "Sundanese",
+    "sv": "Swedish", "sw": "Swahili", "ta": "Tamil",
+    "te": "Telugu", "tg": "Tajik", "th": "Thai",
+    "ti": "Tigrinya", "tk": "Turkmen", "tl": "Filipino",
+    "tn": "Tswana", "to": "Tongan", "tr": "Turkish",
+    "ts": "Tsonga", "tt": "Tatar", "tw": "Akan",
+    "ty": "Tahitian", "ug": "Uyghur", "uk": "Ukrainian",
+    "ur": "Urdu", "uz": "Uzbek", "ve": "Venda",
+    "vi": "Vietnamese", "vo": "Volap\u00fck", "wa": "Walloon",
+    "wo": "Wolof", "xh": "Xhosa", "yi": "Yiddish",
+    "yo": "Yoruba", "za": "Zhuang", "zh": "Chinese",
+    "zu": "Zulu",
+  };
+
+  class DisplayNames {
+    #type;
+    #style;
+    #fallback;
+    #languageDisplay;
+    #locale;
+
+    constructor(locales, options) {
+      this.#locale = checkLocale(locales, /^en(-[A-Za-z0-9]+)*$/i);
+      const given = options === undefined ? {} : Object(options);
+      this.#type = choose(given, "type", ["language", "region", "currency"], undefined, "DisplayNames");
+      if (this.#type === undefined) throw new TypeError("invalid_argument");
+      this.#style = choose(given, "style", ["long", "short", "narrow"], "long", "DisplayNames");
+      this.#fallback = choose(given, "fallback", ["code", "none"], "code", "DisplayNames");
+      this.#languageDisplay = choose(given, "languageDisplay", ["dialect", "standard"], "dialect", "DisplayNames");
+    }
+
+    of(code) {
+      const text = String(code);
+      let name;
+      if (this.#type === "region") {
+        if (!/^(?:[a-z]{2}|\d{3})$/i.test(text)) throw new RangeError("invalid_argument");
+        if (this.#style !== "long" && SHORT_REGION_NAMES[text] !== undefined) name = SHORT_REGION_NAMES[text];
+        else name = REGION_NAMES[text];
+      } else if (this.#type === "currency") {
+        if (!/^[a-z]{3}$/i.test(text)) throw new RangeError("invalid_argument");
+        name = CURRENCY_NAMES[text.toUpperCase()];
+      } else {
+        if (!LANGUAGE_TAG.test(text)) throw new RangeError("invalid_argument");
+        if (text.indexOf("-") === -1) name = LANGUAGE_NAMES[text.toLowerCase()];
+      }
+      if (name !== undefined) return name;
+      return this.#fallback === "none" ? undefined : text;
+    }
+
+    resolvedOptions() {
+      const out = { locale: this.#locale, style: this.#style, type: this.#type, fallback: this.#fallback };
+      if (this.#type === "language") out.languageDisplay = this.#languageDisplay;
+      return out;
+    }
+  }
+
+  Object.defineProperty(DisplayNames.prototype, Symbol.toStringTag, { value: "Intl.DisplayNames", configurable: true });
+
+  // Node has the constructor refuse a call without new
+  function DisplayNamesConstructor(locales, options) {
+    if (new.target === undefined) throw new TypeError("Constructor Intl.DisplayNames requires 'new'");
+    return new DisplayNames(locales, options);
+  }
+  DisplayNamesConstructor.prototype = DisplayNames.prototype;
+  define(DisplayNames.prototype, "constructor", DisplayNamesConstructor);
+  define(DisplayNamesConstructor, "name", "DisplayNames");
+
   // What Intl.supportedValuesOf lists, as Node 26.13 lists it
   const SUPPORTED_VALUES = {
     calendar: [
@@ -673,6 +1015,7 @@
   define(Intl, "ListFormat", ListFormat);
   define(Intl, "RelativeTimeFormat", RelativeTimeFormat);
   define(Intl, "Segmenter", Segmenter);
+  define(Intl, "DisplayNames", DisplayNamesConstructor);
   define(Intl, "supportedValuesOf", supportedValuesOf);
   Object.defineProperty(Intl, Symbol.toStringTag, { value: "Intl", configurable: true });
 
