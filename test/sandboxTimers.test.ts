@@ -296,6 +296,58 @@ describe("performance.now", () => {
   });
 });
 
+describe("Timeout", () => {
+  test("setTimeout returns a Timeout that clears by itself, by its number, or with close", async () => {
+    const logs = await sandbox.execute(`
+      const t = setTimeout(() => console.log("never"), 10);
+      console.log(typeof t, t.constructor.name);
+      clearTimeout(t);
+      const u = setTimeout(() => console.log("cleared by number"), 5);
+      clearTimeout(+u);
+      setTimeout(() => console.log("closed"), 5).close();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      console.log("done");
+    `);
+
+    expect(logs.logs).toEqual(["object Timeout", "done"]);
+  });
+
+  test("an unreferenced timer does not keep the run going, and a referenced one does", async () => {
+    const logs = await sandbox.execute(`
+      setTimeout(() => console.log("unreferenced, never"), 10).unref();
+      console.log("sync");
+    `);
+    expect(logs.logs).toEqual(["sync"]);
+
+    const both = await sandbox.execute(`
+      setTimeout(() => console.log("unreferenced fires"), 10).unref();
+      setTimeout(() => console.log("referenced fires"), 20);
+      console.log("ok");
+    `);
+    expect(both.logs).toEqual(["ok", "unreferenced fires", "referenced fires"]);
+  });
+
+  test("hasRef reports the reference, and ref restores it", async () => {
+    expect(await value(`
+      const t = setTimeout(() => {}, 5);
+      const seen = [t.hasRef(), t.unref().hasRef(), t.ref().hasRef()];
+      clearTimeout(t);
+      return seen.join(" ");
+    `)).toBe("true false true");
+  });
+
+  test("refresh starts a pending timer again from now", async () => {
+    const logs = await sandbox.execute(`
+      const late = setTimeout(() => console.log("refreshed fires"), 50);
+      setTimeout(() => console.log("at 60"), 60);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      late.refresh();
+    `);
+
+    expect(logs.logs).toEqual(["at 60", "refreshed fires"]);
+  });
+});
+
 describe("setImmediate", () => {
   test("runs its callback with the arguments after the code, and before a timer of 5 ms", async () => {
     expect(

@@ -1732,6 +1732,55 @@
     arraySplice(timers, low, 0, timer);
   }
 
+  // What setTimeout and setInterval return: a Timeout, as in Node, whose methods work
+  // on the timer. The timer is kept in a WeakMap, out of the program's reach.
+  const timerHandles = new WeakMap();
+  function Timeout() {}
+  function timerOf(handle) {
+    return weakMapHas(timerHandles, handle) ? weakMapGet(timerHandles, handle) : undefined;
+  }
+  const timeoutMethods = {
+    ref() {
+      const timer = timerOf(this);
+      if (timer !== undefined) timer.ref = true;
+      return this;
+    },
+    unref() {
+      const timer = timerOf(this);
+      if (timer !== undefined) timer.ref = false;
+      return this;
+    },
+    hasRef() {
+      const timer = timerOf(this);
+      return timer !== undefined && timer.ref;
+    },
+    refresh() {
+      const timer = timerOf(this);
+      if (timer !== undefined) {
+        for (let i = 0; i < timers.length; i++) {
+          if (timers[i] === timer) {
+            arraySplice(timers, i, 1);
+            break;
+          }
+        }
+        timer.at = timerClock + timer.wait;
+        schedule(timer);
+      }
+      return this;
+    },
+    close() {
+      clearTimeout(this);
+      return this;
+    },
+    [Symbol.toPrimitive]() {
+      const timer = timerOf(this);
+      return timer === undefined ? NaN : timer.id;
+    },
+  };
+  for (const name of Reflect.ownKeys(timeoutMethods)) {
+    Object.defineProperty(Timeout.prototype, name, { value: timeoutMethods[name], writable: true, configurable: true, enumerable: false });
+  }
+
   function addTimer(callback, delay, args, repeat) {
     if (typeof callback !== "function") {
       throw new TypeError("The callback must be a function");
@@ -1741,13 +1790,17 @@
     const timer = {
       id: ++lastTimerId,
       at: timerClock + wait,
+      wait,
       callback,
       args,
       every: repeat ? wait : 0,
+      ref: true,
     };
     schedule(timer);
 
-    return timer.id;
+    const handle = new Timeout();
+    weakMapSet(timerHandles, handle, timer);
+    return handle;
   }
 
   function setTimeout(callback, delay, ...args) {
@@ -1759,7 +1812,8 @@
     return addTimer(callback, delay, args, true);
   }
 
-  function clearTimeout(id) {
+  function clearTimeout(handle) {
+    const id = weakMapHas(timerHandles, handle) ? weakMapGet(timerHandles, handle).id : handle;
     if (firing !== null && firing.id === id) firing.every = 0;
 
     for (let i = 0; i < timers.length; i++) {
@@ -1783,8 +1837,12 @@
     clearTimeout(id);
   }
 
+  // Only timers that were not unreferenced keep the run going: once the rest are
+  // unreferenced, the run ends without them, as Node's event loop does.
   function tick() {
-    if (timers.length === 0) return false;
+    let referenced = false;
+    for (let i = 0; i < timers.length && !referenced; i++) referenced = timers[i].ref;
+    if (!referenced) return false;
 
     const timer = arraySplice(timers, 0, 1)[0];
     timerClock = timer.at;

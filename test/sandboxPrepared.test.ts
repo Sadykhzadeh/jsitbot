@@ -25,7 +25,7 @@ describe("runtimes built ahead of time", () => {
     const second = await sandbox.execute(`
       const id = setTimeout(() => {}, 1);
       await new Promise((resolve) => setTimeout(resolve, 100));
-      return id;
+      return +id;
     `);
 
     expect(second.logs).toEqual([]);
