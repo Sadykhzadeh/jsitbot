@@ -2224,6 +2224,20 @@
     Object.defineProperty(globalThis, name, { value, writable: true, configurable: true, enumerable: false });
   }
 
+  // A built-in prints as Node prints it, on one line with no body: function max() { [native code] }.
+  // A bound function is anonymous there, whatever its target was called. A program's own
+  // functions keep their source as they are.
+  const engineFunctionSource = Function.prototype.toString;
+  const nativeBody = /\{\n    \[native code\]\n\}$/;
+  const boundHead = /^function bound \(\)/;
+  const functionSource = {
+    toString() {
+      const text = reflectApply(engineFunctionSource, this, []);
+      return nativeBody.test(text) ? text.replace(boundHead, "function ()").replace(nativeBody, "{ [native code] }") : text;
+    },
+  }.toString;
+  Object.defineProperty(Function.prototype, "toString", { value: functionSource, writable: true, configurable: true, enumerable: false });
+
   collectBuiltInNames();
 
   return { finish, fail, tick, uncaught };

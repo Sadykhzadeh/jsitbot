@@ -513,3 +513,32 @@ describe("WeakRef", () => {
     ).toBe("true|object|1|[object WeakRef]|true|WeakRef|1");
   });
 });
+
+describe("the source of a function, checked against Node 26.13", () => {
+  test("a built-in is one line with no body, and a bound function is anonymous", async () => {
+    const result = await sandbox.execute(`
+      const out = [
+        Math.max, Array.prototype.map, Symbol, JSON.parse, (function () {}).bind(null), (() => 1).bind(null),
+        Object.prototype.toString, Promise, Map.prototype.get, Math.min,
+      ];
+      out.push(function named(a, b) { return a + b }, (x) => x * 2, class K { m() {} });
+      return out.map(String).join("\\n");
+    `);
+
+    expect(result.ok && result.result.split("\n")).toEqual([
+      "function max() { [native code] }",
+      "function map() { [native code] }",
+      "function Symbol() { [native code] }",
+      "function parse() { [native code] }",
+      "function () { [native code] }",
+      "function () { [native code] }",
+      "function toString() { [native code] }",
+      "function Promise() { [native code] }",
+      "function get() { [native code] }",
+      "function min() { [native code] }",
+      "function named(a, b) { return a + b }",
+      "(x) => x * 2",
+      "class K { m() {} }",
+    ]);
+  });
+});
