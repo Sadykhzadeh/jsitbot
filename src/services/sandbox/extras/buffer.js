@@ -430,38 +430,89 @@
     return count;
   }
 
-  // Defines the reads and writes of one width and byte order. A signed one reads
-  // and writes two's complement.
-  function numeric(bytes, littleEndian, signed) {
+  // The limits of an integer of `bytes` bytes. Node names them as numbers up to four
+  // bytes, and as powers of two above that.
+  function integerLimits(bytes, signed) {
     const span = 2 ** (8 * bytes);
     const max = signed ? span / 2 - 1 : span - 1;
     const min = signed ? -(span / 2) : 0;
+    if (bytes <= 4) return { min, max };
+    const bits = 8 * bytes;
+    const range = signed ? ">= -(2 ** " + (bits - 1) + ") and < 2 ** " + (bits - 1) : ">= 0 and < 2 ** " + bits;
+    return { min, max, range };
+  }
+
+  // The integer of `bytes` bytes at start, read as two's complement when signed.
+  function readInteger(buffer, start, bytes, littleEndian, signed) {
+    let value = 0;
+    for (let i = 0; i < bytes; i++) {
+      const index = littleEndian ? start + bytes - 1 - i : start + i;
+      value = value * 256 + buffer[index];
+    }
+    const span = 2 ** (8 * bytes);
+    return signed && value >= span / 2 ? value - span : value;
+  }
+
+  // Writes a whole number, already checked against the limits, as its bytes. NaN is written as 0.
+  function writeInteger(buffer, start, bytes, littleEndian, value) {
+    let rest = Math.trunc(value);
+    if (rest < 0) rest += 2 ** (8 * bytes);
+    for (let i = 0; i < bytes; i++) {
+      const index = littleEndian ? start + i : start + bytes - 1 - i;
+      buffer[index] = rest % 256;
+      rest = Math.floor(rest / 256);
+    }
+  }
+
+  // Defines the reads and writes of one width and byte order. A signed one reads
+  // and writes two's complement.
+  function numeric(bytes, littleEndian, signed) {
+    const { min, max, range } = integerLimits(bytes, signed);
     return {
       read(buffer, offset) {
         const start = offset === undefined ? 0 : offset;
         checkOffset(buffer, start, bytes, "offset");
-        let value = 0;
-        for (let i = 0; i < bytes; i++) {
-          const index = littleEndian ? start + bytes - 1 - i : start + i;
-          value = value * 256 + buffer[index];
-        }
-        return signed && value > max ? value - span : value;
+        return readInteger(buffer, start, bytes, littleEndian, signed);
       },
       write(buffer, value, offset) {
         const number = +value;
-        checkValue(number, min, max);
+        checkValue(number, min, max, range);
         const start = offset === undefined ? 0 : offset;
         checkOffset(buffer, start, bytes, "offset");
-        let rest = Math.trunc(number);
-        if (rest < 0) rest += span;
-        for (let i = 0; i < bytes; i++) {
-          const index = littleEndian ? start + i : start + bytes - 1 - i;
-          buffer[index] = rest % 256;
-          rest = Math.floor(rest / 256);
-        }
+        writeInteger(buffer, start, bytes, littleEndian, number);
         return start + bytes;
       },
     };
+  }
+
+  // The reads and writes whose byte length is given: from 1 to 6 bytes.
+  function variable(littleEndian, signed) {
+    return {
+      read(buffer, offset, byteLength) {
+        checkByteLength(byteLength);
+        checkOffset(buffer, offset, byteLength, "offset");
+        return readInteger(buffer, offset, byteLength, littleEndian, signed);
+      },
+      write(buffer, value, offset, byteLength) {
+        checkByteLength(byteLength);
+        const number = +value;
+        const { min, max, range } = integerLimits(byteLength, signed);
+        checkValue(number, min, max, range);
+        checkOffset(buffer, offset, byteLength, "offset");
+        writeInteger(buffer, offset, byteLength, littleEndian, number);
+        return offset + byteLength;
+      },
+    };
+  }
+
+  function checkByteLength(byteLength) {
+    if (typeof byteLength !== "number") throw argumentError("byteLength", "must be of type number", byteLength);
+    if (!Number.isInteger(byteLength)) {
+      throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" is out of range. It must be an integer. Received ' + byteLength);
+    }
+    if (byteLength < 1 || byteLength > 6) {
+      throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" is out of range. It must be >= 1 and <= 6. Received ' + byteLength);
+    }
   }
 
   // Floats and doubles, read and written through a DataView over the buffer.
@@ -530,6 +581,10 @@
     BigInt64BE: bigint(false, true),
     BigUInt64LE: bigint(true, false),
     BigUInt64BE: bigint(false, false),
+    UIntLE: variable(true, false),
+    UIntBE: variable(false, false),
+    IntLE: variable(true, true),
+    IntBE: variable(false, true),
   };
 
   // -1, 0 or 1: how two byte sequences order, the shorter one first when one starts the other.
@@ -898,6 +953,38 @@
     writeBigUInt64BE(value, offset) {
       return widths.BigUInt64BE.write(this, value, offset);
     }
+
+    readUIntLE(offset, byteLength) {
+      return widths.UIntLE.read(this, offset, byteLength);
+    }
+
+    readUIntBE(offset, byteLength) {
+      return widths.UIntBE.read(this, offset, byteLength);
+    }
+
+    readIntLE(offset, byteLength) {
+      return widths.IntLE.read(this, offset, byteLength);
+    }
+
+    readIntBE(offset, byteLength) {
+      return widths.IntBE.read(this, offset, byteLength);
+    }
+
+    writeUIntLE(value, offset, byteLength) {
+      return widths.UIntLE.write(this, value, offset, byteLength);
+    }
+
+    writeUIntBE(value, offset, byteLength) {
+      return widths.UIntBE.write(this, value, offset, byteLength);
+    }
+
+    writeIntLE(value, offset, byteLength) {
+      return widths.IntLE.write(this, value, offset, byteLength);
+    }
+
+    writeIntBE(value, offset, byteLength) {
+      return widths.IntBE.write(this, value, offset, byteLength);
+    }
   }
 
   // The offset or length of write(), which must be a number in 0 to the length of the buffer.
@@ -918,7 +1005,7 @@
   // Node names the unsigned reads and writes with a lowercase "int" as well, and both names
   // are the same function.
   const LOWERCASE_NAMES = [
-    "Uint8", "Uint16LE", "Uint16BE", "Uint32LE", "Uint32BE", "BigUint64LE", "BigUint64BE",
+    "Uint8", "Uint16LE", "Uint16BE", "Uint32LE", "Uint32BE", "BigUint64LE", "BigUint64BE", "UintLE", "UintBE",
   ];
   for (const name of LOWERCASE_NAMES) {
     for (const verb of ["read", "write"]) {
