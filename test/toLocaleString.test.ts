@@ -215,7 +215,7 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await sign("-0.4", "signDisplay: 'auto', maximumFractionDigits: 0")).toBe("-0");
     expect(await value(`return (5n).toLocaleString("en-US", { signDisplay: "always" })`)).toBe("+5");
     expect(await sign("1", "signDisplay: 'bogus'")).toBe(
-      "error: RangeError: Value bogus out of range for Intl.NumberFormat options property signDisplay",
+      "error: RangeError: Value bogus out of range for Number.prototype.toLocaleString options property signDisplay",
     );
   });
 
@@ -235,5 +235,22 @@ describe("BigInt.prototype.toLocaleString", () => {
     expect(await value(`return (12345678901234567890n).toLocaleString()`)).toBe("12,345,678,901,234,567,890");
     expect(await value(`return (-1000n).toLocaleString("en-US")`)).toBe("-1,000");
     expect(await value(`return (5n).toLocaleString("en-US", { minimumFractionDigits: 2 })`)).toBe("5.00");
+  });
+});
+
+describe("toLocaleString options, checked against Node 26.13", () => {
+  test("refuses a value Node refuses, and names the method it was given to", async () => {
+    const cases: Array<[string, string]> = [
+      [`(1).toLocaleString("en", { style: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property style"],
+      [`(1).toLocaleString("en", { currency: "us" })`, "RangeError: Invalid currency code : us"],
+      [`(1).toLocaleString("en", { notation: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property notation"],
+      [`(1).toLocaleString("en", { style: "unit" })`, "TypeError: Invalid unit argument for Number.prototype.toLocaleString() ''"],
+      [`(1n).toLocaleString("en", { currency: "us" })`, "RangeError: Invalid currency code : us"],
+      [`(1n).toLocaleString("en", { style: "currency", currency: "USD", currencyDisplay: "bogus" })`, "RangeError: Value bogus out of range for BigInt.prototype.toLocaleString options property currencyDisplay"],
+    ];
+
+    for (const [call, expected] of cases) {
+      expect(await value(`try { ${call}; return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(expected);
+    }
   });
 });

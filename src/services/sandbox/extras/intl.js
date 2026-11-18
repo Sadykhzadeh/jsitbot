@@ -95,8 +95,27 @@
     return parts;
   }
 
+  // The values Intl.NumberFormat takes for its options, as Node 26 reads them; the
+  // same list as toLocaleString in number.js.
+  const NUMBER_OPTION_VALUES = {
+    style: ["decimal", "percent", "currency", "unit"],
+    currencyDisplay: ["code", "symbol", "narrowSymbol", "name"],
+    currencySign: ["standard", "accounting"],
+    unitDisplay: ["short", "narrow", "long"],
+    notation: ["standard", "scientific", "engineering", "compact"],
+    compactDisplay: ["short", "long"],
+    signDisplay: ["auto", "never", "always", "exceptZero", "negative"],
+    roundingMode: ["ceil", "floor", "expand", "trunc", "halfCeil", "halfFloor", "halfExpand", "halfTrunc", "halfEven"],
+  };
+
   class NumberFormat {
     constructor(locales, options) {
+      const asked = options === undefined || options === null ? {} : Object(options);
+      for (const name of Object.keys(NUMBER_OPTION_VALUES)) choose(asked, name, NUMBER_OPTION_VALUES[name], undefined, "NumberFormat");
+      if (asked.currency !== undefined && !/^[A-Za-z]{3}$/.test(String(asked.currency))) {
+        throw new RangeError("Invalid currency code : " + String(asked.currency));
+      }
+      if (asked.style === "unit" && asked.unit === undefined) throw new TypeError("Invalid unit argument for Intl.NumberFormat() ''");
       // the arguments are checked now, as a constructor does, not at the first format
       Number.prototype.toLocaleString.call(0, locales, options);
 

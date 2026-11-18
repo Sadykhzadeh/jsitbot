@@ -152,3 +152,31 @@ describe("language tags, checked as Node 26.13 checks them", () => {
     ).toBe("EN-gb,zh-Hant-TW,sr-Latn-RS,es-419,en-US-posix,en-a-bbb-x-a-ccc,de-DE-u-co-phonebk-co-phonebk,de-1901");
   });
 });
+
+describe("Intl.NumberFormat options, checked against Node 26.13", () => {
+  test("refuses a value Node refuses, and names the constructor", async () => {
+    const cases: Array<[string, string]> = [
+      [`{ style: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property style"],
+      [`{ currencyDisplay: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property currencyDisplay"],
+      [`{ notation: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property notation"],
+      [`{ notation: "compact", compactDisplay: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property compactDisplay"],
+      [`{ unitDisplay: "bogus", style: "unit", unit: "meter" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property unitDisplay"],
+      [`{ signDisplay: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property signDisplay"],
+      [`{ roundingMode: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property roundingMode"],
+      [`{ style: "currency", currency: "us" }`, "RangeError: Invalid currency code : us"],
+      [`{ style: "currency", currency: "USDX" }`, "RangeError: Invalid currency code : USDX"],
+      [`{ style: "currency", currency: 123 }`, "RangeError: Invalid currency code : 123"],
+      [`{ style: "unit" }`, "TypeError: Invalid unit argument for Intl.NumberFormat() ''"],
+    ];
+
+    for (const [options, expected] of cases) {
+      expect(await value(`try { new Intl.NumberFormat("en", ${options}); return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(expected);
+    }
+  });
+
+  test("still takes the values Node takes, and a currency code in either case", async () => {
+    expect(await value(`return [new Intl.NumberFormat("en", { style: "currency", currency: "usd" }).format(1), new Intl.NumberFormat("en", { style: "currency", currency: "XYZ" }).format(1)].join(" ")`)).toBe(
+      "$1.00 XYZ\u00a01.00",
+    );
+  });
+});

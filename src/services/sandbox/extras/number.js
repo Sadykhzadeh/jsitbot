@@ -92,6 +92,18 @@
     "meter-per-second": [" m/s", " m/s", "m/s", " meter per second", " meters per second"],
   };
   const UNIT_DISPLAYS = ["short", "narrow", "long"];
+  // The values an option of a number format takes, as Node 26 reads them. Any other
+  // value is refused, whatever the locale, and a currency is a code of three letters.
+  const OPTION_VALUES = {
+    style: ["decimal", "percent", "currency", "unit"],
+    currencyDisplay: ["code", "symbol", "narrowSymbol", "name"],
+    currencySign: ["standard", "accounting"],
+    unitDisplay: UNIT_DISPLAYS,
+    notation: ["standard", "scientific", "engineering", "compact"],
+    compactDisplay: ["short", "long"],
+    signDisplay: ["auto", "never", "always", "exceptZero", "negative"],
+    roundingMode: ["ceil", "floor", "expand", "trunc", "halfCeil", "halfFloor", "halfExpand", "halfTrunc", "halfEven"],
+  };
   const UNSUPPORTED = [
     "roundingMode", "roundingIncrement",
   ];
@@ -366,9 +378,26 @@
     return forms[text === "1" ? 0 : 1];
   }
 
+  function checkOptions(options, owner) {
+    if (options === undefined || options === null) return;
+    for (const name of Object.keys(OPTION_VALUES)) {
+      const value = options[name];
+      if (value !== undefined && OPTION_VALUES[name].indexOf(String(value)) === -1) {
+        throw new RangeError("Value " + String(value) + " out of range for " + owner + " options property " + name);
+      }
+    }
+    if (options.currency !== undefined && !/^[A-Za-z]{3}$/.test(String(options.currency))) {
+      throw new RangeError("Invalid currency code : " + String(options.currency));
+    }
+    if (options.style === "unit" && options.unit === undefined) {
+      throw new TypeError("Invalid unit argument for " + owner + "() ''");
+    }
+  }
+
   function numberToLocaleString(locales, options) {
     const value = Number.prototype.valueOf.call(this);
     checkLocales(locales);
+    checkOptions(options, "Number.prototype.toLocaleString");
     if (!handled(locales, options)) return original.call(value, locales, options);
 
     return format(value < 0 || Object.is(value, -0), Math.abs(value), options || {});
@@ -377,6 +406,7 @@
   function bigintToLocaleString(locales, options) {
     const value = BigInt.prototype.valueOf.call(this);
     checkLocales(locales);
+    checkOptions(options, "BigInt.prototype.toLocaleString");
     if (!handled(locales, options)) return original.call(value, locales, options);
 
     return format(value < 0n, value < 0n ? -value : value, options || {});
