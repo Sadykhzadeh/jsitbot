@@ -411,6 +411,26 @@
     return new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   }
 
+  // The bytes indexOf and lastIndexOf look for: a byte, the bytes of a string in an
+  // encoding, or the bytes of a view.
+  function needleOf(value, encoding) {
+    if (typeof value === "number") return Uint8Array.of(value & 255);
+    if (typeof value === "string") return bytesOfString(value, encodingOf(encoding));
+    if (value instanceof Uint8Array) return value;
+    throw nodeError(
+      TypeError,
+      "ERR_INVALID_ARG_TYPE",
+      'The "value" argument must be one of type number or string or an instance of Buffer or Uint8Array. Received ' + describe(value),
+    );
+  }
+
+  function matchesAt(haystack, needle, at) {
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[at + j] !== needle[j]) return false;
+    }
+    return true;
+  }
+
   // Bytes of a string that fit in `room`, whole characters only for UTF-8 and UTF-16.
   function writeInto(buffer, text, encoding, offset, room) {
     if (encoding === "utf8") {
@@ -711,32 +731,38 @@
         encoding = byteOffset;
         byteOffset = 0;
       }
-      let needle;
-      if (typeof value === "number") {
-        needle = Uint8Array.of(value & 255);
-      } else if (typeof value === "string") {
-        needle = bytesOfString(value, encodingOf(encoding));
-      } else if (value instanceof Uint8Array) {
-        needle = value;
-      } else {
-        throw nodeError(
-          TypeError,
-          "ERR_INVALID_ARG_TYPE",
-          'The "value" argument must be one of type number or string or an instance of Buffer or Uint8Array. Received ' + describe(value),
-        );
-      }
+      const needle = needleOf(value, encoding);
       let from = byteOffset === undefined ? 0 : Math.trunc(+byteOffset) || 0;
       if (from < 0) from = Math.max(0, this.length + from);
       if (needle.length === 0) return Math.min(from, this.length);
       for (let i = from; i + needle.length <= this.length; i++) {
-        let match = true;
-        for (let j = 0; j < needle.length; j++) {
-          if (this[i + j] !== needle[j]) {
-            match = false;
-            break;
-          }
-        }
-        if (match) return i;
+        if (matchesAt(this, needle, i)) return i;
+      }
+      return -1;
+    }
+
+    lastIndexOf(value, byteOffsetArgument, encodingArgument) {
+      let byteOffset = byteOffsetArgument;
+      let encoding = encodingArgument;
+      if (typeof byteOffset === "string") {
+        encoding = byteOffset;
+        byteOffset = undefined;
+      }
+      const needle = needleOf(value, encoding);
+      // The start Node takes for a search backwards, as its C++ does: an offset
+      // before the buffer is no match unless the needle is empty.
+      let from = Math.floor(byteOffset === undefined ? NaN : +byteOffset);
+      if (Number.isNaN(from)) from = this.length;
+      if (from < 0) {
+        if (from + this.length >= 0) from += this.length;
+        else if (needle.length === 0) from = 0;
+        else return -1;
+      } else if (from + needle.length > this.length) {
+        from = needle.length === 0 ? this.length : this.length - 1;
+      }
+      if (needle.length === 0) return from;
+      for (let i = Math.min(from, this.length - needle.length); i >= 0; i--) {
+        if (matchesAt(this, needle, i)) return i;
       }
       return -1;
     }
