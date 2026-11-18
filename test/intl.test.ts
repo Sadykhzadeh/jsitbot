@@ -51,7 +51,7 @@ describe("Intl", () => {
   test("is there, and has only the classes it has", async () => {
     expect(await value(`return [typeof Intl, Object.prototype.toString.call(Intl)].join()`)).toBe("object,[object Intl]");
     expect(await value(`return Object.getOwnPropertyNames(Intl).join()`)).toBe(
-      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter",
+      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter,supportedValuesOf",
     );
   });
 
@@ -227,5 +227,43 @@ describe("Intl.DateTimeFormat and toLocale* options, checked against Node 26.13"
     expect(
       await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", era: "narrow", dayPeriod: "long", formatMatcher: "best fit", localeMatcher: "best fit", year: "numeric" }).resolvedOptions())`),
     ).toBe('{"locale":"en-US","calendar":"gregory","numberingSystem":"latn","timeZone":"UTC","era":"narrow","year":"numeric","dayPeriod":"long"}');
+  });
+});
+
+describe("Intl.supportedValuesOf, checked against Node 26.13", () => {
+  test("lists each key with the count, first and last value Node gives", async () => {
+    const cases: Array<[string, string]> = [
+      ["calendar", "18,buddhist,roc"],
+      ["collation", "12,compat,zhuyin"],
+      ["currency", "162,AED,ZWL"],
+      ["numberingSystem", "78,adlm,wcho"],
+      ["timeZone", "418,Africa/Abidjan,Pacific/Wallis"],
+      ["unit", "45,acre,year"],
+    ];
+
+    for (const [key, expected] of cases) {
+      expect(
+        await value(`const v = Intl.supportedValuesOf("${key}"); return [v.length, v[0], v[v.length - 1]].join()`),
+      ).toBe(expected);
+    }
+  });
+
+  test("lists the units without the compound ones the number format also takes, and the zones by Node's names", async () => {
+    expect(await value(`return [Intl.supportedValuesOf("unit").includes("kilometer"), Intl.supportedValuesOf("unit").includes("kilometer-per-hour")].join()`)).toBe("true,false");
+    expect(await value(`return [Intl.supportedValuesOf("timeZone").includes("Asia/Calcutta"), Intl.supportedValuesOf("timeZone").includes("Asia/Kolkata")].join()`)).toBe("true,false");
+  });
+
+  test("returns a new array each time", async () => {
+    expect(await value(`Intl.supportedValuesOf("unit").length = 0; return Intl.supportedValuesOf("unit").length`)).toBe("45");
+  });
+
+  test("refuses a key Node refuses", async () => {
+    expect(await value(`try { Intl.supportedValuesOf("bogus"); return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(
+      "RangeError: Invalid key : bogus",
+    );
+    expect(await value(`try { Intl.supportedValuesOf(); return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(
+      "RangeError: Invalid key : undefined",
+    );
+    expect(await value(`return [Intl.supportedValuesOf.name, Intl.supportedValuesOf.length].join()`)).toBe("supportedValuesOf,1");
   });
 });
