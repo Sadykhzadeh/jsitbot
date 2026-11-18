@@ -625,3 +625,44 @@ try { Buffer.alloc(1).writeUInt8(256) } catch (e) { console.log(e.name, e.code, 
     );
   });
 });
+
+describe("Buffer integers of 5 and 6 bytes with a fraction, checked against Node 26.13", () => {
+  test("a negative fraction floors the high bytes and truncates the low 32 bits", async () => {
+    const result = await sandbox.execute(`
+      const out = [];
+      const cases = [
+        ["writeIntBE", -0.5, 5], ["writeIntLE", -0.5, 5], ["writeIntBE", -0.5, 6], ["writeIntLE", -0.5, 6],
+        ["writeIntBE", -1.5, 5], ["writeIntLE", -1.5, 6], ["writeIntBE", -2.7, 4], ["writeIntBE", -0.5, 4],
+        ["writeIntBE", -0.5, 3], ["writeIntBE", -0.5, 2], ["writeIntBE", -1.5, 1], ["writeUIntBE", 0.5, 6],
+        ["writeIntBE", -40.5, 6], ["writeIntLE", -(2 ** 39) + 0.5, 5], ["writeIntBE", 2 ** 39 - 1.5, 5],
+        ["writeIntLE", -(2 ** 47) + 0.25, 6], ["writeIntBE", NaN, 5],
+      ];
+      for (const [method, value, length] of cases) {
+        const b = Buffer.alloc(8, 0xaa);
+        b[method](value, 0, length);
+        out.push(method + "(" + value + ",0," + length + ") => " + b.toString("hex"));
+      }
+      console.log(out.join("\\n"));
+    `);
+
+    expect(result.logs[0].split("\n")).toEqual([
+      "writeIntBE(-0.5,0,5) => ff00000000aaaaaa",
+      "writeIntLE(-0.5,0,5) => 00000000ffaaaaaa",
+      "writeIntBE(-0.5,0,6) => ffff00000000aaaa",
+      "writeIntLE(-0.5,0,6) => 00000000ffffaaaa",
+      "writeIntBE(-1.5,0,5) => ffffffffffaaaaaa",
+      "writeIntLE(-1.5,0,6) => ffffffffffffaaaa",
+      "writeIntBE(-2.7,0,4) => fffffffeaaaaaaaa",
+      "writeIntBE(-0.5,0,4) => 00000000aaaaaaaa",
+      "writeIntBE(-0.5,0,3) => 000000aaaaaaaaaa",
+      "writeIntBE(-0.5,0,2) => 0000aaaaaaaaaaaa",
+      "writeIntBE(-1.5,0,1) => ffaaaaaaaaaaaaaa",
+      "writeUIntBE(0.5,0,6) => 000000000000aaaa",
+      "writeIntBE(-40.5,0,6) => ffffffffffd8aaaa",
+      "writeIntLE(-549755813887.5,0,5) => 0100000080aaaaaa",
+      "writeIntBE(549755813886.5,0,5) => 7ffffffffeaaaaaa",
+      "writeIntLE(-140737488355327.75,0,6) => 010000000080aaaa",
+      "writeIntBE(NaN,0,5) => 0000000000aaaaaa",
+    ]);
+  });
+});

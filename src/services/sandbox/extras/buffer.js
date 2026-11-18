@@ -473,15 +473,26 @@
     return signed && value >= span / 2 ? value - span : value;
   }
 
-  // Writes a whole number, already checked against the limits, as its bytes. NaN is written as 0.
+  // Writes a number, already checked against the limits, as its bytes. NaN is written as 0.
+  // Node takes the low 32 bits from the truncated value and the bytes above them from the
+  // floor, so a negative fraction in a five or six byte integer sets its high bytes.
   function writeInteger(buffer, start, bytes, littleEndian, value) {
-    let rest = Math.trunc(value);
-    if (rest < 0) rest += 2 ** (8 * bytes);
+    let low = wrapInto(Math.trunc(value), 2 ** 32);
+    let high = bytes > 4 ? wrapInto(Math.floor(value / 2 ** 32), 2 ** (8 * (bytes - 4))) : 0;
     for (let i = 0; i < bytes; i++) {
       const index = littleEndian ? start + i : start + bytes - 1 - i;
-      buffer[index] = rest % 256;
-      rest = Math.floor(rest / 256);
+      if (i < 4) {
+        buffer[index] = low % 256;
+        low = Math.floor(low / 256);
+      } else {
+        buffer[index] = high % 256;
+        high = Math.floor(high / 256);
+      }
     }
+  }
+
+  function wrapInto(number, span) {
+    return number < 0 ? number + span * Math.ceil(-number / span) : number % span;
   }
 
   // Defines the reads and writes of one width and byte order. A signed one reads
