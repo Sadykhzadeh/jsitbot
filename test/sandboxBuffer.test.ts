@@ -388,4 +388,21 @@ try { Buffer.alloc(1).writeUInt8(256) } catch (e) { console.log(e.name, e.code, 
     ].join("\n"),
     );
   });
+
+  test("the lowercase names of the unsigned reads and writes are the same functions", async () => {
+    const program = [
+      "const P = Buffer.prototype; const names = [\"Uint8\",\"Uint16LE\",\"Uint16BE\",\"Uint32LE\",\"Uint32BE\",\"BigUint64LE\",\"BigUint64BE\"];",
+      "console.log(names.map(n => [typeof P[\"read\"+n], P[\"read\"+n] === P[\"read\"+n.replace(\"Uint\",\"UInt\")], typeof P[\"write\"+n], P[\"write\"+n] === P[\"write\"+n.replace(\"Uint\",\"UInt\")]].join(\",\")).join(\" \"));",
+      "const b = Buffer.from([1,2,3,4,5,6,7,8]); b.writeUint16BE(0x1234, 0); b.writeUint32LE(0xdeadbeef, 2); b.writeBigUint64BE(5n, 0);",
+      "console.log(b.readUint8(0), b.readUint16LE(0), b.readUint32BE(0), b.readBigUint64LE(0), b.readBigUint64BE(0), b.writeUint8(9, 7), b);",
+    ];
+    const result = await sandbox.execute(program.join("\n"));
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(
+      [
+      "function,true,function,true function,true,function,true function,true,function,true function,true,function,true function,true,function,true function,true,function,true function,true,function,true",
+      "0 0 0 360287970189639680n 5n 8 <Buffer 00 00 00 00 00 00 00 09>",
+    ].join("\n"),
+    );
+  });
 });

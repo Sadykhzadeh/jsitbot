@@ -915,6 +915,23 @@
     }
   }
 
+  // Node names the unsigned reads and writes with a lowercase "int" as well, and both names
+  // are the same function.
+  const LOWERCASE_NAMES = [
+    "Uint8", "Uint16LE", "Uint16BE", "Uint32LE", "Uint32BE", "BigUint64LE", "BigUint64BE",
+  ];
+  for (const name of LOWERCASE_NAMES) {
+    for (const verb of ["read", "write"]) {
+      const original = verb + name.replace("Uint", "UInt");
+      Object.defineProperty(Buffer.prototype, verb + name, {
+        value: Buffer.prototype[original],
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+    }
+  }
+
   // Node prints at most 50 bytes, then how many are left.
   register(
     Buffer,
