@@ -391,14 +391,15 @@
         const number = +value;
         const max = bytes === 1 ? 255 : bytes === 2 ? 65535 : 4294967295;
         checkValue(number, 0, max);
-        checkOffset(buffer, offset, bytes, "offset");
+        const start = offset === undefined ? 0 : offset;
+        checkOffset(buffer, start, bytes, "offset");
         let rest = number;
         for (let i = 0; i < bytes; i++) {
-          const index = littleEndian ? offset + i : offset + bytes - 1 - i;
+          const index = littleEndian ? start + i : start + bytes - 1 - i;
           buffer[index] = rest % 256;
           rest = Math.floor(rest / 256);
         }
-        return offset + bytes;
+        return start + bytes;
       },
     };
   }

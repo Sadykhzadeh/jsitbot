@@ -75,4 +75,22 @@ describe("Buffer, checked against Node 26.13", () => {
 
     expect(result.ok ? result.logs.join("\n") : result.error).toBe("<Buffer 68 69>\n<Buffer >\n<Buffer 00 ff 10>\n<Buffer 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01>\n<Buffer 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 ... 1 more byte>\n<Buffer ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ab ... 70 more bytes>\n[ <Buffer 61> ]\n{ b: <Buffer 01 02>, n: 1 }\n<Buffer 07>\n<Buffer 62 63>\nUint8Array(2) [ 1, 2 ]\n{ type: 'Buffer', data: [ 1 ] }\nhi\n<Buffer 68 c3 a9 6c 6c 6f 20 77 c3 b6 72 6c 64>\n<Buffer 7f 7f 7f>\n<Buffer 01>\nhi\ntrue\nAB\n[ <Buffer 00 00 00> ] <Buffer 00 00>\nMap(1) { 'k' => <Buffer 76> }");
   });
+
+  test("fixed-width writes take their offset as 0 when it is left out", async () => {
+    const result = await sandbox.execute(`const a = Buffer.alloc(2);
+console.log(a.writeUInt8(7), a);
+const b = Buffer.alloc(4);
+console.log(b.writeUInt16BE(258), b);
+const c = Buffer.alloc(4);
+console.log(c.writeUInt32LE(0x01020304, undefined), c);
+console.log(Buffer.alloc(3).writeUInt16LE(1, 1));
+try { Buffer.alloc(1).writeUInt16LE(1) } catch (e) { console.log(e.name, e.code, e.message) }
+try { Buffer.alloc(1).writeUInt8(256) } catch (e) { console.log(e.name, e.code, e.message) }`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(
+      "1 <Buffer 07 00>\n2 <Buffer 01 02 00 00>\n4 <Buffer 04 03 02 01>\n3\n" +
+        "RangeError ERR_BUFFER_OUT_OF_BOUNDS Attempt to access memory outside buffer bounds\n" +
+        'RangeError ERR_OUT_OF_RANGE The value of "value" is out of range. It must be >= 0 and <= 255. Received 256',
+    );
+  });
 });
