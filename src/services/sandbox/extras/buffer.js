@@ -327,6 +327,36 @@
     }
   }
 
+  // A position taken as Node takes one: a number rounded down, and 0 for anything
+  // that is not a finite number.
+  function integerOf(value) {
+    const number = +value;
+    return Number.isFinite(number) ? Math.floor(number) : 0;
+  }
+
+  function outOfRange(name, range, value) {
+    return nodeError(
+      RangeError,
+      "ERR_OUT_OF_RANGE",
+      'The value of "' + name + '" is out of range. It must be ' + range + ". Received " + received(value),
+    );
+  }
+
+  // Reverses the bytes of each group of `width` bytes, in place.
+  function swapBytes(buffer, width) {
+    if (buffer.length % width !== 0) {
+      throw nodeError(RangeError, "ERR_INVALID_BUFFER_SIZE", "Buffer size must be a multiple of " + width * 8 + "-bits");
+    }
+    for (let start = 0; start < buffer.length; start += width) {
+      for (let a = start, b = start + width - 1; a < b; a++, b--) {
+        const byte = buffer[a];
+        buffer[a] = buffer[b];
+        buffer[b] = byte;
+      }
+    }
+    return buffer;
+  }
+
   // The checks of the fixed-width reads and writes: an offset that is a whole
   // number, and room for `bytes` bytes after it.
   function checkOffset(buffer, offset, bytes, name) {
@@ -667,6 +697,33 @@
       const tfrom = targetStart === undefined ? 0 : targetStart;
       const tto = targetEnd === undefined ? target.length : targetEnd;
       return compareBytes(this.subarray(from, to), target.subarray(tfrom, tto));
+    }
+
+    copy(target, targetStart, sourceStart, sourceEnd) {
+      if (!(target instanceof Uint8Array)) throw argumentError("target", "must be an instance of Buffer or Uint8Array", target);
+      const to = targetStart === undefined ? 0 : integerOf(targetStart);
+      if (to < 0) throw outOfRange("targetStart", ">= 0", to);
+      const from = sourceStart === undefined ? 0 : integerOf(sourceStart);
+      if (from < 0 || from > this.length) throw outOfRange("sourceStart", ">= 0 && <= " + this.length, from);
+      const end = sourceEnd === undefined ? this.length : integerOf(sourceEnd);
+      if (end < 0) throw outOfRange("sourceEnd", ">= 0", end);
+      if (to >= target.length || from >= end) return 0;
+
+      const count = Math.min(end - from, target.length - to, this.length - from);
+      target.set(this.subarray(from, from + count), to);
+      return count;
+    }
+
+    swap16() {
+      return swapBytes(this, 2);
+    }
+
+    swap32() {
+      return swapBytes(this, 4);
+    }
+
+    swap64() {
+      return swapBytes(this, 8);
     }
 
     write(string, offsetArgument, lengthArgument, encodingArgument) {
