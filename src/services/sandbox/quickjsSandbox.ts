@@ -32,7 +32,8 @@ const NEVER_SETTLES_MESSAGE = "The code is waiting on a promise that can never s
 const UNREADABLE_MESSAGE = "The sandbox returned a result it could not read.";
 // What QuickJS says when a string or a heap runs out: the length of a string is
 // capped as well as its memory, and a doubled string reaches the cap first.
-const MEMORY_ERRORS = new Set(["InternalError: out of memory", "InternalError: string too long"]);
+const OUT_OF_MEMORY = "InternalError: out of memory";
+const MEMORY_ERRORS = new Set([OUT_OF_MEMORY, "InternalError: string too long"]);
 // What the guest reports for a thrown null, which is also all that is left of an out-of-memory error.
 const NULL_THROWN = "Uncaught null";
 
@@ -331,6 +332,12 @@ export class QuickJsSandboxService implements SandboxService {
       }
       if (!packed) {
         return failure(UNREADABLE_MESSAGE);
+      }
+      // A promise job that runs out of memory is rejected inside the engine, where
+      // nothing reports it, and the heap never shrinks, so a run that ended with
+      // the heap at its cap ran out of memory whatever its result says.
+      if (heapExhausted()) {
+        return failure(OUT_OF_MEMORY);
       }
       if (!packed.ok) {
         return failure(packed.text, { truncated: packed.truncated, line: packed.line, column: packed.column });

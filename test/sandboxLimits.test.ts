@@ -72,6 +72,14 @@ describe("memory limits", () => {
       again();
       await new Promise(() => {});
     `,
+    "a promise chain that allocates after the code has returned": `
+      const kept = [];
+      Promise.resolve().then(function grow() {
+        kept.push(new Array(1e5).fill(1));
+        return Promise.resolve().then(grow);
+      });
+      "started";
+    `,
     "a replace whose result does not fit": `"a".repeat(5e7).replace(/a/g, "bb").length`,
     "a million small objects built at once": `new Array(1e6).fill(0).map((_, i) => ({ i, s: "x".repeat(100) })).length`,
     "many small objects": `
