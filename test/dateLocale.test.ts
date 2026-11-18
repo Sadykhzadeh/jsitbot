@@ -391,6 +391,18 @@ describe("Intl.DateTimeFormat", () => {
     ).toBe("1/5/2024 | 1 PM | January 5 | Jan 5, 2024, 1:07 PM");
   });
 
+  test("write only the date, in another language, when only a date is asked for", async () => {
+    expect(
+      await value(`
+        const when = Date.UTC(2024, 0, 5, 13, 7, 9);
+        return [
+          new Intl.DateTimeFormat("en-GB", { timeZone: "UTC" }).format(when),
+          new Intl.DateTimeFormat("de-DE", { timeZone: "UTC" }).format(when),
+        ].join(" | ");
+      `),
+    ).toBe("01/05/2024 | 01/05/2024");
+  });
+
   test("has a format that works detached, and one for now when it is given nothing", async () => {
     expect(
       await value(`

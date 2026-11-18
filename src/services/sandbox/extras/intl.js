@@ -160,6 +160,9 @@
     "timeZoneName", "dateStyle", "timeStyle",
   ];
 
+  const DATE_FORMAT_FIELDS = ["weekday", "year", "month", "day", "dateStyle"];
+  const TIME_FORMAT_FIELDS = ["hour", "minute", "second", "fractionalSecondDigits", "timeStyle"];
+
   class DateTimeFormat {
     constructor(locales, options) {
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
@@ -168,13 +171,20 @@
       if (!FORMAT_FIELDS.some((name) => given[name] !== undefined)) {
         given = Object.assign({}, given, { year: "numeric", month: "numeric", day: "numeric" });
       }
+      // A language the engine answers itself gets the engine's method for the parts asked
+      // for, so a date alone is not followed by a time.
+      const hasDate = DATE_FORMAT_FIELDS.some((name) => given[name] !== undefined);
+      const hasTime = TIME_FORMAT_FIELDS.some((name) => given[name] !== undefined);
+      const write = hasDate && !hasTime ? Date.prototype.toLocaleDateString
+        : hasTime && !hasDate ? Date.prototype.toLocaleTimeString
+        : Date.prototype.toLocaleString;
       // the arguments are checked now, as a constructor does, not at the first format
-      Date.prototype.toLocaleString.call(new Date(0), locales, given);
+      write.call(new Date(0), locales, given);
 
       const format = (date) => {
         const when = new Date(date === undefined ? Date.now() : Number(date));
         if (when.getTime() !== when.getTime()) throw new RangeError("Invalid time value");
-        return Date.prototype.toLocaleString.call(when, locales, given);
+        return write.call(when, locales, given);
       };
       define(this, "format", format);
       define(this, "resolvedOptions", () => {
