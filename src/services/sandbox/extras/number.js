@@ -21,6 +21,22 @@
   "use strict";
 
   const ENGLISH = /^en(-(US|GB|AU|CA|NZ|IE))?$/i;
+
+  // The grammar of a language tag, as the engine reads it, with no singleton given twice.
+  // Node refuses a tag that fails either check with "Invalid language tag".
+  const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
+
+  function checkLocales(locales) {
+    const tags = Array.isArray(locales) ? locales : [locales];
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i] === undefined) continue;
+      const tag = String(tags[i]);
+      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
+      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+        throw new RangeError("Invalid language tag: " + tag);
+      }
+    }
+  }
   const SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "CN¥", CAD: "CA$", AUD: "A$" };
   const WHOLE_CURRENCIES = ["JPY", "KRW"];
   // What follows the number in each unit: the short form for one and for more,
@@ -352,6 +368,7 @@
 
   function numberToLocaleString(locales, options) {
     const value = Number.prototype.valueOf.call(this);
+    checkLocales(locales);
     if (!handled(locales, options)) return original.call(value, locales, options);
 
     return format(value < 0 || Object.is(value, -0), Math.abs(value), options || {});
@@ -359,6 +376,7 @@
 
   function bigintToLocaleString(locales, options) {
     const value = BigInt.prototype.valueOf.call(this);
+    checkLocales(locales);
     if (!handled(locales, options)) return original.call(value, locales, options);
 
     return format(value < 0n, value < 0n ? -value : value, options || {});

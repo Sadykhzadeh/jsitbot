@@ -151,6 +151,7 @@
 
   class Collator {
     constructor(locales, options) {
+      checkLocales(locales);
       const compare = (a, b) => String(a).localeCompare(String(b), locales, options);
       define(this, "compare", compare);
       define(this, "resolvedOptions", () => {
@@ -222,9 +223,26 @@
     }
   }
 
+  // The grammar of a language tag, as the engine reads it, with no singleton given twice.
+  // Node refuses a tag that fails either check with "Invalid language tag".
+  const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
+
+  function checkLocales(locales) {
+    const tags = Array.isArray(locales) ? locales : [locales];
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i] === undefined) continue;
+      const tag = String(tags[i]);
+      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
+      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+        throw new RangeError("Invalid language tag: " + tag);
+      }
+    }
+  }
+
   // PluralRules and ListFormat only know English; any other language is refused
   // rather than answered with English rules.
   function checkLocale(locales, ending) {
+    checkLocales(locales);
     const tag = Array.isArray(locales) ? locales[0] : locales;
     if (tag === undefined) return "en-US";
     if (!ending.test(String(tag))) throw new RangeError("Incorrect locale information provided");
@@ -443,6 +461,7 @@
     #granularity;
 
     constructor(locales, options) {
+      checkLocales(locales);
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
       const asked = options === undefined ? {} : Object(options);
       this.#granularity = choose(asked, "granularity", ["grapheme", "word", "sentence"], "grapheme", "Segmenter");

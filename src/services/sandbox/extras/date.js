@@ -16,6 +16,22 @@
   "use strict";
 
   const ENGLISH = /^en(-US)?$/i;
+
+  // The grammar of a language tag, as the engine reads it, with no singleton given twice.
+  // Node refuses a tag that fails either check with "Invalid language tag".
+  const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
+
+  function checkLocales(locales) {
+    const tags = Array.isArray(locales) ? locales : [locales];
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i] === undefined) continue;
+      const tag = String(tags[i]);
+      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
+      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+        throw new RangeError("Invalid language tag: " + tag);
+      }
+    }
+  }
   const UTC_ZONES = ["utc", "gmt", "etc/utc", "etc/gmt"];
   const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const MONTHS = [
@@ -212,6 +228,7 @@
   }
 
   function format(date, locales, options, required, defaults) {
+    checkLocales(locales);
     const tag = Array.isArray(locales) ? locales[0] : locales;
     if (tag !== undefined && !ENGLISH.test(String(tag))) return original.call(date, locales, options);
 

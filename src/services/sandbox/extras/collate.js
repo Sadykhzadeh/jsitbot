@@ -111,6 +111,22 @@
     return sign(a.length - b.length);
   }
 
+  // The grammar of a language tag, as the engine reads it, with no singleton given twice.
+  // Node refuses a tag that fails either check with "Invalid language tag".
+  const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
+
+  function checkLocales(locales) {
+    const tags = Array.isArray(locales) ? locales : [locales];
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i] === undefined) continue;
+      const tag = String(tags[i]);
+      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
+      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+        throw new RangeError("Invalid language tag: " + tag);
+      }
+    }
+  }
+
   function localeCompare(that) {
     // The runtime is evaluated as a script, where a function called on null or
     // undefined is given the global object instead.
@@ -118,6 +134,7 @@
       throw new TypeError("String.prototype.localeCompare called on null or undefined");
     }
 
+    checkLocales(arguments[1]);
     const options = arguments[2];
     const numeric = options != null && !!options.numeric;
     const ignorePunctuation = options != null && !!options.ignorePunctuation;

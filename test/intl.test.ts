@@ -107,3 +107,48 @@ describe("resolvedOptions", () => {
     expect(await value(`return new Intl.Collator().resolvedOptions().sensitivity`)).toBe("variant");
   });
 });
+
+describe("language tags, checked as Node 26.13 checks them", () => {
+  test("a tag that is not well formed is refused by every method that takes one", async () => {
+    const tags = ["xx-invalid-!!", "en_US", "en--US", "root", "e", "en-u", "en-x", "en-u-ca-gregory-u-nu-latn", "x-foo", ""];
+    const probes = [
+      "new Intl.NumberFormat(t)",
+      "new Intl.DateTimeFormat(t)",
+      "new Intl.Collator(t)",
+      "new Intl.Segmenter(t)",
+      "new Intl.PluralRules(t)",
+      "new Intl.ListFormat(t)",
+      "new Intl.RelativeTimeFormat(t)",
+      "(1).toLocaleString(t)",
+      "new Date(0).toLocaleString(t)",
+      `"a".localeCompare("b", t)`,
+    ];
+    const code = `
+      const out = [];
+      for (const t of ${JSON.stringify(tags)}) {
+        ${probes.map((probe) => `try { ${probe}; out.push("ok"); } catch (e) { out.push(e.name + " " + e.message); }`).join("\n        ")}
+      }
+      return out.join("\\n");
+    `;
+
+    const result = await new QuickJsSandboxService({ maxResultLength: 100_000 }).execute(code);
+    expect(result.ok && result.result.split("\n")).toEqual(
+      tags.flatMap((tag) => probes.map(() => `RangeError Invalid language tag: ${tag}`)),
+    );
+  });
+
+  test("a tag that is well formed is accepted, whatever its case and extensions", async () => {
+    expect(
+      await value(`
+        const tags = ["EN-gb", "zh-Hant-TW", "sr-Latn-RS", "es-419", "en-US-posix", "en-a-bbb-x-a-ccc", "de-DE-u-co-phonebk-co-phonebk", "de-1901"];
+        const out = [];
+        for (const t of tags) {
+          new Intl.NumberFormat(t); new Intl.DateTimeFormat(t); new Intl.Collator(t); new Intl.Segmenter(t);
+          (1).toLocaleString(t); "a".localeCompare("b", t);
+          out.push(t);
+        }
+        return out.join(",");
+      `),
+    ).toBe("EN-gb,zh-Hant-TW,sr-Latn-RS,es-419,en-US-posix,en-a-bbb-x-a-ccc,de-DE-u-co-phonebk-co-phonebk,de-1901");
+  });
+});
