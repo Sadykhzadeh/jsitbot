@@ -27,18 +27,9 @@
 
   const COMPACT_WORDS = ["K", "M", "B", "T", "thousand", "million", "billion", "trillion"];
 
-  // The parts a number can end with, before the unit of a unit style.
-  const NUMBER_ENDS = ["integer", "fraction", "exponentInteger", "compact", "nan", "infinity"];
-
-  // Whether a compact word, such as K or million, is written at `at` as a word of its own.
-  function compactWordAt(text, at) {
-    return COMPACT_WORDS.some((word) => text.startsWith(word, at) && !/[A-Za-z]/.test(text.charAt(at + word.length)));
-  }
-
   // Cuts what the number formatter wrote into the parts formatToParts names.
-  // Its output has one shape, so each piece is told by what it is made of. In a
-  // unit style everything after the number is the unit, as one part.
-  function numberParts(text, unitStyle, compactStyle) {
+  // Its output has one shape, so each piece is told by what it is made of.
+  function numberParts(text) {
     const parts = [];
     let point = false;
     let exponent = false;
@@ -59,14 +50,6 @@
       }
 
       const last = parts.length === 0 ? "" : parts[parts.length - 1].type;
-      if (unitStyle && c !== "E" && NUMBER_ENDS.indexOf(last) !== -1 && !/[,.+-]/.test(c) && !(compactStyle && compactWordAt(text, i))) {
-        if (c === " " || c === "\u00a0") {
-          add("literal", c);
-          i++;
-        }
-        add("unit", text.slice(i));
-        break;
-      }
       if (c === "," || c === ".") {
         if (c === ".") point = true;
         add(c === "," ? "group" : "decimal", c);
@@ -99,18 +82,36 @@
     return parts;
   }
 
+  // In a unit style the unit is what the formatter writes after the number, with a space
+  // before it when the form has one. The number without its unit is parsed as a number, so
+  // a compact letter such as the K of 12KB is cut off from a unit that starts with one.
+  function unitStyleParts(text, bare) {
+    const parts = numberParts(bare);
+    const rest = text.slice(bare.length);
+    if (rest.length === 0) return parts;
+    const space = rest[0] === " " || rest[0] === "\u00a0";
+    if (space) parts.push({ type: "literal", value: rest[0] });
+    parts.push({ type: "unit", value: space ? rest.slice(1) : rest });
+    return parts;
+  }
+
   class NumberFormat {
     constructor(locales, options) {
       // the arguments are checked now, as a constructor does, not at the first format
       Number.prototype.toLocaleString.call(0, locales, options);
 
-      const format = (value) =>
+      const formatWith = (value, withOptions) =>
         typeof value === "bigint"
-          ? BigInt.prototype.toLocaleString.call(value, locales, options)
-          : Number.prototype.toLocaleString.call(Number(value), locales, options);
+          ? BigInt.prototype.toLocaleString.call(value, locales, withOptions)
+          : Number.prototype.toLocaleString.call(Number(value), locales, withOptions);
+      const format = (value) => formatWith(value, options);
       define(this, "format", format);
       const layout = given(options, ["style", "notation"]);
-      define(this, "formatToParts", (value) => numberParts(format(value), layout.style === "unit", layout.notation === "compact"));
+      const bareOptions = Object.assign({}, options, { style: undefined, unit: undefined, unitDisplay: undefined });
+      define(this, "formatToParts", (value) => {
+        const text = format(value);
+        return layout.style === "unit" ? unitStyleParts(text, formatWith(value, bareOptions)) : numberParts(text);
+      });
       define(this, "resolvedOptions", () => {
         const asked = given(options, [
           "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",

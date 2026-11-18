@@ -39,6 +39,10 @@ const OPTIONS = [
   `{ style: "unit", unit: "percent" }`,
   `{ style: "unit", unit: "kilometer-per-hour", unitDisplay: "narrow" }`,
   `{ style: "unit", unit: "liter", notation: "compact" }`,
+  `{ style: "unit", unit: "byte", notation: "compact", unitDisplay: "narrow" }`,
+  `{ style: "unit", unit: "kilobyte", notation: "compact", unitDisplay: "narrow" }`,
+  `{ style: "unit", unit: "megabyte", notation: "compact" }`,
+  `{ style: "unit", unit: "kilometer-per-hour", notation: "compact", unitDisplay: "long" }`,
 ];
 
 describe("Intl.NumberFormat formatToParts", () => {
@@ -69,6 +73,25 @@ describe("Intl.NumberFormat formatToParts", () => {
     );
     expect(await value(`return JSON.stringify(new Intl.NumberFormat("en-US").formatToParts("42.5"))`)).toBe(
       JSON.stringify(new Intl.NumberFormat("en-US").formatToParts("42.5" as unknown as number)),
+    );
+  });
+});
+
+describe("Intl.NumberFormat formatToParts with a compact unit, checked against Node 26.13", () => {
+  test("cuts the compact letter off a unit that starts with one", async () => {
+    expect(
+      await value(`
+        const parts = (n, unit, unitDisplay) => new Intl.NumberFormat("en-US", { notation: "compact", style: "unit", unit, unitDisplay }).formatToParts(n);
+        return JSON.stringify([parts(12000, "byte", "narrow"), parts(2e9, "byte", "narrow"), parts(12000, "kilobyte", "narrow"), parts(999, "megabyte", "narrow"), parts(12000, "megabyte", "short")]);
+      `),
+    ).toBe(
+      JSON.stringify([
+        [{ type: "integer", value: "12" }, { type: "compact", value: "K" }, { type: "unit", value: "B" }],
+        [{ type: "integer", value: "2" }, { type: "compact", value: "B" }, { type: "unit", value: "B" }],
+        [{ type: "integer", value: "12" }, { type: "compact", value: "K" }, { type: "unit", value: "kB" }],
+        [{ type: "integer", value: "999" }, { type: "unit", value: "MB" }],
+        [{ type: "integer", value: "12" }, { type: "compact", value: "K" }, { type: "literal", value: " " }, { type: "unit", value: "MB" }],
+      ]),
     );
   });
 });
