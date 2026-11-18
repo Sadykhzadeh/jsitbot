@@ -345,14 +345,40 @@
     }
   }
 
-  function checkValue(value, min, max) {
-    if (!(value >= min && value <= max)) {
+  // What a range error shows as the value: Node groups the digits of a whole number
+  // above 2 ** 32 in threes, and a bigint gets its n.
+  function groupDigits(text) {
+    const start = text[0] === "-" ? 1 : 0;
+    let end = text.length;
+    let groups = "";
+    for (; end >= start + 4; end -= 3) groups = "_" + text.slice(end - 3, end) + groups;
+    return text.slice(0, end) + groups;
+  }
+
+  function received(value) {
+    if (typeof value === "bigint") {
+      const text = String(value);
+      return (value > 4294967296n || value < -4294967296n ? groupDigits(text) : text) + "n";
+    }
+    if (Number.isInteger(value) && Math.abs(value) > 4294967296) return groupDigits(String(value));
+    return Object.is(value, -0) ? "-0" : String(value);
+  }
+
+  // Node refuses only a value above max or below min, so NaN is written as 0.
+  function checkValue(value, min, max, range) {
+    if (value > max || value < min) {
+      const shown = range === undefined ? ">= " + min + " and <= " + max : range;
       throw nodeError(
         RangeError,
         "ERR_OUT_OF_RANGE",
-        'The value of "value" is out of range. It must be >= ' + min + " and <= " + max + ". Received " + value,
+        'The value of "value" is out of range. It must be ' + shown + ". Received " + received(value),
       );
     }
+  }
+
+  // The DataView over the bytes of a buffer, so that offsets count from its start.
+  function viewOf(buffer) {
+    return new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   }
 
   // Bytes of a string that fit in `room`, whole characters only for UTF-8 and UTF-16.
@@ -374,26 +400,30 @@
     return count;
   }
 
-  // Defines the reads and writes of one width and byte order.
+  // Defines the reads and writes of one width and byte order. A signed one reads
+  // and writes two's complement.
   function numeric(bytes, littleEndian, signed) {
+    const span = 2 ** (8 * bytes);
+    const max = signed ? span / 2 - 1 : span - 1;
+    const min = signed ? -(span / 2) : 0;
     return {
       read(buffer, offset) {
-        checkOffset(buffer, offset === undefined ? 0 : offset, bytes, "offset");
         const start = offset === undefined ? 0 : offset;
+        checkOffset(buffer, start, bytes, "offset");
         let value = 0;
         for (let i = 0; i < bytes; i++) {
           const index = littleEndian ? start + bytes - 1 - i : start + i;
           value = value * 256 + buffer[index];
         }
-        return value;
+        return signed && value > max ? value - span : value;
       },
       write(buffer, value, offset) {
         const number = +value;
-        const max = bytes === 1 ? 255 : bytes === 2 ? 65535 : 4294967295;
-        checkValue(number, 0, max);
+        checkValue(number, min, max);
         const start = offset === undefined ? 0 : offset;
         checkOffset(buffer, start, bytes, "offset");
-        let rest = number;
+        let rest = Math.trunc(number);
+        if (rest < 0) rest += span;
         for (let i = 0; i < bytes; i++) {
           const index = littleEndian ? start + i : start + bytes - 1 - i;
           buffer[index] = rest % 256;
@@ -404,12 +434,72 @@
     };
   }
 
+  // Floats and doubles, read and written through a DataView over the buffer.
+  function floating(bytes, littleEndian) {
+    const getter = bytes === 4 ? "getFloat32" : "getFloat64";
+    const setter = bytes === 4 ? "setFloat32" : "setFloat64";
+    return {
+      read(buffer, offset) {
+        const start = offset === undefined ? 0 : offset;
+        checkOffset(buffer, start, bytes, "offset");
+        return viewOf(buffer)[getter](start, littleEndian);
+      },
+      write(buffer, value, offset) {
+        const number = +value;
+        const start = offset === undefined ? 0 : offset;
+        checkOffset(buffer, start, bytes, "offset");
+        viewOf(buffer)[setter](start, number, littleEndian);
+        return start + bytes;
+      },
+    };
+  }
+
+  // Signed and unsigned 64-bit integers, which take and give bigints only.
+  function bigint(littleEndian, signed) {
+    const min = signed ? -(2n ** 63n) : 0n;
+    const max = signed ? 2n ** 63n - 1n : 2n ** 64n - 1n;
+    const range = signed ? ">= -(2n ** 63n) and < 2n ** 63n" : ">= 0n and < 2n ** 64n";
+    return {
+      read(buffer, offset) {
+        const start = offset === undefined ? 0 : offset;
+        checkOffset(buffer, start, 8, "offset");
+        const view = viewOf(buffer);
+        return signed ? view.getBigInt64(start, littleEndian) : view.getBigUint64(start, littleEndian);
+      },
+      write(buffer, value, offset) {
+        checkValue(value, min, max, range);
+        if (typeof value !== "bigint") {
+          throw new TypeError("Cannot mix BigInt and other types, use explicit conversions");
+        }
+        const start = offset === undefined ? 0 : offset;
+        checkOffset(buffer, start, 8, "offset");
+        const view = viewOf(buffer);
+        if (signed) view.setBigInt64(start, value, littleEndian);
+        else view.setBigUint64(start, value, littleEndian);
+        return start + 8;
+      },
+    };
+  }
+
   const widths = {
     UInt8: numeric(1, true, false),
     UInt16LE: numeric(2, true, false),
     UInt16BE: numeric(2, false, false),
     UInt32LE: numeric(4, true, false),
     UInt32BE: numeric(4, false, false),
+    Int8: numeric(1, true, true),
+    Int16LE: numeric(2, true, true),
+    Int16BE: numeric(2, false, true),
+    Int32LE: numeric(4, true, true),
+    Int32BE: numeric(4, false, true),
+    FloatLE: floating(4, true),
+    FloatBE: floating(4, false),
+    DoubleLE: floating(8, true),
+    DoubleBE: floating(8, false),
+    BigInt64LE: bigint(true, true),
+    BigInt64BE: bigint(false, true),
+    BigUInt64LE: bigint(true, false),
+    BigUInt64BE: bigint(false, false),
   };
 
   // -1, 0 or 1: how two byte sequences order, the shorter one first when one starts the other.
@@ -646,6 +736,110 @@
 
     writeUInt32BE(value, offset) {
       return widths.UInt32BE.write(this, value, offset);
+    }
+
+    readInt8(offset) {
+      return widths.Int8.read(this, offset);
+    }
+
+    readInt16LE(offset) {
+      return widths.Int16LE.read(this, offset);
+    }
+
+    readInt16BE(offset) {
+      return widths.Int16BE.read(this, offset);
+    }
+
+    readInt32LE(offset) {
+      return widths.Int32LE.read(this, offset);
+    }
+
+    readInt32BE(offset) {
+      return widths.Int32BE.read(this, offset);
+    }
+
+    readFloatLE(offset) {
+      return widths.FloatLE.read(this, offset);
+    }
+
+    readFloatBE(offset) {
+      return widths.FloatBE.read(this, offset);
+    }
+
+    readDoubleLE(offset) {
+      return widths.DoubleLE.read(this, offset);
+    }
+
+    readDoubleBE(offset) {
+      return widths.DoubleBE.read(this, offset);
+    }
+
+    readBigInt64LE(offset) {
+      return widths.BigInt64LE.read(this, offset);
+    }
+
+    readBigInt64BE(offset) {
+      return widths.BigInt64BE.read(this, offset);
+    }
+
+    readBigUInt64LE(offset) {
+      return widths.BigUInt64LE.read(this, offset);
+    }
+
+    readBigUInt64BE(offset) {
+      return widths.BigUInt64BE.read(this, offset);
+    }
+
+    writeInt8(value, offset) {
+      return widths.Int8.write(this, value, offset);
+    }
+
+    writeInt16LE(value, offset) {
+      return widths.Int16LE.write(this, value, offset);
+    }
+
+    writeInt16BE(value, offset) {
+      return widths.Int16BE.write(this, value, offset);
+    }
+
+    writeInt32LE(value, offset) {
+      return widths.Int32LE.write(this, value, offset);
+    }
+
+    writeInt32BE(value, offset) {
+      return widths.Int32BE.write(this, value, offset);
+    }
+
+    writeFloatLE(value, offset) {
+      return widths.FloatLE.write(this, value, offset);
+    }
+
+    writeFloatBE(value, offset) {
+      return widths.FloatBE.write(this, value, offset);
+    }
+
+    writeDoubleLE(value, offset) {
+      return widths.DoubleLE.write(this, value, offset);
+    }
+
+    writeDoubleBE(value, offset) {
+      return widths.DoubleBE.write(this, value, offset);
+    }
+
+    writeBigInt64LE(value, offset) {
+      return widths.BigInt64LE.write(this, value, offset);
+    }
+
+    writeBigInt64BE(value, offset) {
+      return widths.BigInt64BE.write(this, value, offset);
+    }
+
+    writeBigUInt64LE(value, offset) {
+      return widths.BigUInt64LE.write(this, value, offset);
+    }
+
+    writeBigUInt64BE(value, offset) {
+      return widths.BigUInt64BE.write(this, value, offset);
     }
   }
 
