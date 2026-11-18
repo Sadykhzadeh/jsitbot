@@ -127,6 +127,24 @@
     }
   }
 
+  // The values the options of a collator take, as Node 26 reads them.
+  const COLLATOR_OPTION_VALUES = {
+    usage: ["sort", "search"],
+    sensitivity: ["base", "accent", "case", "variant"],
+    caseFirst: ["upper", "lower", "false"],
+  };
+
+  function checkCollatorOptions(options) {
+    if (options === null) throw new TypeError("String.prototype.localeCompare called on null or undefined");
+    if (options === undefined) return;
+    for (const name of Object.keys(COLLATOR_OPTION_VALUES)) {
+      const value = options[name];
+      if (value !== undefined && COLLATOR_OPTION_VALUES[name].indexOf(String(value)) === -1) {
+        throw new RangeError("Value " + String(value) + " out of range for String.prototype.localeCompare options property " + name);
+      }
+    }
+  }
+
   function localeCompare(that) {
     // The runtime is evaluated as a script, where a function called on null or
     // undefined is given the global object instead.
@@ -136,6 +154,7 @@
 
     checkLocales(arguments[1]);
     const options = arguments[2];
+    checkCollatorOptions(options);
     const numeric = options != null && !!options.numeric;
     const ignorePunctuation = options != null && !!options.ignorePunctuation;
     const sensitivity = options != null && options.sensitivity !== undefined ? String(options.sensitivity) : "variant";

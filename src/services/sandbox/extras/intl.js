@@ -171,6 +171,11 @@
   class Collator {
     constructor(locales, options) {
       checkLocales(locales);
+      if (options === null) throw new TypeError("Intl.Collator called on null or undefined");
+      const asked = options === undefined ? {} : Object(options);
+      choose(asked, "usage", ["sort", "search"], undefined, "Collator");
+      choose(asked, "sensitivity", ["base", "accent", "case", "variant"], undefined, "Collator");
+      choose(asked, "caseFirst", ["upper", "lower", "false"], undefined, "Collator");
       const compare = (a, b) => String(a).localeCompare(String(b), locales, options);
       define(this, "compare", compare);
       define(this, "resolvedOptions", () => {
@@ -182,7 +187,7 @@
           ignorePunctuation: asked.ignorePunctuation === undefined ? false : Boolean(asked.ignorePunctuation),
           collation: "default",
           numeric: asked.numeric === undefined ? false : Boolean(asked.numeric),
-          caseFirst: asked.caseFirst === undefined ? "false" : asked.caseFirst,
+          caseFirst: asked.caseFirst === undefined ? "false" : String(asked.caseFirst),
         };
       });
     }

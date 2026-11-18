@@ -180,3 +180,24 @@ describe("Intl.NumberFormat options, checked against Node 26.13", () => {
     );
   });
 });
+
+describe("Intl.Collator options, checked against Node 26.13", () => {
+  test("refuses a value Node refuses, in the constructor and in localeCompare", async () => {
+    const cases: Array<[string, string]> = [
+      [`new Intl.Collator("en", { sensitivity: "bogus" })`, "RangeError: Value bogus out of range for Intl.Collator options property sensitivity"],
+      [`new Intl.Collator("en", { usage: "bogus" })`, "RangeError: Value bogus out of range for Intl.Collator options property usage"],
+      [`new Intl.Collator("en", { caseFirst: "bogus" })`, "RangeError: Value bogus out of range for Intl.Collator options property caseFirst"],
+      [`new Intl.Collator("en", null)`, "TypeError: Intl.Collator called on null or undefined"],
+      [`"a".localeCompare("b", "en", { sensitivity: "bogus" })`, "RangeError: Value bogus out of range for String.prototype.localeCompare options property sensitivity"],
+      [`"a".localeCompare("b", "en", null)`, "TypeError: String.prototype.localeCompare called on null or undefined"],
+    ];
+
+    for (const [call, expected] of cases) {
+      expect(await value(`try { ${call}; return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(expected);
+    }
+  });
+
+  test("reports caseFirst false as the string Node reports it as", async () => {
+    expect(await value(`return JSON.stringify(new Intl.Collator("en", { caseFirst: false }).resolvedOptions().caseFirst)`)).toBe('"false"');
+  });
+});
