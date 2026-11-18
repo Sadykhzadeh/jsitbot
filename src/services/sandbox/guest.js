@@ -2122,6 +2122,8 @@
   lazyMethod("datestring", Date.prototype, "toTimeString");
   lazyMethod("number", Number.prototype, "toLocaleString");
   lazyMethod("number", BigInt.prototype, "toLocaleString");
+  lazyMethod("arrays", Array.prototype, "join");
+  lazyMethod("arrays", Array.prototype, "toLocaleString");
   lazyGlobals("clone", ["structuredClone"]);
   lazyGlobals("proxy", ["Proxy"]);
   lazyGlobals("digest", []);

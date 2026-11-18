@@ -253,6 +253,17 @@ describe("structures of absurd size", () => {
 
     expect(text(result)).toContain("self: [Circular *1]");
   });
+
+  test("an array that holds itself is joined with nothing in its place, as Node joins it", async () => {
+    const { result } = await run(`
+      const a = [1]; a.push(a);
+      const b = []; b[0] = b;
+      const c = [1, [2]]; c[1].push(c);
+      [a.join("-"), String(b), c.join(), a.toLocaleString(), String(b).length].join(" | ")
+    `);
+
+    expect(result.ok ? result.result : result.error).toBe("1- |  | 1,2, | 1, | 0");
+  });
 });
 
 describe("what the guest cannot do to block the process", () => {
