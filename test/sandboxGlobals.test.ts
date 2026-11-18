@@ -542,3 +542,32 @@ describe("the source of a function, checked against Node 26.13", () => {
     ]);
   });
 });
+
+describe("the console, timer and Buffer functions print as built-ins", () => {
+  test("a console method prints as Node's bound function does, with no name", async () => {
+    const result = await sandbox.execute(`
+      return [console.log, console.error, console.table, console.group, console.dir].map(String).join("\\n");
+    `);
+
+    expect(result.ok && result.result.split("\n")).toEqual(Array(5).fill("function () { [native code] }"));
+  });
+
+  test("a timer and a Buffer function print under their names, with no body", async () => {
+    const result = await sandbox.execute(`
+      return [setTimeout, clearInterval, setImmediate, queueMicrotask, Buffer.from, Buffer.prototype.toString].map(String).join("\\n");
+    `);
+
+    expect(result.ok && result.result.split("\n")).toEqual([
+      "function setTimeout() { [native code] }",
+      "function clearInterval() { [native code] }",
+      "function setImmediate() { [native code] }",
+      "function queueMicrotask() { [native code] }",
+      "function from() { [native code] }",
+      "function toString() { [native code] }",
+    ]);
+  });
+
+  test("a program's own function keeps its source", async () => {
+    expect(await value(`function named(a) { return a } return String(named)`)).toBe("function named(a) { return a }");
+  });
+});

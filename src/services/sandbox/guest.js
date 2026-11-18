@@ -1686,6 +1686,13 @@
     }[name];
   }
 
+  // What a built-in prints as, where the engine would show the source of the sandbox. The
+  // console methods are bound functions in Node, so they are anonymous there.
+  const builtInText = new WeakMap();
+  function markBuiltIn(fn, anonymous) {
+    weakMapSet(builtInText, fn, anonymous ? "function () { [native code] }" : "function " + fn.name + "() { [native code] }");
+  }
+
   const console = freeze({
     log: printer("log"),
     info: printer("info"),
@@ -1711,6 +1718,7 @@
     timeEnd,
   });
   Object.defineProperty(globalThis, "console", { value: console, writable: false, configurable: false, enumerable: false });
+  for (const name of getOwnPropertyNames(console)) markBuiltIn(console[name], true);
 
   // Timers run on a virtual clock. The host calls tick() once the promise queue
   // is empty, and each call fires the earliest timer, so a sleep costs no real
@@ -1988,11 +1996,33 @@
     extra: (module) => loaders[module](),
   };
 
-  function lazyGlobals(module, names) {
+  // The functions an extra exports, and those its classes own, print as built-ins.
+  function markBuiltIns(exported) {
+    const names = getOwnPropertyNames(exported);
+    for (let i = 0; i < names.length; i++) {
+      const value = exported[names[i]];
+      markOwnFunctions(value);
+      if (typeof value === "function") markOwnFunctions(value.prototype);
+    }
+  }
+
+  function markOwnFunctions(object) {
+    if (object === null || (typeof object !== "object" && typeof object !== "function")) return;
+    const names = getOwnPropertyNames(object);
+    for (let i = 0; i < names.length; i++) {
+      const descriptor = getOwnPropertyDescriptor(object, names[i]);
+      if (typeof descriptor.value === "function") markBuiltIn(descriptor.value, false);
+    }
+  }
+
+  function lazyGlobals(module, names, builtIns) {
     let exported;
 
     function load() {
-      if (exported === undefined) exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions);
+      if (exported === undefined) {
+        exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions);
+        if (builtIns) markBuiltIns(exported);
+      }
       return exported;
     }
 
@@ -2191,7 +2221,7 @@
   lazyGlobals("intl", ["Intl"]);
   lazyGlobals("events", ["DOMException", "Event", "CustomEvent", "EventTarget", "AbortController", "AbortSignal"]);
   lazyGlobals("weakref", ["WeakRef"]);
-  lazyGlobals("buffer", ["Buffer"]);
+  lazyGlobals("buffer", ["Buffer"], true);
   lazyGlobals("disposable", ["DisposableStack", "AsyncDisposableStack", "SuppressedError"]);
   lazyGlobals("blob", ["Blob", "File"]);
   lazyMethods("bytes", [
@@ -2222,6 +2252,7 @@
     ["global", globalThis],
   ]) {
     Object.defineProperty(globalThis, name, { value, writable: true, configurable: true, enumerable: false });
+    if (typeof value === "function") markBuiltIn(value, false);
   }
 
   // A built-in prints as Node prints it, on one line with no body: function max() { [native code] }.
@@ -2232,6 +2263,7 @@
   const boundHead = /^function bound \(\)/;
   const functionSource = {
     toString() {
+      if (weakMapHas(builtInText, this)) return weakMapGet(builtInText, this);
       const text = reflectApply(engineFunctionSource, this, []);
       return nativeBody.test(text) ? text.replace(boundHead, "function ()").replace(nativeBody, "{ [native code] }") : text;
     },
