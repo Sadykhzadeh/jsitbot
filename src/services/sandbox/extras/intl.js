@@ -27,9 +27,18 @@
 
   const COMPACT_WORDS = ["K", "M", "B", "T", "thousand", "million", "billion", "trillion"];
 
+  // The parts a number can end with, before the unit of a unit style.
+  const NUMBER_ENDS = ["integer", "fraction", "exponentInteger", "compact", "nan", "infinity"];
+
+  // Whether a compact word, such as K or million, is written at `at` as a word of its own.
+  function compactWordAt(text, at) {
+    return COMPACT_WORDS.some((word) => text.startsWith(word, at) && !/[A-Za-z]/.test(text.charAt(at + word.length)));
+  }
+
   // Cuts what the number formatter wrote into the parts formatToParts names.
-  // Its output has one shape, so each piece is told by what it is made of.
-  function numberParts(text) {
+  // Its output has one shape, so each piece is told by what it is made of. In a
+  // unit style everything after the number is the unit, as one part.
+  function numberParts(text, unitStyle, compactStyle) {
     const parts = [];
     let point = false;
     let exponent = false;
@@ -50,6 +59,14 @@
       }
 
       const last = parts.length === 0 ? "" : parts[parts.length - 1].type;
+      if (unitStyle && c !== "E" && NUMBER_ENDS.indexOf(last) !== -1 && !/[,.+-]/.test(c) && !(compactStyle && compactWordAt(text, i))) {
+        if (c === " " || c === "\u00a0") {
+          add("literal", c);
+          i++;
+        }
+        add("unit", text.slice(i));
+        break;
+      }
       if (c === "," || c === ".") {
         if (c === ".") point = true;
         add(c === "," ? "group" : "decimal", c);
@@ -92,7 +109,8 @@
           ? BigInt.prototype.toLocaleString.call(value, locales, options)
           : Number.prototype.toLocaleString.call(Number(value), locales, options);
       define(this, "format", format);
-      define(this, "formatToParts", (value) => numberParts(format(value)));
+      const layout = given(options, ["style", "notation"]);
+      define(this, "formatToParts", (value) => numberParts(format(value), layout.style === "unit", layout.notation === "compact"));
       define(this, "resolvedOptions", () => {
         const asked = given(options, [
           "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",

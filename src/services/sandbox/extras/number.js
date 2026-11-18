@@ -11,6 +11,9 @@
 // and for currencies currencyDisplay "symbol" and "code" and currencySign. The
 // number is rounded on the digits it is written with, half away from zero, so
 // 1.005 gives 1.01.
+// For the style unit, the units are the ones Intl.supportedValuesOf lists for
+// units and the three per units that are most used, in the short, narrow and long
+// forms of English.
 // Anything else, another language or an option that is not listed, is left to
 // the engine's own method, which is the `original` it is given, together with
 // the prototype it belongs to.
@@ -20,8 +23,61 @@
   const ENGLISH = /^en(-(US|GB|AU|CA|NZ|IE))?$/i;
   const SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "CN¥", CAD: "CA$", AUD: "A$" };
   const WHOLE_CURRENCIES = ["JPY", "KRW"];
+  // What follows the number in each unit: the short form for one and for more,
+  // the narrow form, and the long form for one and for more.
+  const UNITS = {
+    "acre": [" ac", " ac", "ac", " acre", " acres"],
+    "bit": [" bit", " bit", "bit", " bit", " bits"],
+    "byte": [" byte", " byte", "B", " byte", " bytes"],
+    "celsius": ["°C", "°C", "°C", " degree Celsius", " degrees Celsius"],
+    "centimeter": [" cm", " cm", "cm", " centimeter", " centimeters"],
+    "day": [" day", " days", "d", " day", " days"],
+    "degree": [" deg", " deg", "°", " degree", " degrees"],
+    "fahrenheit": ["°F", "°F", "°", " degree Fahrenheit", " degrees Fahrenheit"],
+    "fluid-ounce": [" fl oz", " fl oz", "fl oz", " fluid ounce", " fluid ounces"],
+    "foot": [" ft", " ft", "′", " foot", " feet"],
+    "gallon": [" gal", " gal", "gal", " gallon", " gallons"],
+    "gigabit": [" Gb", " Gb", "Gb", " gigabit", " gigabits"],
+    "gigabyte": [" GB", " GB", "GB", " gigabyte", " gigabytes"],
+    "gram": [" g", " g", "g", " gram", " grams"],
+    "hectare": [" ha", " ha", "ha", " hectare", " hectares"],
+    "hour": [" hr", " hr", "h", " hour", " hours"],
+    "inch": [" in", " in", "″", " inch", " inches"],
+    "kilobit": [" kb", " kb", "kb", " kilobit", " kilobits"],
+    "kilobyte": [" kB", " kB", "kB", " kilobyte", " kilobytes"],
+    "kilogram": [" kg", " kg", "kg", " kilogram", " kilograms"],
+    "kilometer": [" km", " km", "km", " kilometer", " kilometers"],
+    "liter": [" L", " L", "L", " liter", " liters"],
+    "megabit": [" Mb", " Mb", "Mb", " megabit", " megabits"],
+    "megabyte": [" MB", " MB", "MB", " megabyte", " megabytes"],
+    "meter": [" m", " m", "m", " meter", " meters"],
+    "microsecond": [" μs", " μs", "μs", " microsecond", " microseconds"],
+    "mile": [" mi", " mi", "mi", " mile", " miles"],
+    "mile-scandinavian": [" smi", " smi", "smi", " mile-scandinavian", " miles-scandinavian"],
+    "milliliter": [" mL", " mL", "mL", " milliliter", " milliliters"],
+    "millimeter": [" mm", " mm", "mm", " millimeter", " millimeters"],
+    "millisecond": [" ms", " ms", "ms", " millisecond", " milliseconds"],
+    "minute": [" min", " min", "m", " minute", " minutes"],
+    "month": [" mth", " mths", "m", " month", " months"],
+    "nanosecond": [" ns", " ns", "ns", " nanosecond", " nanoseconds"],
+    "ounce": [" oz", " oz", "oz", " ounce", " ounces"],
+    "percent": ["%", "%", "%", " percent", " percent"],
+    "petabyte": [" PB", " PB", "PB", " petabyte", " petabytes"],
+    "pound": [" lb", " lb", "#", " pound", " pounds"],
+    "second": [" sec", " sec", "s", " second", " seconds"],
+    "stone": [" st", " st", "st", " stone", " stones"],
+    "terabit": [" Tb", " Tb", "Tb", " terabit", " terabits"],
+    "terabyte": [" TB", " TB", "TB", " terabyte", " terabytes"],
+    "week": [" wk", " wks", "w", " week", " weeks"],
+    "yard": [" yd", " yd", "yd", " yard", " yards"],
+    "year": [" yr", " yrs", "y", " year", " years"],
+    "kilometer-per-hour": [" km/h", " km/h", "km/h", " kilometer per hour", " kilometers per hour"],
+    "mile-per-hour": [" mph", " mph", "mph", " mile per hour", " miles per hour"],
+    "meter-per-second": [" m/s", " m/s", "m/s", " meter per second", " meters per second"],
+  };
+  const UNIT_DISPLAYS = ["short", "narrow", "long"];
   const UNSUPPORTED = [
-    "unit", "unitDisplay", "roundingMode", "roundingIncrement",
+    "roundingMode", "roundingIncrement",
   ];
   const SHORT_UNITS = ["", "K", "M", "B", "T"];
   const LONG_UNITS = ["", " thousand", " million", " billion", " trillion"];
@@ -248,6 +304,7 @@
     else text = digits(magnitude, style, options, defaultMin, defaultMax, notation === "compact", notation);
     const sign = signOf(negative, text, options);
     if (style === "percent") text += "%";
+    if (style === "unit") text += unitSuffix(options, text);
     if (style === "currency") {
       const symbol = options.currencyDisplay === "code" ? undefined : SYMBOLS[currency];
       text = (symbol === undefined ? currency + (/^\d/.test(text) ? " " : "") : symbol) + text;
@@ -271,7 +328,26 @@
     if (options.compactDisplay !== undefined && options.compactDisplay !== "short" && options.compactDisplay !== "long") return false;
     if (options.currencyDisplay !== undefined && options.currencyDisplay !== "symbol" && options.currencyDisplay !== "code") return false;
     if (options.currencySign !== undefined && options.currencySign !== "standard" && options.currencySign !== "accounting") return false;
+    if (options.style === "unit") return unitKnown(options);
     return options.style === undefined || options.style === "decimal" || options.style === "percent" || options.style === "currency";
+  }
+
+  function unitDisplayOf(options) {
+    return options.unitDisplay === undefined ? "short" : String(options.unitDisplay);
+  }
+
+  function unitKnown(options) {
+    return Object.prototype.hasOwnProperty.call(UNITS, String(options.unit)) && UNIT_DISPLAYS.indexOf(unitDisplayOf(options)) !== -1;
+  }
+
+  // The unit after the number, with its space when the form has one. A number of
+  // exactly one takes the singular.
+  function unitSuffix(options, text) {
+    const forms = UNITS[String(options.unit)];
+    const display = unitDisplayOf(options);
+    if (display === "narrow") return forms[2];
+    if (display === "long") return forms[text === "1" ? 3 : 4];
+    return forms[text === "1" ? 0 : 1];
   }
 
   function numberToLocaleString(locales, options) {

@@ -85,6 +85,30 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await value(`return [1234.5, 1e6].toLocaleString()`)).toBe("1,234.5,1,000,000");
   });
 
+  test("writes a unit after the number, in its short, narrow and long forms", async () => {
+    expect(
+      await value(`
+        const unit = (n, options) => n.toLocaleString("en-US", { style: "unit", ...options });
+        return [
+          unit(1, { unit: "kilometer" }),
+          unit(2, { unit: "kilometer" }),
+          unit(1.5, { unit: "kilometer", unitDisplay: "long" }),
+          unit(-1234.5, { unit: "liter", unitDisplay: "long" }),
+          unit(20, { unit: "celsius" }),
+          unit(3, { unit: "kilometer-per-hour", unitDisplay: "narrow" }),
+          unit(12000, { unit: "liter", notation: "compact" }),
+          unit(0, { unit: "day" }),
+          unit(0.5, { unit: "percent" }),
+          unit(2, { unit: "week" }),
+        ].join(" | ");
+      `),
+    ).toBe("1 km | 2 km | 1.5 kilometers | -1,234.5 liters | 20°C | 3km/h | 12K L | 0 days | 0.5% | 2 wks");
+  });
+
+  test("writes a number whose unit it does not know without one", async () => {
+    expect(await value(`return (3).toLocaleString("en-US", { style: "unit", unit: "bogus" })`)).toBe("3");
+  });
+
   test("leaves another language and options it does not know to the engine", async () => {
     expect(await value(`return (1234.5).toLocaleString("de-DE")`)).toBe("1234.5");
     expect(await value(`return (1234.5).toLocaleString("en-US", { roundingMode: "ceil" })`)).toBe("1234.5");

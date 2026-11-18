@@ -33,6 +33,12 @@ const OPTIONS = [
   `{ minimumFractionDigits: 2 }`,
   `{ useGrouping: false }`,
   `{ maximumSignificantDigits: 3 }`,
+  `{ style: "unit", unit: "kilometer" }`,
+  `{ style: "unit", unit: "kilometer", unitDisplay: "long" }`,
+  `{ style: "unit", unit: "celsius" }`,
+  `{ style: "unit", unit: "percent" }`,
+  `{ style: "unit", unit: "kilometer-per-hour", unitDisplay: "narrow" }`,
+  `{ style: "unit", unit: "liter", notation: "compact" }`,
 ];
 
 describe("Intl.NumberFormat formatToParts", () => {
