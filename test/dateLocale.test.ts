@@ -300,6 +300,17 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
     ).toBe("1:00 PM");
   });
 
+  test("name the zone after a date with no time in it", async () => {
+    const at = (options: string) => value(`return new Date(0).toLocaleDateString("en-US", { ${options} })`);
+
+    expect(await at(`timeZone: "America/New_York", timeZoneName: "short"`)).toBe("12/31/1969, EST");
+    expect(await at(`timeZone: "America/New_York", timeZoneName: "long"`)).toBe("12/31/1969, Eastern Standard Time");
+    expect(await at(`timeZone: "America/New_York", timeZoneName: "short", weekday: "long"`)).toBe("Wednesday, EST");
+    expect(await at(`timeZone: "America/New_York", timeZoneName: "short", month: "long"`)).toBe("December at EST");
+    expect(await at(`timeZone: "UTC", timeZoneName: "long"`)).toBe("1/1/1970, Coordinated Universal Time");
+    expect(await at(`timeZone: "Etc/GMT+5", timeZoneName: "short"`)).toBe("12/31/1969, GMT-5");
+  });
+
   test("name the zone as the host's time zone data does", async () => {
     // Against the host itself, not literals: zone names come from its ICU, and
     // one ICU says "GMT" for UTC's short offset where the next says "GMT+0".

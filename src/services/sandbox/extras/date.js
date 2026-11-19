@@ -162,7 +162,6 @@
     // What the engine's formats have no sensible form for
     if (f.fractionalSecondDigits !== undefined && f.second === undefined) return null;
     if (f.second !== undefined && f.hour !== undefined && f.minute === undefined) return null;
-    if (f.timeZoneName !== undefined && !has(f, ["hour", "minute", "second"])) return null;
     if (f.day !== undefined && f.month === undefined && f.year !== undefined) return null;
     if (f.month === "narrow" && (f.weekday !== undefined || f.day !== undefined || f.year !== undefined)) return null;
 
@@ -268,7 +267,9 @@
     if (c.year < 1 || c.year > 9999) return original.call(date, locales, options);
 
     const dateText = has(f, DATE_FIELDS) ? datePart(f, c) : "";
-    const timeText = has(f, ["hour", "minute", "second"]) ? timePart(f, c, cycle, zoneText) : "";
+    const timeText = has(f, ["hour", "minute", "second"])
+      ? timePart(f, c, cycle, zoneText)
+      : f.timeZoneName !== undefined ? zoneText : "";
     if (dateText === "" || timeText === "") return dateText + timeText;
 
     let glue = resolved.glue;
