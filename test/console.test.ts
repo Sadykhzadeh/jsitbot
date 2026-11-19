@@ -25,6 +25,19 @@ describe("console.table", () => {
     ]);
   });
 
+  test("orders the columns as the keys of an object are, so a number-like key comes first", async () => {
+    const [table] = await logs(`console.table([{ b: 1, 2: "x" }, { c: 3, 0: "y" }])`);
+
+    expect(table.split("\n")).toEqual([
+      "┌─────────┬─────┬─────┬───┬───┐",
+      "│ (index) │ 0   │ 2   │ b │ c │",
+      "├─────────┼─────┼─────┼───┼───┤",
+      "│ 0       │     │ 'x' │ 1 │   │",
+      "│ 1       │ 'y' │     │   │ 3 │",
+      "└─────────┴─────┴─────┴───┴───┘",
+    ]);
+  });
+
   test("puts primitive rows under Values and names the rows of an object by key", async () => {
     const [table] = await logs(`console.table({ x: { n: 1 }, y: 5 })`);
 

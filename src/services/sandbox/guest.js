@@ -1503,14 +1503,16 @@
       rows[rows.length] = row;
     }
 
+    // The columns the rows found are ordered as the keys of an object are, so a number-like key comes first.
+    const names = chosen ? columns : getKeys(known);
     const headers = ["(index)"];
-    for (let i = 0; i < columns.length; i++) headers[headers.length] = columns[i];
+    for (let i = 0; i < names.length; i++) headers[headers.length] = names[i];
     if (hasValues) headers[headers.length] = "Values";
 
     const body = [];
     for (let i = 0; i < rows.length; i++) {
       const parts = [rows[i].index];
-      for (let j = 0; j < columns.length; j++) parts[parts.length] = rows[i].cells[columns[j]] || "";
+      for (let j = 0; j < names.length; j++) parts[parts.length] = rows[i].cells[names[j]] || "";
       if (hasValues) parts[parts.length] = rows[i].value;
       body[body.length] = parts;
     }
