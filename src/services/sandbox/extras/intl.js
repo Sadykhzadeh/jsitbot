@@ -309,6 +309,12 @@
     return text;
   }
 
+  // The end of a range of numbers, which is refused when it is not one, as Node names it.
+  function rangeEnd(value, which) {
+    if (value === undefined) throw new TypeError("Invalid " + which + " : undefined");
+    if (Number.isNaN(+value)) throw new RangeError("Invalid " + which + " : NaN");
+  }
+
   class PluralRules {
     #type;
     #locale;
@@ -324,6 +330,15 @@
       if (given.maximumFractionDigits !== undefined) this.#digits.maximumFractionDigits = given.maximumFractionDigits;
       // the digits are checked now, as a constructor does
       Number.prototype.toLocaleString.call(0, "en-US", this.#digits);
+    }
+
+    // English puts every range of numbers in "other", whatever the ends are.
+    selectRange(start, end) {
+      // The receiver must be a PluralRules, as it is for select.
+      void this.#type;
+      rangeEnd(start, "startRange");
+      rangeEnd(end, "endRange");
+      return "other";
     }
 
     select(value) {

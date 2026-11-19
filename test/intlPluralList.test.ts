@@ -45,6 +45,19 @@ describe("Intl.PluralRules", () => {
     ).toBe("other one other other");
   });
 
+  test("gives every range of numbers the category other, and refuses an end that is not a number", async () => {
+    expect(await value(`const pr = new Intl.PluralRules("en"); return [pr.selectRange(1, 1), pr.selectRange(0, 1), pr.selectRange(-1, 2.5), pr.selectRange("3", "4")].join()`)).toBe(
+      "other,other,other,other",
+    );
+    expect(await value(`try { new Intl.PluralRules("en").selectRange(NaN, 1) } catch (e) { return e.name + ": " + e.message }`)).toBe(
+      "RangeError: Invalid startRange : NaN",
+    );
+    expect(await value(`try { new Intl.PluralRules("en").selectRange(1, undefined) } catch (e) { return e.name + ": " + e.message }`)).toBe(
+      "TypeError: Invalid endRange : undefined",
+    );
+    expect(await value(`try { Intl.PluralRules.prototype.selectRange.call({}, 1, 2) } catch (e) { return e.name }`)).toBe("TypeError");
+  });
+
   test("works detached from its object, as a helper is passed around", async () => {
     expect(await value(`const { select } = new Intl.PluralRules("en"); return select(1)`)).toMatch(/^error: TypeError/);
   });
