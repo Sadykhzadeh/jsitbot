@@ -1,15 +1,29 @@
-import type { Bot } from "grammy";
-import type { Message } from "grammy/types";
+import type { Api, Bot } from "grammy";
+import type { Document, Message } from "grammy/types";
 
-import { rateKey, createRunner, type RunnerOptions } from "../runner";
+import { createRunner, rateKey, type RunnerOptions } from "../runner";
 import { stripCodeFence } from "../codeInput";
 import { ReplyTracker } from "../replyTracker";
-import { createPrivateAnswerer, USAGE } from "./privateMessage";
+import {
+  type CodeFileOptions,
+  type PrivateRequest,
+  createPrivateAnswerer,
+  isCodeFile,
+  readCodeFile,
+  refuseFile,
+  USAGE,
+} from "./privateMessage";
 
-interface RunCommandOptions extends RunnerOptions {
+interface RunCommandOptions extends RunnerOptions, CodeFileOptions {
   botUsername: string;
   /** Shared with the private handler, so that an edit of a command finds the answer it made. */
   replies: ReplyTracker;
+}
+
+interface AddressedCode {
+  code: string;
+  /** A code file that was replied to, which is the code when the command has none of its own. */
+  file?: Document;
 }
 
 const COMMAND = /^\/run(?:@([A-Za-z0-9_]+))?(?=\s|$)/;
@@ -31,11 +45,11 @@ function codeIn(message: Message): string {
  * Finds out whether a message asks the bot to run something, and what. A chat
  * with many people in it is not a place to run every message that looks like
  * code, so the bot only reacts when it is addressed: `/run code`, `@bot code`,
- * or either of them as a reply to a message that holds the code. Returns
- * undefined for any other message, and an empty code for a request that names
- * nothing to run.
+ * or either of them as a reply to a message that holds the code or a code
+ * file. Returns undefined for any other message, and an empty code for a
+ * request that names nothing to run.
  */
-export function addressedCode(message: Message, botUsername: string): { code: string } | undefined {
+export function addressedCode(message: Message, botUsername: string): AddressedCode | undefined {
   const text = message.text;
   if (text === undefined) {
     return undefined;
@@ -65,12 +79,34 @@ export function addressedCode(message: Message, botUsername: string): { code: st
   }
 
   const quoted = message.reply_to_message;
-  return { code: quoted && !quoted.from?.is_bot ? codeIn(quoted) : "" };
+  if (!quoted || quoted.from?.is_bot) {
+    return { code: "" };
+  }
+  // The file is the code, and whatever was written with it is not.
+  if (quoted.document && isCodeFile(quoted.document)) {
+    return { code: "", file: quoted.document };
+  }
+  return { code: codeIn(quoted) };
 }
 
 export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions): void {
   const runCode = createRunner(options);
   const answerer = createPrivateAnswerer(options);
+
+  // The code a request runs: its own, or the file it replies to. A file that
+  // cannot be read is refused in the chat and gives no code.
+  async function codeOf(api: Api, request: AddressedCode, ids: Omit<PrivateRequest, "code">): Promise<string | undefined> {
+    if (!request.file) {
+      return request.code;
+    }
+
+    const read = await readCodeFile(api, request.file, options);
+    if ("refusal" in read) {
+      await refuseFile(api, ids, options, read.refusal);
+      return undefined;
+    }
+    return read.code;
+  }
 
   // In a private chat the answer is handled like the answer to any message, so
   // that editing the command updates it.
@@ -81,17 +117,18 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
       return;
     }
 
-    if (ctx.chat.type === "private") {
-      await answerer.send(ctx.api, {
-        chatId: ctx.chat.id,
-        userId: ctx.from.id,
-        messageId: ctx.message.message_id,
-        code: request.code,
-      });
+    const ids = { chatId: ctx.chat.id, userId: ctx.from.id, messageId: ctx.message.message_id };
+    const code = await codeOf(ctx.api, request, ids);
+    if (code === undefined) {
       return;
     }
 
-    if (request.code.trim() === "") {
+    if (ctx.chat.type === "private") {
+      await answerer.send(ctx.api, { ...ids, code });
+      return;
+    }
+
+    if (code.trim() === "") {
       // Nothing to run, but a reply costs the chat a message all the same.
       if (options.rateLimiter.consume(rateKey(ctx.from.id), options.rateLimitPolicy).allowed) {
         await ctx.reply(USAGE, {
@@ -102,7 +139,7 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
       return;
     }
 
-    const outcome = await runCode(ctx.from.id, request.code);
+    const outcome = await runCode(ctx.from.id, code);
     // In a group, a user who is over a limit is not worth a message everybody reads.
     if (!outcome.ran && outcome.refusal !== "too-long") {
       return;
@@ -121,11 +158,12 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
       return;
     }
 
-    await answerer.edit(ctx.api, {
-      chatId: ctx.chat.id,
-      userId: ctx.from.id,
-      messageId: ctx.editedMessage.message_id,
-      code: request.code,
-    });
+    const ids = { chatId: ctx.chat.id, userId: ctx.from.id, messageId: ctx.editedMessage.message_id };
+    const code = await codeOf(ctx.api, request, ids);
+    if (code === undefined) {
+      return;
+    }
+
+    await answerer.edit(ctx.api, { ...ids, code });
   });
 }

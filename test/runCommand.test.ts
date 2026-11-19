@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Bot } from "grammy";
+import { Bot, type Api } from "grammy";
 import type { Message, MessageEntity, Update, UserFromGetMe } from "grammy/types";
 
 import { addressedCode, registerRunCommandHandler } from "../src/bot/handlers/runCommand";
@@ -11,13 +11,18 @@ import { ReplyTracker } from "../src/bot/replyTracker";
 import { registerStartHelpHandlers } from "../src/bot/handlers/startHelp";
 import { HELP_LIMITS } from "./helpers/botHarness";
 
+const CODE_FILE = { file_id: "file-1", file_unique_id: "u1", file_name: "answer.js", file_size: 10 };
+const encode = (text: string) => new TextEncoder().encode(text);
+
 const BOT_ID = 999;
 type ReplyMessage = NonNullable<Message["reply_to_message"]>;
 
 const GROUP_ID = -100123;
 const sandbox = new QuickJsSandboxService();
 
-function createBotUnderTest(options: { maxRequests?: number; concurrency?: boolean } = {}) {
+function createBotUnderTest(
+  options: { maxRequests?: number; concurrency?: boolean; readFile?: (api: Api, fileId: string, maxBytes: number) => Promise<Uint8Array> } = {},
+) {
   const bot = new Bot("1:test", {
     botInfo: {
       id: BOT_ID,
@@ -43,6 +48,7 @@ function createBotUnderTest(options: { maxRequests?: number; concurrency?: boole
     timeBudget: new SandboxTimeBudget(),
     timeBudgetPolicy: { windowMs: 10_000, maxMs: 10_000_000 },
     maxCodeLength: 2_000,
+    readFile: options.readFile,
   };
   const concurrency = options.concurrency ? handleConcurrently(bot, { limit: 8, perUser: 3 }) : undefined;
   if (concurrency) {
@@ -97,19 +103,24 @@ function createBotUnderTest(options: { maxRequests?: number; concurrency?: boole
       return id;
     },
 
-    async edit(text: string, editedId: number, userId = 42, chat: "group" | "private" = "private"): Promise<void> {
+    async edit(
+      text: string,
+      editedId: number,
+      userId = 42,
+      chat: "group" | "private" = "private",
+      replyTo?: Partial<Message>,
+    ): Promise<void> {
+      const target = chat === "private" ? { id: userId, type: "private", first_name: "T" } : { id: GROUP_ID, type: "supergroup", title: "Chat" };
       await bot.handleUpdate({
         update_id: updateId++,
         edited_message: {
           message_id: editedId,
           date: 0,
           edit_date: 1,
-          chat:
-            chat === "private"
-              ? { id: userId, type: "private", first_name: "T" }
-              : { id: GROUP_ID, type: "supergroup", title: "Chat" },
+          chat: target,
           from: { id: userId, is_bot: false, first_name: "T" },
           text,
+          ...(replyTo ? { reply_to_message: { message_id: 1, date: 0, chat: target, ...replyTo } } : {}),
         },
       } as Update);
     },
@@ -160,6 +171,15 @@ describe("addressedCode", () => {
     expect(addressedCode(message("/run 1 + 1", { reply_to_message: quoted as ReplyMessage }), "jsitbot")).toEqual({ code: "1 + 1" });
   });
 
+  test("takes a code file that is replied to as the code, not the caption sent with it", () => {
+    const quoted = { message_id: 1, date: 0, chat: { id: 1, type: "supergroup", title: "t" }, document: CODE_FILE, caption: "1 + 1" } as Message;
+
+    expect(addressedCode(message("/run", { reply_to_message: quoted as ReplyMessage }), "jsitbot")).toEqual({
+      code: "",
+      file: CODE_FILE,
+    });
+  });
+
   test("has no code when the replied message is a bot's or has no text", () => {
     const fromBot = message("*Code*", { from: { id: BOT_ID, is_bot: true, first_name: "JS" } });
     const photo = { message_id: 1, date: 0, chat: { id: 1, type: "supergroup", title: "t" } } as Message;
@@ -190,6 +210,30 @@ describe("running code in a group", () => {
     await chat.say("/run", { replyTo: { text: "'abc'.toUpperCase()" } });
 
     expect(chat.sent()[0].text).toContain("ABC");
+  });
+
+  test("runs the code file that is replied to", async () => {
+    const chat = createBotUnderTest({ readFile: async () => encode("6 * 7") });
+
+    const id = await chat.say("/run", { replyTo: { document: CODE_FILE } });
+
+    expect(chat.sent()[0].text).toContain("42");
+    expect(chat.sent()[0].reply_parameters).toEqual({ message_id: id, allow_sending_without_reply: true });
+  });
+
+  test("refuses a code file that is too big without reading it", async () => {
+    let read = 0;
+    const chat = createBotUnderTest({
+      readFile: async () => {
+        read++;
+        return encode("1");
+      },
+    });
+
+    await chat.say("/run", { replyTo: { document: { ...CODE_FILE, file_size: 6_001 } } });
+
+    expect(read).toBe(0);
+    expect(chat.sent()[0].text).toContain("File exceeds the 2000-character limit.");
   });
 
   test("runs a message addressed to the bot by name", async () => {
@@ -286,6 +330,18 @@ describe("running code in a group", () => {
 });
 
 describe("the same commands in a private chat", () => {
+  test("/run that replies to a code file runs the file, and an edit of the command runs it again", async () => {
+    let contents = "1 + 1";
+    const chat = createBotUnderTest({ readFile: async () => encode(contents) });
+
+    const id = await chat.say("/run", { chat: "private", replyTo: { document: CODE_FILE } });
+    contents = "2 + 2";
+    await chat.edit("/run", id, 42, "private", { document: CODE_FILE });
+
+    expect(chat.sent()[0].text).toContain("*Result*\n```\n2\n```");
+    expect(chat.edits()[0].text).toContain("*Result*\n```\n4\n```");
+  });
+
   test("/run works, and a message that begins with the bot's name is run once", async () => {
     const chat = createBotUnderTest();
 

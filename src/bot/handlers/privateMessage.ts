@@ -1,5 +1,5 @@
 import { GrammyError, type Api, type Bot } from "grammy";
-import type { ParseMode } from "grammy/types";
+import type { Document, ParseMode } from "grammy/types";
 
 import { rateKey, createRunner, type RunnerOptions } from "../runner";
 import { stripCodeFence } from "../codeInput";
@@ -9,14 +9,18 @@ import { ReplyTracker, type TrackedReply } from "../replyTracker";
 import { sendWholeOutput } from "../wholeOutput";
 import { describeAnyError } from "../../runtime/logError";
 
-interface PrivateMessageHandlerOptions extends RunnerOptions {
-  botUserId: number;
-  replies?: ReplyTracker;
+export interface CodeFileOptions {
+  maxCodeLength: number;
   /** Reads a file the chat sent, as bytes, and refuses one bigger than the given number of bytes. Telegram's download unless a test gives another. */
   readFile?: (api: Api, fileId: string, maxBytes: number) => Promise<Uint8Array>;
 }
 
-// Files a private chat may send as code: JavaScript and TypeScript sources.
+interface PrivateMessageHandlerOptions extends RunnerOptions, CodeFileOptions {
+  botUserId: number;
+  replies?: ReplyTracker;
+}
+
+// Files a chat may send as code: JavaScript and TypeScript sources.
 const CODE_FILE_NAME = /\.[mc]?[jt]s$/i;
 // UTF-8 takes at most three bytes for one UTF-16 unit, so a file this big holds
 // no more code than the code length limit allows.
@@ -106,6 +110,39 @@ export async function downloadTelegramFile(
     }
     throw new FileDownloadError("failed", "file download failed");
   }
+}
+
+export function isCodeFile(document: Document): boolean {
+  return CODE_FILE_NAME.test(document.file_name ?? "");
+}
+
+/** The code in a file that was sent as code, or the one line that says why it cannot be run. */
+export async function readCodeFile(
+  api: Api,
+  document: Document,
+  options: CodeFileOptions,
+): Promise<{ code: string } | { refusal: string }> {
+  const tooLarge = `File exceeds the ${options.maxCodeLength}-character limit.`;
+
+  const maxBytes = options.maxCodeLength * MAX_BYTES_PER_CHARACTER;
+  // Telegram gives the size before the file is downloaded, so a big one is refused without being read.
+  // A file without a size is downloaded, and the download stops at the limit all the same.
+  if ((document.file_size ?? 0) > maxBytes) {
+    return { refusal: tooLarge };
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = await (options.readFile ?? downloadTelegramFile)(api, document.file_id, maxBytes);
+  } catch (error) {
+    if (error instanceof FileDownloadError && error.reason === "too-large") {
+      return { refusal: tooLarge };
+    }
+    console.error(`Could not read a code file: ${error instanceof FileDownloadError ? error.message : describeAnyError(error)}`);
+    return { refusal: "Could not download the file. Send it again." };
+  }
+
+  return { code: new TextDecoder().decode(bytes) };
 }
 
 export interface PrivateRequest {
@@ -274,6 +311,22 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
   };
 }
 
+/** Answers a file that cannot be run with one line, as a reply to the message it came in, unless the user is over the request limit. */
+export async function refuseFile(
+  api: Api,
+  request: Pick<PrivateRequest, "chatId" | "userId" | "messageId">,
+  options: RunnerOptions,
+  reason: string,
+): Promise<void> {
+  if (options.rateLimiter.consume(rateKey(request.userId), options.rateLimitPolicy).allowed) {
+    const rejection = formatRejectionMessage(reason);
+    await api.sendMessage(request.chatId, rejection.text, {
+      parse_mode: rejection.parseMode,
+      reply_parameters: { message_id: request.messageId, allow_sending_without_reply: true },
+    });
+  }
+}
+
 export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageHandlerOptions): void {
   const answerer = createPrivateAnswerer({ ...options, replies: options.replies ?? new ReplyTracker() });
 
@@ -291,49 +344,22 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
   // A file is read as code when its name says so, and ignored otherwise, like any
   // other message the bot has no answer for.
   bot.chatType("private").on("message:document", async (ctx) => {
-    const document = ctx.message.document;
-    if (!CODE_FILE_NAME.test(document.file_name ?? "")) {
+    if (!isCodeFile(ctx.message.document)) {
       return;
     }
 
-    const reject = async (text: string) => {
-      if (options.rateLimiter.consume(rateKey(ctx.from.id), options.rateLimitPolicy).allowed) {
-        const rejection = formatRejectionMessage(text);
-        await ctx.reply(rejection.text, {
-          parse_mode: rejection.parseMode,
-          reply_parameters: { message_id: ctx.message.message_id, allow_sending_without_reply: true },
-        });
-      }
-    };
-    const tooLarge = `File exceeds the ${options.maxCodeLength}-character limit.`;
-
-    const maxBytes = options.maxCodeLength * MAX_BYTES_PER_CHARACTER;
-    // Telegram gives the size before the file is downloaded, so a big one is refused without being read.
-    // A file without a size is downloaded, and the download stops at the limit all the same.
-    if ((document.file_size ?? 0) > maxBytes) {
-      await reject(tooLarge);
-      return;
-    }
-
-    let bytes: Uint8Array;
-    try {
-      bytes = await (options.readFile ?? downloadTelegramFile)(ctx.api, document.file_id, maxBytes);
-    } catch (error) {
-      if (error instanceof FileDownloadError && error.reason === "too-large") {
-        await reject(tooLarge);
-        return;
-      }
-      console.error(`Could not read a code file: ${error instanceof FileDownloadError ? error.message : describeAnyError(error)}`);
-      await reject("Could not download the file. Send it again.");
-      return;
-    }
-
-    await answerer.send(ctx.api, {
+    const request = {
       chatId: ctx.chat.id,
       userId: ctx.from.id,
       messageId: ctx.message.message_id,
-      code: new TextDecoder().decode(bytes),
-    });
+    };
+    const read = await readCodeFile(ctx.api, ctx.message.document, options);
+    if ("refusal" in read) {
+      await refuseFile(ctx.api, request, options, read.refusal);
+      return;
+    }
+
+    await answerer.send(ctx.api, { ...request, code: read.code });
   });
 
   bot.chatType("private").on("message:text", async (ctx) => {
