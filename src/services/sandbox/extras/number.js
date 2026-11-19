@@ -421,6 +421,18 @@
     return Object.prototype.hasOwnProperty.call(UNITS, String(options.unit)) && UNIT_DISPLAYS.indexOf(unitDisplayOf(options)) !== -1;
   }
 
+  // A unit is well formed when it is a simple unit, or two simple units joined by
+  // "per"; any other unit is refused, as Node refuses it.
+  function isSimpleUnit(unit) {
+    return Object.prototype.hasOwnProperty.call(UNITS, unit) && unit.indexOf("-per-") === -1;
+  }
+
+  function unitWellFormed(unit) {
+    if (isSimpleUnit(unit)) return true;
+    const at = unit.indexOf("-per-");
+    return at !== -1 && isSimpleUnit(unit.slice(0, at)) && isSimpleUnit(unit.slice(at + 5));
+  }
+
   // The unit after the number, with its space when the form has one. A number of
   // exactly one takes the singular.
   function unitSuffix(options, text) {
@@ -459,6 +471,9 @@
     }
     if (options.style === "unit" && options.unit === undefined) {
       throw new TypeError("Invalid unit argument for " + owner + "() ''");
+    }
+    if (options.unit !== undefined && !unitWellFormed(String(options.unit))) {
+      throw new RangeError("Invalid unit argument for " + owner + "() '" + String(options.unit) + "'");
     }
   }
 

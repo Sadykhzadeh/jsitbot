@@ -172,6 +172,7 @@ describe("Intl.NumberFormat options, checked against Node 26.13", () => {
       [`{ style: "currency", currency: "USDX" }`, "RangeError: Invalid currency code : USDX"],
       [`{ style: "currency", currency: 123 }`, "RangeError: Invalid currency code : 123"],
       [`{ style: "unit" }`, "TypeError: Invalid unit argument for Intl.NumberFormat() ''"],
+      [`{ style: "unit", unit: "furlong" }`, "RangeError: Invalid unit argument for Intl.NumberFormat() 'furlong'"],
     ];
 
     for (const [options, expected] of cases) {

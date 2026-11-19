@@ -122,8 +122,13 @@ describe("Number.prototype.toLocaleString", () => {
     ).toBe("1 km | 2 km | 1.5 kilometers | -1,234.5 liters | 20°C | 3km/h | 12K L | 0 days | 0.5% | 2 wks");
   });
 
-  test("writes a number whose unit it does not know without one", async () => {
-    expect(await value(`return (3).toLocaleString("en-US", { style: "unit", unit: "bogus" })`)).toBe("3");
+  test("refuses a unit that is not a unit, whatever the style", async () => {
+    expect(await value(`return (3).toLocaleString("en-US", { style: "unit", unit: "bogus" })`)).toBe(
+      "error: RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'bogus'",
+    );
+    expect(await value(`return (3).toLocaleString("en-US", { unit: "furlong" })`)).toBe(
+      "error: RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'furlong'",
+    );
   });
 
   test("leaves another language and options it does not know to the engine", async () => {
@@ -293,6 +298,8 @@ describe("toLocaleString options, checked against Node 26.13", () => {
       [`(1).toLocaleString("en", { currency: "us" })`, "RangeError: Invalid currency code : us"],
       [`(1).toLocaleString("en", { notation: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property notation"],
       [`(1).toLocaleString("en", { style: "unit" })`, "TypeError: Invalid unit argument for Number.prototype.toLocaleString() ''"],
+      [`(1).toLocaleString("en", { style: "unit", unit: "furlong" })`, "RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'furlong'"],
+      [`(1).toLocaleString("en", { unit: "per-second" })`, "RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'per-second'"],
       [`(1n).toLocaleString("en", { currency: "us" })`, "RangeError: Invalid currency code : us"],
       [`(1n).toLocaleString("en", { style: "currency", currency: "USD", currencyDisplay: "bogus" })`, "RangeError: Value bogus out of range for BigInt.prototype.toLocaleString options property currencyDisplay"],
     ];

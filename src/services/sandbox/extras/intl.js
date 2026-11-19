@@ -121,7 +121,7 @@
         Number.prototype.toLocaleString.call(0, locales, options);
       } catch (error) {
         if (error instanceof RangeError) {
-          throw new RangeError(error.message.replace(" for Number.prototype.toLocaleString options", " for Intl.NumberFormat options"));
+          throw new RangeError(error.message.replace(" for Number.prototype.toLocaleString options", " for Intl.NumberFormat options").replace("for Number.prototype.toLocaleString() ", "for Intl.NumberFormat() "));
         }
         throw error;
       }
