@@ -81,6 +81,8 @@ describe("result formatting", () => {
     ["a comment in the head of a class does not hide it", `const K = class /* note */ Keep { }; K`, "[class Keep]"],
     ["the tag of a class instance is shown after its class", `class A { get [Symbol.toStringTag]() { return "X" } } return [new A()]`, "[ A [X] {} ]"],
     ["a tag equal to the class name is not repeated", `class A { get [Symbol.toStringTag]() { return "A" } } return new A()`, "A {}"],
+    ["a tag that ends in the class name stands for the class", `class Foo { get [Symbol.toStringTag]() { return "Bar.Foo" } } return [new Foo()]`, "[ Bar.Foo {} ]"],
+    ["an Intl object is named by its tag", `[new Intl.NumberFormat("en"), new Intl.PluralRules("en"), new Intl.Collator()]`, "[ Intl.NumberFormat {}, Intl.PluralRules {}, Intl.Collator {} ]"],
     ["an own tag is a property, not a prefix", `({ [Symbol.toStringTag]: "X", a: 1 })`, "{ a: 1, Symbol(Symbol.toStringTag): 'X' }"],
     ["accessors are not invoked", `({ get a() { throw new Error("no") }, set b(v) {}, get c() { return 1 }, set c(v) {} })`, "{ a: [Getter], b: [Setter], c: [Getter/Setter] }"],
     ["objects without a prototype", `Object.assign(Object.create(null), { a: 1 })`, "[Object: null prototype] { a: 1 }"],

@@ -561,6 +561,9 @@
     }
   }
 
+  Object.defineProperty(NumberFormat.prototype, Symbol.toStringTag, { value: "Intl.NumberFormat", configurable: true });
+  Object.defineProperty(DateTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.DateTimeFormat", configurable: true });
+  Object.defineProperty(Collator.prototype, Symbol.toStringTag, { value: "Intl.Collator", configurable: true });
   Object.defineProperty(Segmenter.prototype, Symbol.toStringTag, { value: "Intl.Segmenter", configurable: true });
   Object.defineProperty(RelativeTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.RelativeTimeFormat", configurable: true });
   Object.defineProperty(PluralRules.prototype, Symbol.toStringTag, { value: "Intl.PluralRules", configurable: true });

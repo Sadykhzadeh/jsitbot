@@ -437,6 +437,14 @@ describe("Intl.getCanonicalLocales, checked against Node 26.13", () => {
   });
 });
 
+describe("Intl objects, checked against Node 26.13", () => {
+  test("have the tag Node gives them", async () => {
+    expect(await value(`return Object.prototype.toString.call(new Intl.NumberFormat("en"))`)).toBe("[object Intl.NumberFormat]");
+    expect(await value(`return Object.prototype.toString.call(new Intl.DateTimeFormat("en"))`)).toBe("[object Intl.DateTimeFormat]");
+    expect(await value(`return String(new Intl.Collator())`)).toBe("[object Intl.Collator]");
+  });
+});
+
 describe("Intl.DateTimeFormat.formatToParts, checked against Node 26.13", () => {
   test("gives the parts a date is written with, as Node does", async () => {
     expect(await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", {}).formatToParts(new Date(Date.UTC(2024, 0, 5, 13, 7, 9, 45))))`)).toBe(

@@ -944,11 +944,16 @@
 
   // The prefix Node puts before an object: its constructor name, then its tag when
   // the tag is another name, then the size. A null prototype is said so.
+  // A tag that ends in ".Name" stands for the class Name, as Intl.Locale does.
+  function namesClass(name, tag) {
+    return name !== null && tag.length > name.length && stringSlice(tag, tag.length - name.length - 1) === "." + name;
+  }
+
   function prefixFor(name, tag, fallback, size) {
     if (name === null) {
       return "[" + fallback + size + ": null prototype] " + (tag !== "" && tag !== fallback ? "[" + tag + "] " : "");
     }
-    if (tag !== "" && name !== tag) return name + size + " [" + tag + "] ";
+    if (tag !== "" && name !== tag) return (namesClass(name, tag) ? tag + size : name + size + " [" + tag + "]") + " ";
     return name + size + " ";
   }
 
@@ -1073,7 +1078,7 @@
     const tagName = tagOf(value);
     let prefix = (name === null ? label : name) + " ";
     if (reported === "[object Arguments]" && name === "Object") prefix = "[Arguments] ";
-    else if (tagName !== "" && tagName !== name) prefix += "[" + tagName + "] ";
+    else if (tagName !== "" && tagName !== name) prefix = namesClass(name, tagName) ? tagName + " " : prefix + "[" + tagName + "] ";
     else if (name === "Object") prefix = "";
     return formatProperties(value, prefix, depth, state);
   }
