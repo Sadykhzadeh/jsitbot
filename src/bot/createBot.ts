@@ -11,22 +11,27 @@ import { ReplyTracker } from "./replyTracker";
 import { registerStartHelpHandlers } from "./handlers/startHelp";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../security/rateLimiter";
 import { createSandbox } from "../services/sandbox/createSandbox";
+import { countRuns, type RunStats } from "../runtime/stats";
 
 export async function createBot(
   config: AppEnv,
+  runStats: RunStats,
 ): Promise<{ bot: Bot; concurrency: ConcurrentMiddleware<Context> }> {
   const bot = new Bot(config.botToken);
   const me = await bot.api.getMe();
   const botUsername = me.username ?? "jsitbot";
 
-  const sandbox = await createSandbox({
-    timeoutMs: config.sandbox.timeoutMs,
-    memoryLimitBytes: config.sandbox.memoryLimitBytes,
-    maxStackSizeBytes: config.sandbox.maxStackSizeBytes,
-    maxLogs: 50,
-    maxLogLength: 2_000,
-    maxResultLength: 4_000,
-  });
+  const sandbox = countRuns(
+    await createSandbox({
+      timeoutMs: config.sandbox.timeoutMs,
+      memoryLimitBytes: config.sandbox.memoryLimitBytes,
+      maxStackSizeBytes: config.sandbox.maxStackSizeBytes,
+      maxLogs: 50,
+      maxLogLength: 2_000,
+      maxResultLength: 4_000,
+    }),
+    runStats,
+  );
   const rateLimiter = new SlidingWindowRateLimiter();
   const timeBudget = new SandboxTimeBudget();
 

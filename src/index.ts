@@ -6,7 +6,7 @@ import type { ConcurrentMiddleware } from "./bot/concurrency";
 import { listenForCrashes } from "./runtime/crash";
 import { logBotError, redactConsoleErrors } from "./runtime/logError";
 import { listenForShutdown } from "./runtime/shutdown";
-import { logStatsPeriodically } from "./runtime/stats";
+import { createRunStats, logStatsPeriodically } from "./runtime/stats";
 import { createApiGuard } from "./runtime/telegramApi";
 
 function fail(message: string): never {
@@ -29,6 +29,7 @@ redactConsoleErrors([env.botToken]);
 
 const apiGuard = createApiGuard(env.telegramApi);
 
+const runStats = createRunStats();
 let bot: Bot | undefined;
 let concurrency: ConcurrentMiddleware<Context> | undefined;
 listenForShutdown({
@@ -48,7 +49,7 @@ listenForShutdown({
 });
 
 try {
-  ({ bot, concurrency } = await createBot(env));
+  ({ bot, concurrency } = await createBot(env, runStats));
 } catch (error) {
   // Both of these say what is wrong in a line; a stack trace adds nothing.
   if (error instanceof GrammyError && error.error_code === 401) {
@@ -71,7 +72,7 @@ bot.api.config.use(apiGuard.transformer);
 // failed Telegram call that includes the message that was being sent.
 bot.catch(logBotError);
 
-logStatsPeriodically(bot, apiGuard.stats, env.statsEverySeconds);
+logStatsPeriodically(bot, apiGuard.stats, runStats, env.statsEverySeconds);
 
 await bot.start({
   // Say which updates are wanted rather than inherit whatever list Telegram

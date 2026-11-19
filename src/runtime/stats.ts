@@ -1,6 +1,41 @@
 import type { Bot } from "grammy";
 
+import type { SandboxExecution, SandboxService } from "../services/sandbox/types";
 import type { ApiStats } from "./telegramApi";
+
+/**
+ * What the sandbox did since the reporter last looked. It counts the runs; it
+ * never looks at the code or at what came out of it.
+ */
+export interface RunStats {
+  /** Runs that finished since the last line. */
+  runs: number;
+  /** Runs that hit the time limit since the last line. */
+  timedOut: number;
+  /** The longest run since the last line, in milliseconds. */
+  slowestMs: number;
+}
+
+export function createRunStats(): RunStats {
+  return { runs: 0, timedOut: 0, slowestMs: 0 };
+}
+
+/** Hands every run to `sandbox` and counts it in `stats`. */
+export function countRuns(sandbox: SandboxService, stats: RunStats): SandboxService {
+  return {
+    async execute(code: string): Promise<SandboxExecution> {
+      const execution = await sandbox.execute(code);
+      stats.runs++;
+      if (execution.timedOut) {
+        stats.timedOut++;
+      }
+      stats.slowestMs = Math.max(stats.slowestMs, execution.durationMs);
+      return execution;
+    },
+    warmUp: () => sandbox.warmUp?.() ?? Promise.resolve(),
+    dispose: () => sandbox.dispose?.(),
+  };
+}
 
 /** What the bot did since the last line. */
 export interface Interval {
@@ -9,6 +44,9 @@ export interface Interval {
   peakPending: number;
   rateLimited: number;
   failedOver: number;
+  runs: number;
+  timedOut: number;
+  slowestMs: number;
   rssMb: number;
 }
 
@@ -17,6 +55,7 @@ export function formatStats(interval: Interval, seconds: number): string {
     `Last ${seconds}s: ${interval.updates} updates, ` +
     `most calls to Telegram waiting at once ${interval.peakPending}, ` +
     `${interval.rateLimited} waits for a 429, ${interval.failedOver} retries after an error, ` +
+    `${interval.runs} runs, ${interval.timedOut} timed out, slowest ${interval.slowestMs} ms, ` +
     `${interval.rssMb} MB resident`
   );
 }
@@ -29,6 +68,7 @@ export function formatStats(interval: Interval, seconds: number): string {
 export function createStatsReporter(
   bot: Bot,
   api: ApiStats,
+  runStats: RunStats,
   seconds: number,
   log: (line: string) => void = (line) => console.log(line),
 ) {
@@ -48,6 +88,9 @@ export function createStatsReporter(
       peakPending: api.peakPending,
       rateLimited: api.rateLimited - rateLimited,
       failedOver: api.failedOver - failedOver,
+      runs: runStats.runs,
+      timedOut: runStats.timedOut,
+      slowestMs: runStats.slowestMs,
       rssMb: Math.round(process.memoryUsage.rss() / 1024 / 1024),
     };
 
@@ -55,6 +98,9 @@ export function createStatsReporter(
     rateLimited = api.rateLimited;
     failedOver = api.failedOver;
     api.peakPending = api.pending;
+    runStats.runs = 0;
+    runStats.timedOut = 0;
+    runStats.slowestMs = 0;
 
     if (interval.updates > 0 || interval.rateLimited > 0 || interval.failedOver > 0) {
       log(formatStats(interval, seconds));
@@ -63,6 +109,6 @@ export function createStatsReporter(
 }
 
 /** Prints a line about the bot every `seconds` while it is busy. */
-export function logStatsPeriodically(bot: Bot, api: ApiStats, seconds: number): void {
-  setInterval(createStatsReporter(bot, api, seconds), seconds * 1_000).unref();
+export function logStatsPeriodically(bot: Bot, api: ApiStats, runStats: RunStats, seconds: number): void {
+  setInterval(createStatsReporter(bot, api, runStats, seconds), seconds * 1_000).unref();
 }

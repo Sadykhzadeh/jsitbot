@@ -208,7 +208,7 @@ If the sandbox process cannot be started on your machine, the bot logs it and ru
 One line per event, and never the code people send or the answers built from it:
 
 - `Bot started as @name`, once it is polling
-- `Last 60s: ...`, a line of counts (updates, the most calls to Telegram waiting at once, waits for a 429, retries, memory) every minute while the bot is busy, and nothing while it is idle
+- `Last 60s: ...`, a line of counts (updates, the most calls to Telegram waiting at once, waits for a 429, retries, runs, timeouts, the slowest run, memory) every minute while the bot is busy, and nothing while it is idle
 - `Bot error in message#123: sendMessage failed with 429: ...`, when an update could not be handled: the kind of update and what failed, not what was in it
 - `Could not publish the command menu: setMyCommands failed with ...`, when the menu cannot be published at startup; the bot keeps running without it
 - `SIGTERM received` and `Stopped after N ms`, when the process is asked to end; it finishes the answers in progress first, for at most 8 s

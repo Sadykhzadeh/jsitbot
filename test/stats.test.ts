@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { Bot } from "grammy";
 
-import { createStatsReporter, formatStats } from "../src/runtime/stats";
+import { countRuns, createRunStats, createStatsReporter, formatStats } from "../src/runtime/stats";
 import type { ApiStats } from "../src/runtime/telegramApi";
+import type { SandboxExecution } from "../src/services/sandbox/types";
 
 function setup() {
   const handled: number[] = [];
@@ -10,10 +11,11 @@ function setup() {
     handleUpdate: async (update: { update_id: number }) => void handled.push(update.update_id),
   } as unknown as Bot;
   const api: ApiStats = { pending: 0, peakPending: 0, rateLimited: 0, failedOver: 0, lastActivityAt: 0 };
+  const runs = createRunStats();
   const lines: string[] = [];
-  const report = createStatsReporter(bot, api, 60, (line) => void lines.push(line));
+  const report = createStatsReporter(bot, api, runs, 60, (line) => void lines.push(line));
 
-  return { bot, api, lines, report, handled };
+  return { bot, api, runs, lines, report, handled };
 }
 
 const feed = (bot: Bot, ...ids: number[]) =>
@@ -67,6 +69,31 @@ describe("stats line", () => {
     expect(lines).toHaveLength(1);
   });
 
+  test("counts the runs of the interval, the timeouts and the slowest", async () => {
+    const { bot, runs, lines, report } = setup();
+    const finished = (durationMs: number, timedOut: boolean): SandboxExecution =>
+      timedOut
+        ? { ok: false, error: "InternalError: interrupted", logs: [], durationMs, timedOut, truncated: false }
+        : { ok: true, result: "2", logs: [], durationMs, timedOut, truncated: false };
+    const sandbox = countRuns(
+      {
+        execute: async (code: string) => (code === "spin" ? finished(700, true) : finished(3, false)),
+      },
+      runs,
+    );
+
+    await feed(bot, 1);
+    await sandbox.execute("1 + 1");
+    await sandbox.execute("spin");
+    report();
+    await feed(bot, 2);
+    await sandbox.execute("1 + 1");
+    report();
+
+    expect(lines[0]).toContain("2 runs, 1 timed out, slowest 700 ms");
+    expect(lines[1]).toContain("1 runs, 0 timed out, slowest 3 ms");
+  });
+
   test("starts the next peak from what is waiting now", async () => {
     const { bot, api, lines, report } = setup();
 
@@ -83,10 +110,13 @@ describe("stats line", () => {
 
 describe("formatStats", () => {
   test("is one line of counts", () => {
-    const line = formatStats({ updates: 4, peakPending: 1, rateLimited: 0, failedOver: 0, rssMb: 52 }, 60);
+    const line = formatStats(
+      { updates: 4, peakPending: 1, rateLimited: 0, failedOver: 0, runs: 3, timedOut: 1, slowestMs: 700, rssMb: 52 },
+      60,
+    );
 
     expect(line).toBe(
-      "Last 60s: 4 updates, most calls to Telegram waiting at once 1, 0 waits for a 429, 0 retries after an error, 52 MB resident",
+      "Last 60s: 4 updates, most calls to Telegram waiting at once 1, 0 waits for a 429, 0 retries after an error, 3 runs, 1 timed out, slowest 700 ms, 52 MB resident",
     );
   });
 });
