@@ -51,7 +51,7 @@ describe("Intl", () => {
   test("is there, and has only the classes it has", async () => {
     expect(await value(`return [typeof Intl, Object.prototype.toString.call(Intl)].join()`)).toBe("object,[object Intl]");
     expect(await value(`return Object.getOwnPropertyNames(Intl).join()`)).toBe(
-      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter,DisplayNames,Locale,supportedValuesOf",
+      "NumberFormat,Collator,DateTimeFormat,PluralRules,ListFormat,RelativeTimeFormat,Segmenter,DisplayNames,Locale,supportedValuesOf,getCanonicalLocales",
     );
   });
 
@@ -388,6 +388,42 @@ describe("Intl.Locale, checked against Node 26.13", () => {
       [`new Intl.Locale("en", { region: "U" })`, "RangeError: Incorrect locale information provided"],
       [`new Intl.Locale("en", { script: "lat" })`, "RangeError: Incorrect locale information provided"],
       [`new Intl.Locale("en", null)`, "TypeError: Intl.Locale called on null or undefined"],
+    ];
+
+    for (const [call, expected] of cases) {
+      expect(await value(`try { ${call}; return "ok" } catch (e) { return e.name + ": " + e.message }`)).toBe(expected);
+    }
+  });
+});
+
+describe("Intl.getCanonicalLocales, checked against Node 26.13", () => {
+  test("writes each tag in the form Intl.Locale gives, once", async () => {
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales("EN-us"))`)).toBe(`["en-US"]`);
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales(["en-us", "EN-US", "fr"]))`)).toBe(`["en-US","fr"]`);
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales("zh-hant-tw"))`)).toBe(`["zh-Hant-TW"]`);
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales("sl-rozaj-biske"))`)).toBe(`["sl-biske-rozaj"]`);
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales("en-u-nu-latn-ca-buddhist"))`)).toBe(
+      `["en-u-ca-buddhist-nu-latn"]`,
+    );
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales([new Intl.Locale("de-at")]))`)).toBe(`["de-AT"]`);
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales(["en", , "fr"]))`)).toBe(`["en","fr"]`);
+  });
+
+  test("gives an empty list for nothing, and for a value that is not a list", async () => {
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales())`)).toBe("[]");
+    expect(await value(`return JSON.stringify(Intl.getCanonicalLocales([]))`)).toBe("[]");
+    expect(await value(`return JSON.stringify([5, true, {}].map((v) => Intl.getCanonicalLocales(v)))`)).toBe("[[],[],[]]");
+  });
+
+  test("refuses what Node refuses, with its messages", async () => {
+    const cases: Array<[string, string]> = [
+      [`Intl.getCanonicalLocales("en_US")`, "RangeError: Invalid language tag: en_US"],
+      [`Intl.getCanonicalLocales("")`, "RangeError: Invalid language tag: "],
+      [`Intl.getCanonicalLocales(["en", "root"])`, "RangeError: Invalid language tag: root"],
+      [`Intl.getCanonicalLocales("zh-cmn-hans-cn")`, "RangeError: Invalid language tag: zh-cmn-hans-cn"],
+      [`Intl.getCanonicalLocales(["en", 1])`, "TypeError: Language ID should be string or object."],
+      [`Intl.getCanonicalLocales([null])`, "TypeError: Language ID should be string or object."],
+      [`Intl.getCanonicalLocales(null)`, "TypeError: Cannot convert undefined or null to object"],
     ];
 
     for (const [call, expected] of cases) {

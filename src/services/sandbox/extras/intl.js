@@ -1130,6 +1130,34 @@
     return SUPPORTED_VALUES[name].slice();
   }
 
+  function canonicalTag(text) {
+    const singletons = text.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
+    if (!LANGUAGE_TAG.test(text) || new Set(singletons).size !== singletons.length) {
+      throw new RangeError("Invalid language tag: " + text);
+    }
+    return new Locale(text).toString();
+  }
+
+  // Each tag of the list in the form Intl.Locale writes it, and a tag given twice once.
+  function getCanonicalLocales(locales) {
+    if (locales === null) throw new TypeError("Cannot convert undefined or null to object");
+    if (locales === undefined) return [];
+    const list = typeof locales === "string" || locales instanceof Locale ? [locales] : Object(locales);
+
+    const found = new Set();
+    const length = Number(list.length) || 0;
+    for (let i = 0; i < length; i++) {
+      if (!(i in list)) continue;
+      const item = list[i];
+      if (item === null || (typeof item !== "string" && typeof item !== "object" && typeof item !== "function")) {
+        throw new TypeError("Language ID should be string or object.");
+      }
+      found.add(canonicalTag(String(item)));
+    }
+
+    return [...found];
+  }
+
   const Intl = {};
   define(Intl, "NumberFormat", callable(NumberFormat));
   define(Intl, "Collator", callable(Collator));
@@ -1141,6 +1169,7 @@
   define(Intl, "DisplayNames", requiresNew(DisplayNames, "DisplayNames"));
   define(Intl, "Locale", requiresNew(Locale, "Locale"));
   define(Intl, "supportedValuesOf", supportedValuesOf);
+  define(Intl, "getCanonicalLocales", getCanonicalLocales);
   Object.defineProperty(Intl, Symbol.toStringTag, { value: "Intl", configurable: true });
 
   return { Intl };
