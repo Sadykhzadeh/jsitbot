@@ -4,12 +4,108 @@ import type { ParseMode } from "grammy/types";
 import { rateKey, createRunner, type RunnerOptions } from "../runner";
 import { stripCodeFence } from "../codeInput";
 import { isBotCommand } from "../commands";
+import { formatRejectionMessage } from "../formatters/telegramExecutionMessage";
 import { ReplyTracker, type TrackedReply } from "../replyTracker";
 import { sendWholeOutput } from "../wholeOutput";
+import { describeAnyError } from "../../runtime/logError";
 
 interface PrivateMessageHandlerOptions extends RunnerOptions {
   botUserId: number;
   replies?: ReplyTracker;
+  /** Reads a file the chat sent, as bytes, and refuses one bigger than the given number of bytes. Telegram's download unless a test gives another. */
+  readFile?: (api: Api, fileId: string, maxBytes: number) => Promise<Uint8Array>;
+}
+
+// Files a private chat may send as code: JavaScript and TypeScript sources.
+const CODE_FILE_NAME = /\.[mc]?[jt]s$/i;
+// UTF-8 takes at most three bytes for one UTF-16 unit, so a file this big holds
+// no more code than the code length limit allows.
+const MAX_BYTES_PER_CHARACTER = 3;
+// A download that has not finished this long is given up, so a stalled
+// connection cannot hold an update's place in the queue for good.
+const DOWNLOAD_TIMEOUT_MS = 10_000;
+
+/** A file that could not be read. The message says why in a line and never carries the download address. */
+export class FileDownloadError extends Error {
+  override name = "FileDownloadError";
+
+  constructor(
+    readonly reason: "too-large" | "timeout" | "failed",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && Number(declared) > maxBytes) {
+    await response.body?.cancel();
+    throw new FileDownloadError("too-large", "file is larger than the limit");
+  }
+
+  const reader = response.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (reader) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new FileDownloadError("too-large", "file is larger than the limit");
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+/**
+ * The bytes of a file the chat sent, from Telegram's file server. The size
+ * Telegram declares is not trusted: the body is counted as it arrives and
+ * stopped at `maxBytes`. Errors never include the address, which carries the token.
+ */
+export async function downloadTelegramFile(
+  api: Api,
+  fileId: string,
+  maxBytes: number,
+  timeoutMs = DOWNLOAD_TIMEOUT_MS,
+): Promise<Uint8Array> {
+  const signal = AbortSignal.timeout(timeoutMs);
+  try {
+    // grammY types its signal with the abort-controller package; the runtime one is the same thing.
+    const file = await api.getFile(fileId, signal as never);
+    if (!file.file_path) {
+      throw new FileDownloadError("failed", "Telegram gave no path for the file");
+    }
+
+    const response = await fetch(`https://api.telegram.org/file/bot${api.token}/${file.file_path}`, { signal });
+    if (!response.ok) {
+      throw new FileDownloadError("failed", `file download failed with status ${response.status}`);
+    }
+
+    return await readCapped(response, maxBytes);
+  } catch (error) {
+    if (error instanceof FileDownloadError) {
+      throw error;
+    }
+    if (signal.aborted) {
+      throw new FileDownloadError("timeout", `file download timed out after ${timeoutMs} ms`);
+    }
+    if (error instanceof GrammyError) {
+      throw new FileDownloadError("failed", `getFile failed with ${error.error_code}: ${error.description}`);
+    }
+    throw new FileDownloadError("failed", "file download failed");
+  }
 }
 
 export interface PrivateRequest {
@@ -190,6 +286,53 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
     }
 
     await ctx.react("❤").catch(() => undefined);
+  });
+
+  // A file is read as code when its name says so, and ignored otherwise, like any
+  // other message the bot has no answer for.
+  bot.chatType("private").on("message:document", async (ctx) => {
+    const document = ctx.message.document;
+    if (!CODE_FILE_NAME.test(document.file_name ?? "")) {
+      return;
+    }
+
+    const reject = async (text: string) => {
+      if (options.rateLimiter.consume(rateKey(ctx.from.id), options.rateLimitPolicy).allowed) {
+        const rejection = formatRejectionMessage(text);
+        await ctx.reply(rejection.text, {
+          parse_mode: rejection.parseMode,
+          reply_parameters: { message_id: ctx.message.message_id, allow_sending_without_reply: true },
+        });
+      }
+    };
+    const tooLarge = `File exceeds the ${options.maxCodeLength}-character limit.`;
+
+    const maxBytes = options.maxCodeLength * MAX_BYTES_PER_CHARACTER;
+    // Telegram gives the size before the file is downloaded, so a big one is refused without being read.
+    if ((document.file_size ?? Infinity) > maxBytes) {
+      await reject(tooLarge);
+      return;
+    }
+
+    let bytes: Uint8Array;
+    try {
+      bytes = await (options.readFile ?? downloadTelegramFile)(ctx.api, document.file_id, maxBytes);
+    } catch (error) {
+      if (error instanceof FileDownloadError && error.reason === "too-large") {
+        await reject(tooLarge);
+        return;
+      }
+      console.error(`Could not read a code file: ${error instanceof FileDownloadError ? error.message : describeAnyError(error)}`);
+      await reject("Could not download the file. Send it again.");
+      return;
+    }
+
+    await answerer.send(ctx.api, {
+      chatId: ctx.chat.id,
+      userId: ctx.from.id,
+      messageId: ctx.message.message_id,
+      code: new TextDecoder().decode(bytes),
+    });
   });
 
   bot.chatType("private").on("message:text", async (ctx) => {

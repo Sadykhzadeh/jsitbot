@@ -33,6 +33,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Ends `Date.prototype.toString` and `toTimeString` with the name of the machine's time zone in brackets, as Node does
 - Has `crypto.subtle.digest` (SHA-1, SHA-256, SHA-384 and SHA-512; nothing else of `crypto.subtle`), `crypto.getRandomValues` and `crypto.randomUUID`. The numbers are well spread and differ from run to run, but they come from a small generator inside the sandbox and are not secure; do not use them for secrets
 - Takes code pasted in a fenced block, with or without a language name
+- In a private chat, runs a `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` or `.cts` file sent as a document, with the same limits as a message, and answers as a reply to the file
 - Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, or `/run` as a reply to a message that has the code. It ignores everything else that is said there
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors (a subclass of `Error` by its class: `ValidationError: bad input`), cycles, and a proxy as `Proxy(` its target `)` without running its traps. The items of a Map or Set iterator are not shown (`[Map Iterator] { <items unknown> }`), because reading them would use them up
 - Besides `console.log` and friends it has `console.table`, `assert`, `count`, `group` and `time`
@@ -253,6 +254,8 @@ total
 ```
 
 Edit the message and the answer is updated.
+
+Or send a `.js` or `.ts` file: the bot runs its contents and answers as a reply to it.
 
 Group chat:
 

@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, type Api } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 
 import { handleConcurrently, type ConcurrencyPolicy } from "../../src/bot/concurrency";
@@ -42,6 +42,8 @@ export interface HarnessOptions {
   runCommand?: boolean;
   /** Telegram refuses a reply to a message that was deleted, unless the reply allows being sent without one. */
   deletedReplyTargets?: boolean;
+  /** The bytes of a file the chat sent; without it, reading a file would call Telegram's file server. */
+  readFile?: (api: Api, fileId: string, maxBytes: number) => Promise<Uint8Array>;
 }
 
 /**
@@ -151,6 +153,7 @@ export function createHarness(options: HarnessOptions = {}) {
     timeBudget,
     timeBudgetPolicy,
     maxCodeLength: 2_000,
+    readFile: options.readFile,
   });
   registerInlineQueryHandler(bot, {
     sandbox,
@@ -199,6 +202,19 @@ export function createHarness(options: HarnessOptions = {}) {
       const update: Update = {
         update_id: nextUpdateId++,
         edited_message: { message_id: messageId, date: 0, edit_date: 1, ...sender(userId), text },
+      };
+      await bot.handleUpdate(update);
+    },
+
+    async sendFile(fileName: string, size: number, messageId = 1, userId = USER_ID): Promise<void> {
+      const update: Update = {
+        update_id: nextUpdateId++,
+        message: {
+          message_id: messageId,
+          date: 0,
+          ...sender(userId),
+          document: { file_id: `file-${messageId}`, file_unique_id: `u${messageId}`, file_name: fileName, file_size: size },
+        },
       };
       await bot.handleUpdate(update);
     },
