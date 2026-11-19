@@ -360,6 +360,15 @@ describe("Intl.Locale, checked against Node 26.13", () => {
     expect(await value(`return [new Intl.Locale("und").language, new Intl.Locale("und-Latn").toString()].join("|")`)).toBe("und|und-Latn");
   });
 
+  test("sorts the keywords of the Unicode extension as Node does", async () => {
+    expect(await value(`return new Intl.Locale("en-u-nu-latn-ca-buddhist").toString()`)).toBe("en-u-ca-buddhist-nu-latn");
+    expect(await value(`return new Intl.Locale("en-US-u-ca-gregory-nu-latn-ca-buddhist").toString()`)).toBe("en-US-u-ca-gregory-nu-latn");
+    expect(await value(`return new Intl.Locale("en-u-kn-false-kf-upper").toString()`)).toBe("en-u-kf-upper-kn-false");
+    expect(await value(`return new Intl.Locale("en-u-kb-true-kn-true-ca-gregory").toString()`)).toBe("en-u-ca-gregory-kb-kn");
+    expect(await value(`return new Intl.Locale("en-u-ca-true").toString()`)).toBe("en-u-ca");
+    expect(await value(`return new Intl.Locale("en-u-co-pinyin-co-phonebk-x-a-b-c").toString()`)).toBe("en-u-co-pinyin-x-a-b-c");
+  });
+
   test("takes the language, script and region options over the tag", async () => {
     expect(await value(`return new Intl.Locale("en", { region: "gb" }).toString()`)).toBe("en-GB");
     expect(await value(`return new Intl.Locale("en-US", { region: "GB" }).toString()`)).toBe("en-GB");

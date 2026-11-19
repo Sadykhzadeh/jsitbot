@@ -873,6 +873,41 @@
     return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
+  // A Unicode extension keeps its attributes sorted and its keywords sorted by
+  // key, and a key given twice keeps the value it had first. The other
+  // extensions and the private use part are kept as they were written.
+  function canonicalExtensions(parts) {
+    const groups = [];
+    for (const part of parts) {
+      if (part.length === 1) groups.push([part]);
+      else groups[groups.length - 1].push(part);
+    }
+
+    return groups.flatMap((group) => (group[0] === "u" ? unicodeExtension(group) : group));
+  }
+
+  function unicodeExtension(group) {
+    const attributes = [];
+    const keywords = [];
+    let at = 1;
+    while (at < group.length && group[at].length !== 2) attributes.push(group[at++]);
+    while (at < group.length) {
+      const key = group[at++];
+      const values = [];
+      while (at < group.length && group[at].length !== 2) values.push(group[at++]);
+      keywords.push([key, values]);
+    }
+
+    // A keyword whose value is "true" is written without the value.
+    for (const keyword of keywords) {
+      if (keyword[1].length === 1 && keyword[1][0] === "true") keyword[1] = [];
+    }
+    keywords.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const unique = keywords.filter((keyword) => keywords.findIndex((other) => other[0] === keyword[0]) === keywords.indexOf(keyword));
+
+    return ["u", ...[...new Set(attributes)].sort(), ...unique.flatMap(([key, values]) => [key, ...values])];
+  }
+
   class Locale {
     #language;
     #script;
@@ -908,7 +943,7 @@
       this.#script = script;
       this.#region = region;
       this.#variants = variants.sort();
-      this.#rest = rest;
+      this.#rest = canonicalExtensions(rest);
       if (given.language !== undefined) {
         const language = String(given.language).toLowerCase();
         if (!/^(?:[a-z]{2,3}|[a-z]{5,8})$/.test(language)) throw new RangeError("Incorrect locale information provided");
