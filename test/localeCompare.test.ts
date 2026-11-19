@@ -11,6 +11,15 @@ async function value(code: string): Promise<string> {
 }
 
 describe("String.prototype.localeCompare", () => {
+  test("refuses a symbol on either side, as Node does", async () => {
+    expect(await value(`try { String.prototype.localeCompare.call(Symbol("a"), "b") } catch (e) { return e.name }`)).toBe("TypeError");
+    expect(await value(`try { "a".localeCompare(Symbol("b")) } catch (e) { return e.name }`)).toBe("TypeError");
+  });
+
+  test("compares the text of a global object receiver, as Node does", async () => {
+    expect(await value(`return String.prototype.localeCompare.call(globalThis, "x")`)).toBe("-1");
+  });
+
   test("answers -1, 0 or 1", async () => {
     expect(await value(`return ["a".localeCompare("b"), "b".localeCompare("a"), "a".localeCompare("a")].join()`)).toBe(
       "-1,1,0",

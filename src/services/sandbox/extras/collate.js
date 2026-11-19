@@ -52,7 +52,7 @@
   // With numeric, a run of digits is one element that has its number in `digits`.
   function elements(text, numeric, ignorePunctuation) {
     const list = [];
-    const letters = Array.from(String(text).normalize("NFD"));
+    const letters = Array.from(`${text}`.normalize("NFD"));
 
     for (let i = 0; i < letters.length; i++) {
       const letter = letters[i];
@@ -146,9 +146,9 @@
   }
 
   function localeCompare(that) {
-    // The runtime is evaluated as a script, where a function called on null or
-    // undefined is given the global object instead.
-    if (this === undefined || this === null || this === globalThis) {
+    // The runtime is strict, so a function called on null or undefined gets that
+    // as its receiver, not the global object.
+    if (this === undefined || this === null) {
       throw new TypeError("String.prototype.localeCompare called on null or undefined");
     }
 

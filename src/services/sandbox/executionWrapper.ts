@@ -19,8 +19,11 @@ function compact(source: string): string {
   try {
     const named = compactor.transformSync(`var part = ${source}`);
     const text = named.replace(/^var part\s*=\s*/, "").replace(/;\s*$/, "");
+    // The transpiler drops a "use strict" directive, so the body gets it back.
+    const strict = /\{\s*"use strict";/.test(source) && !text.includes('"use strict"');
+    const compacted = strict ? text.replace(/^function([^{]*)\{/, 'function$1{"use strict";') : text;
 
-    return text.length < source.length && text.startsWith("function") ? `(${text})` : source;
+    return compacted.length < source.length && compacted.startsWith("function") ? `(${compacted})` : source;
   } catch {
     return source;
   }
