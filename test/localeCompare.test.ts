@@ -86,6 +86,22 @@ describe("String.prototype.localeCompare", () => {
     );
   });
 
+  test("keeps the options apart for a string that is compared more than once", async () => {
+    expect(
+      await value(`return ["item10", "item9"].map((x) => [x.localeCompare("item9"), x.localeCompare("item9", undefined, { numeric: true }), x.localeCompare("item9")].join("/")).join(" ")`),
+    ).toBe("-1/1/-1 0/0/0");
+  });
+
+  test("sorts more strings than it keeps apart, in the same order as before", async () => {
+    expect(
+      await value(`
+        const words = Array.from({ length: 1_200 }, (_, i) => "w" + ((i * 7919) % 1_200));
+        const sorted = words.slice().sort((x, y) => x.localeCompare(y));
+        return sorted.every((word, i) => i === 0 || sorted[i - 1].localeCompare(word) < 0) ? sorted[0] + " " + sorted[1199] : "unsorted";
+      `),
+    ).toBe("w0 w999");
+  });
+
   test("is not carried into the next run", async () => {
     await sandbox.execute(`String.prototype.localeCompare = () => 7`);
 

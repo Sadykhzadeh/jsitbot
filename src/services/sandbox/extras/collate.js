@@ -35,6 +35,7 @@
 
   function weight(letter) {
     const code = letter.codePointAt(0);
+    if ((code >= 97 && code <= 122) || (code >= 65 && code <= 90)) return LETTER_GROUP * GROUP + code;
     const index = PUNCTUATION.indexOf(letter);
     if (index >= 0) return (index === 0 ? WHITE_SPACE : PUNCTUATION_GROUP) * GROUP + index;
     if (code >= 48 && code <= 57) return DIGIT_GROUP * GROUP + code;
@@ -58,7 +59,7 @@
       const letter = letters[i];
       const last = list[list.length - 1];
 
-      if (MARK.test(letter)) {
+      if (letter.codePointAt(0) >= 0x300 && MARK.test(letter)) {
         if (last) last.marks.push(letter.codePointAt(0));
         else list.push({ weight: 0, marks: [letter.codePointAt(0)], upper: false });
         continue;
@@ -93,6 +94,26 @@
       list.push(element);
     }
 
+    return list;
+  }
+
+  // A sort compares the same strings again and again, so the short ones are
+  // taken apart once. The count and the length are capped to keep the guest's
+  // memory small.
+  const known = new Map();
+  const KNOWN_COUNT = 1000;
+  const KNOWN_LENGTH = 64;
+
+  function parsed(text, numeric, ignorePunctuation) {
+    if (text.length > KNOWN_LENGTH) return elements(text, numeric, ignorePunctuation);
+
+    const key = (numeric ? "n" : "-") + (ignorePunctuation ? "p" : "-") + text;
+    let list = known.get(key);
+    if (list === undefined) {
+      if (known.size >= KNOWN_COUNT) known.clear();
+      list = elements(text, numeric, ignorePunctuation);
+      known.set(key, list);
+    }
     return list;
   }
 
@@ -160,8 +181,8 @@
     const sensitivity = options != null && options.sensitivity !== undefined ? String(options.sensitivity) : "variant";
     const upperFirst = options != null && String(options.caseFirst) === "upper";
 
-    const a = elements(this, numeric, ignorePunctuation);
-    const b = elements(that, numeric, ignorePunctuation);
+    const a = parsed(`${this}`, numeric, ignorePunctuation);
+    const b = parsed(`${that}`, numeric, ignorePunctuation);
 
     for (let i = 0; i < a.length && i < b.length; i++) {
       if (a[i].weight !== b[i].weight) return sign(a[i].weight - b[i].weight);
