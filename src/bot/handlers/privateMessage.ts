@@ -309,7 +309,8 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
 
     const maxBytes = options.maxCodeLength * MAX_BYTES_PER_CHARACTER;
     // Telegram gives the size before the file is downloaded, so a big one is refused without being read.
-    if ((document.file_size ?? Infinity) > maxBytes) {
+    // A file without a size is downloaded, and the download stops at the limit all the same.
+    if ((document.file_size ?? 0) > maxBytes) {
       await reject(tooLarge);
       return;
     }

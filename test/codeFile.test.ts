@@ -31,6 +31,14 @@ describe("code files sent in a private chat", () => {
     expect(harness.callsTo("sendMessage")[0].payload.text).toContain("10");
   });
 
+  test("reads a file that Telegram sent without a size", async () => {
+    const harness = createHarness({ readFile: async () => encode("6 * 7") });
+
+    await harness.sendFile("answer.js", undefined, 9);
+
+    expect(harness.callsTo("sendMessage")[0].payload.text).toContain("42");
+  });
+
   test("ignores a file whose name is not a JavaScript or TypeScript source", async () => {
     let read = 0;
     const harness = createHarness({

@@ -206,7 +206,7 @@ export function createHarness(options: HarnessOptions = {}) {
       await bot.handleUpdate(update);
     },
 
-    async sendFile(fileName: string, size: number, messageId = 1, userId = USER_ID): Promise<void> {
+    async sendFile(fileName: string, size?: number, messageId = 1, userId = USER_ID): Promise<void> {
       const update: Update = {
         update_id: nextUpdateId++,
         message: {
