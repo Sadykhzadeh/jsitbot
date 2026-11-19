@@ -361,6 +361,18 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
     expect(await value(`new Date(0).toLocaleDateString("en-US", { timeStyle: "short" })`)).toMatch(/^error: TypeError/);
   });
 
+  test("name the clash of a style and a field as Node does", async () => {
+    expect(await value(`new Date(0).toLocaleDateString("en-US", { dateStyle: "full", weekday: "long" })`)).toBe(
+      "error: TypeError: Invalid option : option",
+    );
+    expect(await value(`new Date(0).toLocaleTimeString("en-US", { timeStyle: "full", hour: "numeric" })`)).toBe(
+      "error: TypeError: Invalid option : option",
+    );
+    expect(await value(`new Date(0).toLocaleString("en-US", { dateStyle: "full", timeZoneName: "short" })`)).toBe(
+      "error: TypeError: Invalid option : option",
+    );
+  });
+
   test("leave what they cannot do to the engine, as before", async () => {
     // another language and an era
     for (const call of [

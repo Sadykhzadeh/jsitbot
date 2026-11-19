@@ -131,7 +131,7 @@
       const clash = DATE_FIELDS.concat(TIME_FIELDS, ["timeZoneName"]);
       for (let i = 0; i < clash.length; i++) {
         if (f[clash[i]] !== undefined) {
-          throw new TypeError("Can't set option " + clash[i] + " when " + (dateStyle !== undefined ? "dateStyle" : "timeStyle") + " is used");
+          throw new TypeError("Invalid option : option");
         }
       }
       if (dateStyle !== undefined && required === "time") throw new TypeError("Invalid option : dateStyle");
