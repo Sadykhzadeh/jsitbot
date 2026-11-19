@@ -54,6 +54,20 @@ describe("code files sent in a private chat", () => {
     expect(harness.calls).toHaveLength(0);
   });
 
+  test("reads a UTF-16 file that starts with a byte order mark as the text it holds", async () => {
+    const units = (text: string) => Array.from(text, (character) => character.charCodeAt(0));
+    const littleEndian = Uint8Array.from([0xff, 0xfe, ...units("6 * 7").flatMap((unit) => [unit & 0xff, unit >> 8])]);
+    const bigEndian = Uint8Array.from([0xfe, 0xff, ...units("6 * 7").flatMap((unit) => [unit >> 8, unit & 0xff])]);
+
+    const harness = createHarness({ readFile: async () => littleEndian });
+    await harness.sendFile("answer.js", 12, 3);
+    expect(harness.callsTo("sendMessage")[0].payload.text).toContain("42");
+
+    const other = createHarness({ readFile: async () => bigEndian });
+    await other.sendFile("answer.js", 12, 4);
+    expect(other.callsTo("sendMessage")[0].payload.text).toContain("42");
+  });
+
   test("refuses a file that is too big for the code length limit without reading it", async () => {
     let read = 0;
     const harness = createHarness({

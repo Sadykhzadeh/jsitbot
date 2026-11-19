@@ -116,6 +116,20 @@ export function isCodeFile(document: Document): boolean {
   return CODE_FILE_NAME.test(document.file_name ?? "");
 }
 
+/**
+ * The text of a file, which is UTF-8 unless it starts with a UTF-16 byte order
+ * mark: Notepad's "Unicode" save is UTF-16, and read as UTF-8 it is all NULs.
+ */
+function decodeCode(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder("utf-16le").decode(bytes);
+  }
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder("utf-16be").decode(bytes);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 /** The code in a file that was sent as code, or the one line that says why it cannot be run. */
 export async function readCodeFile(
   api: Api,
@@ -142,7 +156,7 @@ export async function readCodeFile(
     return { refusal: "Could not download the file. Send it again." };
   }
 
-  return { code: new TextDecoder().decode(bytes) };
+  return { code: decodeCode(bytes) };
 }
 
 export interface PrivateRequest {
