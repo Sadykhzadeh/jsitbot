@@ -266,7 +266,7 @@ export function formatHelpMessage(
       `• Limits: ${limits.timeoutMs} ms per run, ${Math.round(limits.memoryLimitBytes / (1024 * 1024))} MB of memory, ${limits.maxCodeLength} characters of code.`,
     ),
     `• Inline, in any chat: ${inlineCode(`@${botUsername} 1 + 1`)}`,
-    `• In a group: ${inlineCode("/run 6 * 7")}, or reply to a message that has code with /run\\.`,
+    `• In a group: ${inlineCode("/run 6 * 7")}, or reply to a message that has code, or to a JavaScript or TypeScript file, with /run\\.`,
   ].join("\n");
 
   return {
