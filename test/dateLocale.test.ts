@@ -300,6 +300,14 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
     ).toBe("1:00 PM");
   });
 
+  test("put a comma after a weekday before a time that has a zone name", async () => {
+    const at = (options: string) => value(`return new Date(Date.UTC(2024, 0, 5, 13, 7, 9)).toLocaleString("en-US", { ${options} })`);
+
+    expect(await at(`timeZone: "UTC", weekday: "short", hour: "numeric"`)).toBe("Fri 1 PM");
+    expect(await at(`timeZone: "UTC", weekday: "short", hour: "numeric", timeZoneName: "short"`)).toBe("Fri, 1 PM UTC");
+    expect(await at(`timeZone: "UTC", weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short"`)).toBe("Fri, 1:07 PM UTC");
+  });
+
   test("name the zone after a date with no time in it", async () => {
     const at = (options: string) => value(`return new Date(0).toLocaleDateString("en-US", { ${options} })`);
 

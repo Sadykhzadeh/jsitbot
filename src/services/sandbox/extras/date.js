@@ -318,7 +318,7 @@
     let glue = wanted;
     if (glue === undefined) {
       if (f.month === "long") glue = " at ";
-      else if (f.month === undefined && f.day === undefined && f.year === undefined && f.hour !== undefined) glue = " ";
+      else if (f.month === undefined && f.day === undefined && f.year === undefined && f.hour !== undefined && f.timeZoneName === undefined) glue = " ";
       else glue = ", ";
     }
     return [...dateParts, { type: "literal", value: glue }, ...timeParts];
