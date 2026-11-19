@@ -8,7 +8,8 @@
 // minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,
 // minimumSignificantDigits, maximumSignificantDigits, useGrouping, signDisplay
 // and notation "compact" (with compactDisplay), "scientific" and "engineering",
-// and for currencies currencyDisplay "symbol" and "code" and currencySign. The
+// and for currencies currencyDisplay "symbol", "narrowSymbol", "code" and "name"
+// (the name for the currencies NARROW_SYMBOLS lists) and currencySign. The
 // number is rounded on the digits it is written with, half away from zero by
 // default, so 1.005 gives 1.01, and the roundingMode option picks another rule.
 // For the style unit, the units are the ones Intl.supportedValuesOf lists for
@@ -38,6 +39,19 @@
     }
   }
   const SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "CN¥", CAD: "CA$", AUD: "A$" };
+  const NARROW_SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "¥", CAD: "$", AUD: "$" };
+  // The name of each currency in NARROW_SYMBOLS: singular, then plural, as English writes it.
+  const CURRENCY_NAMES = {
+    USD: ["US dollar", "US dollars"],
+    EUR: ["euro", "euros"],
+    GBP: ["British pound", "British pounds"],
+    JPY: ["Japanese yen", "Japanese yen"],
+    INR: ["Indian rupee", "Indian rupees"],
+    KRW: ["South Korean won", "South Korean won"],
+    CNY: ["Chinese yuan", "Chinese yuan"],
+    CAD: ["Canadian dollar", "Canadian dollars"],
+    AUD: ["Australian dollar", "Australian dollars"],
+  };
   const WHOLE_CURRENCIES = ["JPY", "KRW"];
   // What follows the number in each unit: the short form for one and for more,
   // the narrow form, and the long form for one and for more.
@@ -368,11 +382,16 @@
     if (style === "percent") text += "%";
     if (style === "unit") text += unitSuffix(options, text);
     if (style === "currency") {
-      const symbol = options.currencyDisplay === "code" ? undefined : SYMBOLS[currency];
-      text = (symbol === undefined ? currency + (/^\d/.test(text) ? " " : "") : symbol) + text;
+      const display = options.currencyDisplay;
+      if (display === "name") {
+        text += " " + CURRENCY_NAMES[currency][text === "1" ? 0 : 1];
+      } else {
+        const symbol = display === "code" ? undefined : display === "narrowSymbol" ? NARROW_SYMBOLS[currency] : SYMBOLS[currency];
+        text = (symbol === undefined ? currency + (/^\d/.test(text) ? " " : "") : symbol) + text;
+      }
     }
-    // A compact number keeps its minus sign, as ICU writes it.
-    if (sign === "-" && style === "currency" && options.currencySign === "accounting" && options.notation !== "compact") {
+    // A compact number keeps its minus sign, as ICU writes it. A currency name is not put in brackets.
+    if (sign === "-" && style === "currency" && options.currencySign === "accounting" && options.currencyDisplay !== "name" && options.notation !== "compact") {
       return "(" + text + ")";
     }
     return sign + text;
@@ -388,7 +407,7 @@
     const notation = options.notation;
     if (notation !== undefined && notation !== "standard" && notation !== "compact" && notation !== "scientific" && notation !== "engineering") return false;
     if (options.compactDisplay !== undefined && options.compactDisplay !== "short" && options.compactDisplay !== "long") return false;
-    if (options.currencyDisplay !== undefined && options.currencyDisplay !== "symbol" && options.currencyDisplay !== "code") return false;
+    if (options.currencyDisplay === "name" && options.style === "currency" && CURRENCY_NAMES[String(options.currency).toUpperCase()] === undefined) return false;
     if (options.currencySign !== undefined && options.currencySign !== "standard" && options.currencySign !== "accounting") return false;
     if (options.style === "unit") return unitKnown(options);
     return options.style === undefined || options.style === "decimal" || options.style === "percent" || options.style === "currency";

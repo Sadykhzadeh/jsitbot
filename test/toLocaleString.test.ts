@@ -58,7 +58,24 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await coded("1500", `currency: "USD", currencyDisplay: "code", notation: "compact"`)).toBe("USD\u00a01.5K");
     expect(await coded("NaN", `currency: "USD", currencyDisplay: "code"`)).toBe("USDNaN");
     expect(await coded("1234.5", `currency: "USD", currencyDisplay: "symbol"`)).toBe("$1,234.50");
-    expect(await coded("1234.5", `currency: "USD", currencyDisplay: "name"`)).toBe("1234.5");
+  });
+
+  test("writes the name of a currency, and its narrow symbol, when currencyDisplay asks for them", async () => {
+    const shown = (n: string, options: string) =>
+      value(`return (${n}).toLocaleString("en-US", { style: "currency", ${options} })`);
+
+    expect(await shown("1234.5", `currency: "USD", currencyDisplay: "name"`)).toBe("1,234.50 US dollars");
+    expect(await shown("1", `currency: "USD", currencyDisplay: "name"`)).toBe("1.00 US dollars");
+    expect(await shown("0.5", `currency: "USD", currencyDisplay: "name", maximumFractionDigits: 0`)).toBe("1 US dollar");
+    expect(await shown("1", `currency: "EUR", currencyDisplay: "name", maximumFractionDigits: 0`)).toBe("1 euro");
+    expect(await shown("-2", `currency: "JPY", currencyDisplay: "name"`)).toBe("-2 Japanese yen");
+    expect(await shown("NaN", `currency: "USD", currencyDisplay: "name"`)).toBe("NaN US dollars");
+    expect(await shown("1500", `currency: "USD", currencyDisplay: "name", notation: "compact"`)).toBe("1.5K US dollars");
+    expect(await shown("1234.5", `currency: "USD", currencyDisplay: "narrowSymbol"`)).toBe("$1,234.50");
+    expect(await shown("3", `currency: "CAD", currencyDisplay: "narrowSymbol"`)).toBe("$3.00");
+    expect(await shown("-2", `currency: "CNY", currencyDisplay: "narrowSymbol"`)).toBe("-\u00a52.00");
+    expect(await value(`return (-3).toLocaleString("en-US", { style: "currency", currency: "USD", currencySign: "accounting", currencyDisplay: "name" })`)).toBe("-3.00 US dollars");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { currencyDisplay: "name" })`)).toBe("1,234.5");
   });
 
   test("puts a negative currency amount in brackets when currencySign is accounting", async () => {
