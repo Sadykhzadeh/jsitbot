@@ -246,6 +246,20 @@ describe("console", () => {
     `)).toEqual(["info", "warn", "error", "debug", "{ x: 1 }"]);
   });
 
+  test("a nested value does not use up the room of the properties after it", async () => {
+    const [text] = await logged(`console.log({ a: { b: "x".repeat(300), c: 1 }, d: "y".repeat(300), e: 2 })`);
+
+    expect(text.endsWith("  e: 2\n}")).toBe(true);
+    expect(text).not.toContain("more propert");
+  });
+
+  test("the items of an array of nested values are all shown when they fit in a log", async () => {
+    const [text] = await logged(`console.log([{ a: "x".repeat(600) }, { b: "y".repeat(600) }, { c: "z".repeat(600) }])`);
+
+    expect(text.endsWith("  }\n]")).toBe(true);
+    expect(text).not.toContain("more item");
+  });
+
   test("a promise, a weak reference and a lazily installed global format in one run", async () => {
     expect(await logged(`console.log(Promise.resolve(1), new WeakRef({ a: 1 }).deref(), typeof structuredClone)`)).toEqual([
       "Promise { 1 } { a: 1 } function",

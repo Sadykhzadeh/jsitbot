@@ -613,9 +613,10 @@
     let index = 0;
     let scanned = 0;
 
-    while (index < length && parts.length < MAX_ENTRIES && state.left > 0) {
+    // An array that runs out of room keeps a tenth of the budget for its "more items" line and its bracket.
+    while (index < length && parts.length < MAX_ENTRIES && state.left > state.room) {
       if (hasOwn(array, index)) {
-        const part = format(array[index], depth + 1, state);
+        const part = nested(array[index], depth + 1, state);
         parts[parts.length] = part;
         state.left -= part.length;
         index++;
@@ -736,7 +737,7 @@
     const before = enter(depth);
     mapForEach(map, function (value, key) {
       if (parts.length >= MAX_ENTRIES || state.left <= 0) return;
-      const part = format(key, depth + 1, state) + " => " + format(value, depth + 1, state);
+      const part = nested(key, depth + 1, state) + " => " + nested(value, depth + 1, state);
       parts[parts.length] = part;
       state.left -= part.length;
     });
@@ -755,7 +756,7 @@
     const before = enter(depth);
     setForEach(set, function (value) {
       if (parts.length >= MAX_ENTRIES || state.left <= 0) return;
-      const part = format(value, depth + 1, state);
+      const part = nested(value, depth + 1, state);
       parts[parts.length] = part;
       state.left -= part.length;
     });
@@ -816,9 +817,9 @@
     const before = enter(depth);
 
     for (let i = 0; i < entries.length && i < MAX_ENTRIES && state.left > 0; i++) {
-      const shown = format(entries[i][1], depth + 1, state);
+      const shown = nested(entries[i][1], depth + 1, state);
       const part = described.map
-        ? format(entries[i][0], depth + 1, state) + " => " + shown
+        ? nested(entries[i][0], depth + 1, state) + " => " + shown
         : entries[i][0] + ": " + shown;
       parts[parts.length] = part;
       state.left -= part.length;
@@ -872,7 +873,7 @@
         if (descriptor.get || descriptor.set) {
           value = descriptor.get ? (descriptor.set ? "[Getter/Setter]" : "[Getter]") : "[Setter]";
         } else {
-          value = format(descriptor.value, depth + 1, state);
+          value = nested(descriptor.value, depth + 1, state);
         }
         const part = (hidden ? "[" + label + "]" : label) + ": " + value;
         parts[parts.length] = part;
@@ -1083,6 +1084,17 @@
     return formatProperties(value, prefix, depth, state);
   }
 
+  // The text of a value that sits inside a container. The budget the value spends
+  // on its own parts is given back, because the container spends the whole text
+  // once, when it adds the value to its parts; spending it at every level counts
+  // nested text two or more times and cuts a log short.
+  function nested(value, depth, state) {
+    const left = state.left;
+    const text = format(value, depth, state);
+    state.left = left;
+    return text;
+  }
+
   // The one entry point for turning any value into text. state.left is the
   // remaining character budget; state.cut records that something was dropped.
   function format(value, depth, state) {
@@ -1130,7 +1142,7 @@
   }
 
   function render(value, limit, raw) {
-    const state = { left: limit, cut: false, stack: [] };
+    const state = { left: limit, room: limit / 10, cut: false, stack: [] };
     let text;
     try {
       text = raw && typeof value === "string" ? value : format(value, 0, state);
@@ -1194,7 +1206,7 @@
     let cutShort = false;
 
     if (isErrorLike(error)) {
-      const state = { left: maxResultLength, cut: false, stack: [] };
+      const state = { left: maxResultLength, room: maxResultLength / 10, cut: false, stack: [] };
       text = bound(errorText(error, state), maxResultLength, state);
       cutShort = state.cut;
       where = whereOf(error);
@@ -1367,7 +1379,7 @@
     }
     logCount++;
 
-    const state = { left: maxLogLength, cut: false, stack: [] };
+    const state = { left: maxLogLength, room: maxLogLength / 10, cut: false, stack: [] };
     let line = "";
     let first = 0;
     if (arguments.length > 1 && typeof arguments[0] === "string" && stringIndexOf(arguments[0], "%") >= 0) {
