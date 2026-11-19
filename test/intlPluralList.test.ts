@@ -145,3 +145,28 @@ describe("Intl.ListFormat", () => {
     ).toBe("en-US,unit,narrow,[object Intl.ListFormat],true");
   });
 });
+
+describe("Intl.ListFormat.formatToParts, checked against Node 26.13", () => {
+  test("gives each item as an element and the words between them as literals", async () => {
+    expect(await value(`return JSON.stringify(new Intl.ListFormat("en").formatToParts(["a", "b", "c"]))`)).toBe(
+      `[{"type":"element","value":"a"},{"type":"literal","value":", "},{"type":"element","value":"b"},{"type":"literal","value":", and "},{"type":"element","value":"c"}]`,
+    );
+    expect(await value(`return JSON.stringify(new Intl.ListFormat("en", { type: "disjunction", style: "short" }).formatToParts(["a", "b"]))`)).toBe(
+      `[{"type":"element","value":"a"},{"type":"literal","value":" or "},{"type":"element","value":"b"}]`,
+    );
+    expect(await value(`return JSON.stringify(new Intl.ListFormat("en", { type: "unit", style: "narrow" }).formatToParts(["a", "b", "c", "d"]))`)).toBe(
+      `[{"type":"element","value":"a"},{"type":"literal","value":" "},{"type":"element","value":"b"},{"type":"literal","value":" "},{"type":"element","value":"c"},{"type":"literal","value":" "},{"type":"element","value":"d"}]`,
+    );
+  });
+
+  test("gives parts for an empty list and a single item", async () => {
+    expect(await value(`return JSON.stringify(new Intl.ListFormat("en").formatToParts([]))`)).toBe("[]");
+    expect(await value(`return JSON.stringify(new Intl.ListFormat("en").formatToParts(["x"]))`)).toBe(`[{"type":"element","value":"x"}]`);
+  });
+
+  test("refuses a non-string item in the same way as format", async () => {
+    expect(await value(`try { new Intl.ListFormat("en").formatToParts([1]) } catch (e) { return e.name + ": " + e.message }`)).toBe(
+      "TypeError: Iterable yielded 1 which is not a string",
+    );
+  });
+});

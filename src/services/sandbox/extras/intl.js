@@ -362,6 +362,14 @@
     }
 
     format(list) {
+      return this.#parts(list).map((part) => part.value).join("");
+    }
+
+    formatToParts(list) {
+      return this.#parts(list);
+    }
+
+    #parts(list) {
       const pattern = LIST_PATTERNS[this.#type][this.#style];
       const items = [];
       if (list !== undefined) {
@@ -371,10 +379,25 @@
         }
       }
 
-      if (items.length < 3) return items.length === 2 ? items[0] + pattern[0] + items[1] : items.join("");
-      let out = items[0];
-      for (let i = 1; i < items.length - 1; i++) out += pattern[1] + items[i];
-      return out + pattern[2] + items[items.length - 1];
+      const parts = [];
+      const element = (value) => parts.push({ type: "element", value });
+      const literal = (value) => parts.push({ type: "literal", value });
+      if (items.length < 3) {
+        if (items.length > 0) element(items[0]);
+        if (items.length === 2) {
+          literal(pattern[0]);
+          element(items[1]);
+        }
+        return parts;
+      }
+      element(items[0]);
+      for (let i = 1; i < items.length - 1; i++) {
+        literal(pattern[1]);
+        element(items[i]);
+      }
+      literal(pattern[2]);
+      element(items[items.length - 1]);
+      return parts;
     }
 
     resolvedOptions() {
@@ -414,33 +437,45 @@
     }
 
     format(value, unit) {
+      return this.#parts(value, unit, "format").map((part) => part.value).join("");
+    }
+
+    formatToParts(value, unit) {
+      return this.#parts(value, unit, "formatToParts");
+    }
+
+    // The errors name the method that was called, as Node does.
+    #parts(value, unit, method) {
       const number = Number(value);
       const text = String(unit);
       const name = text.endsWith("s") ? text.slice(0, -1) : text;
       if (!Object.prototype.hasOwnProperty.call(UNIT_NAMES.long, name)) {
-        throw new RangeError("Invalid unit argument for Intl.RelativeTimeFormat.prototype.format() '" + text + "'");
+        throw new RangeError("Invalid unit argument for Intl.RelativeTimeFormat.prototype." + method + "() '" + text + "'");
       }
       if (!Number.isFinite(number)) {
-        throw new RangeError("Value need to be finite number for Intl.RelativeTimeFormat.prototype.format()");
+        throw new RangeError("Value need to be finite number for Intl.RelativeTimeFormat.prototype." + method + "()");
       }
 
       const style = this.#style;
+      const word = (text) => [{ type: "literal", value: text }];
       if (this.#numeric === "auto" && (number === -1 || number === 0 || number === 1)) {
         const key = Object.is(number, -0) ? 0 : number;
-        if (name === "day") return DAY_WORDS[key];
-        if (name === "second" && key === 0) return "now";
-        if ((name === "minute" || name === "hour") && key === 0) return "this " + name;
+        if (name === "day") return word(DAY_WORDS[key]);
+        if (name === "second" && key === 0) return word("now");
+        if ((name === "minute" || name === "hour") && key === 0) return word("this " + name);
         if (name !== "second" && name !== "minute" && name !== "hour") {
           const unitName = PHRASE_NAMES[style][name];
-          return WORDS[key] + " " + (typeof unitName === "string" ? unitName : unitName[0]);
+          return word(WORDS[key] + " " + (typeof unitName === "string" ? unitName : unitName[0]));
         }
       }
 
       const shown = Number.prototype.toLocaleString.call(Math.abs(number), "en-US");
       const names = UNIT_NAMES[style][name];
       const unitName = typeof names === "string" ? names : names[shown === "1" ? 0 : 1];
-      const phrase = shown + (style === "narrow" ? "" : " ") + unitName;
-      return number < 0 || Object.is(number, -0) ? phrase + " ago" : "in " + phrase;
+      const amount = numberParts(shown).map((part) => ({ type: part.type, value: part.value, unit: name }));
+      const tail = (style === "narrow" ? "" : " ") + unitName;
+      if (number < 0 || Object.is(number, -0)) return [...amount, { type: "literal", value: tail + " ago" }];
+      return [{ type: "literal", value: "in " }, ...amount, { type: "literal", value: tail }];
     }
 
     resolvedOptions() {

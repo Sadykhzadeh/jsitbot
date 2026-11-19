@@ -123,3 +123,44 @@ describe("Intl.RelativeTimeFormat", () => {
     expect(await value(`return Object.prototype.toString.call(new Intl.RelativeTimeFormat())`)).toBe("[object Intl.RelativeTimeFormat]");
   });
 });
+
+describe("Intl.RelativeTimeFormat.formatToParts, checked against Node 26.13", () => {
+  test("gives the number as parts with its unit, and the words around it as literals", async () => {
+    expect(await value(`return JSON.stringify(new Intl.RelativeTimeFormat("en").formatToParts(1000, "day"))`)).toBe(
+      `[{"type":"literal","value":"in "},{"type":"integer","value":"1","unit":"day"},{"type":"group","value":",","unit":"day"},{"type":"integer","value":"000","unit":"day"},{"type":"literal","value":" days"}]`,
+    );
+    expect(await value(`return JSON.stringify(new Intl.RelativeTimeFormat("en").formatToParts(-1.5, "hours"))`)).toBe(
+      `[{"type":"integer","value":"1","unit":"hour"},{"type":"decimal","value":".","unit":"hour"},{"type":"fraction","value":"5","unit":"hour"},{"type":"literal","value":" hours ago"}]`,
+    );
+    expect(await value(`return JSON.stringify(new Intl.RelativeTimeFormat("en", { style: "narrow" }).formatToParts(3, "year"))`)).toBe(
+      `[{"type":"literal","value":"in "},{"type":"integer","value":"3","unit":"year"},{"type":"literal","value":"y"}]`,
+    );
+  });
+
+  test("gives a phrase of numeric: auto as one literal, as format does", async () => {
+    expect(await value(`return JSON.stringify(new Intl.RelativeTimeFormat("en", { numeric: "auto" }).formatToParts(-1, "day"))`)).toBe(
+      `[{"type":"literal","value":"yesterday"}]`,
+    );
+    expect(await value(`return JSON.stringify(new Intl.RelativeTimeFormat("en", { numeric: "auto", style: "short" }).formatToParts(1, "month"))`)).toBe(
+      `[{"type":"literal","value":"next mo."}]`,
+    );
+  });
+
+  test("names formatToParts in its errors, and format in its own", async () => {
+    expect(await value(`try { new Intl.RelativeTimeFormat("en").formatToParts(1, "bogus") } catch (e) { return e.message }`)).toBe(
+      "Invalid unit argument for Intl.RelativeTimeFormat.prototype.formatToParts() 'bogus'",
+    );
+    expect(await value(`try { new Intl.RelativeTimeFormat("en").formatToParts(NaN, "day") } catch (e) { return e.message }`)).toBe(
+      "Value need to be finite number for Intl.RelativeTimeFormat.prototype.formatToParts()",
+    );
+    expect(await value(`try { new Intl.RelativeTimeFormat("en").format(1, "bogus") } catch (e) { return e.message }`)).toBe(
+      "Invalid unit argument for Intl.RelativeTimeFormat.prototype.format() 'bogus'",
+    );
+  });
+
+  test("joins the parts into what format writes", async () => {
+    expect(
+      await value(`const f = new Intl.RelativeTimeFormat("en"); return [-0, 12345.678].map((n) => f.formatToParts(n, "minutes").map((p) => p.value).join("") === f.format(n, "minutes")).join()`),
+    ).toBe("true,true");
+  });
+});
