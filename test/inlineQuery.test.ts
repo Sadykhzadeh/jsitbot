@@ -36,6 +36,14 @@ describe("inline queries", () => {
     expect(articles(harness)[0].id).toBe("help");
   });
 
+  test("answers a query that is only an empty code fence with help instead of running it", async () => {
+    const harness = createHarness();
+
+    await harness.inlineQuery("``` ```");
+
+    expect(articles(harness).map((article) => article.id)).toEqual(["help"]);
+  });
+
   test("a run that times out costs more of the rate limit", async () => {
     const harness = createHarness({
       maxRequests: 4,

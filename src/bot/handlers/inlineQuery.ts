@@ -57,7 +57,9 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
   bot.on("inline_query", async (ctx) => {
     const query = ctx.inlineQuery.query;
 
-    if (!isInlineQueryLongEnough(query, options.minCodeLength)) {
+    const code = stripCodeFence(query);
+
+    if (!isInlineQueryLongEnough(query, options.minCodeLength) || code.trim() === "") {
       const help = formatHelpMessage(options.botUsername, options.helpLimits);
       await ctx.answerInlineQuery(
         [
@@ -79,8 +81,6 @@ export function registerInlineQueryHandler(bot: Bot, options: InlineQueryHandler
       );
       return;
     }
-
-    const code = stripCodeFence(query);
 
     if (!isCodeLengthAllowed(code, options.maxCodeLength)) {
       const rejection = formatRejectionMessage(
