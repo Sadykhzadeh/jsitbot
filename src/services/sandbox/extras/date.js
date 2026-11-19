@@ -12,7 +12,7 @@
 // called then. Anything else, another language, an era, a day period, a
 // calendar or a numbering system, or a year outside 1 to 9999, is left to the
 // engine's own method, which is the `original` it is given.
-(function (original, owner, zoneInfo) {
+(function (engine, zoneInfo) {
   "use strict";
 
   const ENGLISH = /^en(-US)?$/i;
@@ -172,8 +172,14 @@
     return width === "long" ? full : full.slice(0, width === "short" ? 3 : 1);
   }
 
+  // A date is written as parts: the date, then the time, then the zone name. A part
+  // is its type and the text it was written with, so the parts joined are the text.
   function datePart(f, c) {
-    let text;
+    const parts = [];
+    const add = (type, value) => {
+      parts[parts.length] = { type, value };
+    };
+
     let month;
     if (f.month !== undefined) {
       if (f.month === "numeric") month = String(c.month + 1);
@@ -184,63 +190,100 @@
     const year = f.year === undefined ? undefined : f.year === "2-digit" ? pad(c.year % 100) : String(c.year);
 
     if (f.month === "long" || f.month === "short" || f.month === "narrow") {
-      text = month;
-      if (day !== undefined) text += " " + day;
-      if (year !== undefined) text += (day === undefined ? " " : ", ") + year;
+      add("month", month);
+      if (day !== undefined) {
+        add("literal", " ");
+        add("day", day);
+      }
+      if (year !== undefined) {
+        add("literal", day === undefined ? " " : ", ");
+        add("year", year);
+      }
     } else {
-      const parts = [];
-      if (month !== undefined) parts[parts.length] = month;
-      if (day !== undefined) parts[parts.length] = day;
-      if (year !== undefined) parts[parts.length] = year;
-      text = parts.join("/");
+      const fields = [];
+      if (month !== undefined) fields[fields.length] = ["month", month];
+      if (day !== undefined) fields[fields.length] = ["day", day];
+      if (year !== undefined) fields[fields.length] = ["year", year];
+      fields.forEach(([type, value], i) => {
+        if (i > 0) add("literal", "/");
+        add(type, value);
+      });
     }
 
     if (f.weekday !== undefined) {
       const weekday = name(WEEKDAYS[c.weekday], f.weekday);
-      if (text === "") text = weekday;
-      else if (f.day !== undefined && f.month !== undefined) text = weekday + ", " + text;
-      else text += " " + weekday;
+      if (parts.length === 0) add("weekday", weekday);
+      else if (f.day !== undefined && f.month !== undefined) {
+        parts.unshift({ type: "weekday", value: weekday }, { type: "literal", value: ", " });
+      } else {
+        add("literal", " ");
+        add("weekday", weekday);
+      }
     }
-    return text;
+    return parts;
   }
 
   function timePart(f, c, cycle, zoneText) {
     const parts = [];
+    const add = (type, value) => {
+      parts[parts.length] = { type, value };
+    };
+
+    const fields = [];
     const twelve = cycle === "h12";
     if (f.hour !== undefined) {
       let hour = c.hours;
       if (cycle === "h12") hour = hour % 12 || 12;
-      parts[parts.length] = !twelve || f.hour === "2-digit" ? pad(hour) : String(hour);
+      fields[fields.length] = ["hour", !twelve || f.hour === "2-digit" ? pad(hour) : String(hour)];
     }
     if (f.minute !== undefined) {
-      parts[parts.length] = f.hour !== undefined || f.second !== undefined ? pad(c.minutes) : String(c.minutes);
+      fields[fields.length] = ["minute", f.hour !== undefined || f.second !== undefined ? pad(c.minutes) : String(c.minutes)];
     }
     if (f.second !== undefined) {
-      let second = f.minute !== undefined ? pad(c.seconds) : String(c.seconds);
-      if (f.fractionalSecondDigits !== undefined) {
-        const fraction = String(c.milliseconds + 1000).slice(1, 1 + f.fractionalSecondDigits);
-        second += "." + fraction;
-      }
-      parts[parts.length] = second;
+      fields[fields.length] = ["second", f.minute !== undefined ? pad(c.seconds) : String(c.seconds)];
     }
+    fields.forEach(([type, value], i) => {
+      if (i > 0) add("literal", ":");
+      add(type, value);
+    });
 
-    let text = parts.join(":");
-    if (twelve && f.hour !== undefined) text += c.hours < 12 ? " AM" : " PM";
-    if (f.timeZoneName !== undefined) text += " " + zoneText;
-    return text;
+    if (f.second !== undefined && f.fractionalSecondDigits !== undefined) {
+      add("literal", ".");
+      add("fractionalSecond", String(c.milliseconds + 1000).slice(1, 1 + f.fractionalSecondDigits));
+    }
+    if (twelve && f.hour !== undefined) {
+      add("literal", " ");
+      add("dayPeriod", c.hours < 12 ? "AM" : "PM");
+    }
+    if (f.timeZoneName !== undefined) {
+      add("literal", " ");
+      add("timeZoneName", zoneText);
+    }
+    return parts;
   }
 
-  function format(date, locales, options, required, defaults, owner) {
+  // What each method asks for: the fields it writes when none is given, and the
+  // error messages name the method as the engine does.
+  const METHODS = {
+    toLocaleString: { required: "any", defaults: "all", owner: "Date.prototype.toLocaleString" },
+    toLocaleDateString: { required: "date", defaults: "date", owner: "Date.prototype.toLocaleDateString" },
+    toLocaleTimeString: { required: "time", defaults: "time", owner: "Date.prototype.toLocaleTimeString" },
+  };
+
+  // The parts of a date as the method named writes it, or undefined for what the
+  // engine has to write.
+  function layout(date, method, locales, options) {
     checkLocales(locales);
     const tag = Array.isArray(locales) ? locales[0] : locales;
-    if (tag !== undefined && !ENGLISH.test(String(tag))) return original.call(date, locales, options);
+    if (tag !== undefined && !ENGLISH.test(String(tag))) return undefined;
 
     const time = Date.prototype.getTime.call(date);
-    const resolved = resolve(options, required, defaults, owner);
-    if (resolved === null) return original.call(date, locales, options);
-    if (time !== time) return "Invalid Date";
+    const asked = METHODS[method];
+    const resolved = resolve(options, asked.required, asked.defaults, asked.owner);
+    if (resolved === null) return undefined;
+    if (time !== time) return [{ type: "literal", value: "Invalid Date" }];
 
-    const { f, utc, zone, cycle } = resolved;
+    const { f, utc, zone, cycle, glue: wanted } = resolved;
     let zoneText = f.timeZoneName === "long" ? "Coordinated Universal Time" : "UTC";
     // A named zone is read as UTC on a date moved by its offset. The name of the
     // zone local time is in comes from the host as well.
@@ -248,10 +291,10 @@
     if (!utc) {
       const info = zoneInfo(zone === undefined ? "" : zone, time, f.timeZoneName === undefined ? "" : f.timeZoneName);
       const bar = info.indexOf("|");
-      if (info === "" || (f.timeZoneName !== undefined && bar === -1)) return original.call(date, locales, options);
+      if (info === "" || (f.timeZoneName !== undefined && bar === -1)) return undefined;
       if (zone !== undefined) {
         moved = new Date(time + Number(bar === -1 ? info : info.slice(0, bar)));
-        if (Date.prototype.getTime.call(moved) !== Date.prototype.getTime.call(moved)) return original.call(date, locales, options);
+        if (Date.prototype.getTime.call(moved) !== Date.prototype.getTime.call(moved)) return undefined;
       }
       if (bar !== -1) zoneText = info.slice(bar + 1);
     }
@@ -264,34 +307,48 @@
           year: date.getFullYear(), month: date.getMonth(), day: date.getDate(), weekday: date.getDay(),
           hours: date.getHours(), minutes: date.getMinutes(), seconds: date.getSeconds(), milliseconds: date.getMilliseconds(),
         };
-    if (c.year < 1 || c.year > 9999) return original.call(date, locales, options);
+    if (c.year < 1 || c.year > 9999) return undefined;
 
-    const dateText = has(f, DATE_FIELDS) ? datePart(f, c) : "";
-    const timeText = has(f, ["hour", "minute", "second"])
+    const dateParts = has(f, DATE_FIELDS) ? datePart(f, c) : [];
+    const timeParts = has(f, ["hour", "minute", "second"])
       ? timePart(f, c, cycle, zoneText)
-      : f.timeZoneName !== undefined ? zoneText : "";
-    if (dateText === "" || timeText === "") return dateText + timeText;
+      : f.timeZoneName !== undefined ? [{ type: "timeZoneName", value: zoneText }] : [];
+    if (dateParts.length === 0 || timeParts.length === 0) return dateParts.concat(timeParts);
 
-    let glue = resolved.glue;
+    let glue = wanted;
     if (glue === undefined) {
       if (f.month === "long") glue = " at ";
       else if (f.month === undefined && f.day === undefined && f.year === undefined && f.hour !== undefined) glue = " ";
       else glue = ", ";
     }
-    return dateText + glue + timeText;
+    return [...dateParts, { type: "literal", value: glue }, ...timeParts];
+  }
+
+  function format(date, method, locales, options) {
+    const parts = layout(date, method, locales, options);
+    return parts === undefined ? engine[method].call(date, locales, options) : parts.map((part) => part.value).join("");
   }
 
   const methods = {
     toLocaleString(locales, options) {
-      return format(this, locales, options, "any", "all", "Date.prototype.toLocaleString");
+      return format(this, "toLocaleString", locales, options);
     },
     toLocaleDateString(locales, options) {
-      return format(this, locales, options, "date", "date", "Date.prototype.toLocaleDateString");
+      return format(this, "toLocaleDateString", locales, options);
     },
     toLocaleTimeString(locales, options) {
-      return format(this, locales, options, "time", "time", "Date.prototype.toLocaleTimeString");
+      return format(this, "toLocaleTimeString", locales, options);
     },
   };
 
-  return { [original.name]: methods[original.name] };
+  return {
+    toLocaleString: methods.toLocaleString,
+    toLocaleDateString: methods.toLocaleDateString,
+    toLocaleTimeString: methods.toLocaleTimeString,
+    // The parts Intl.DateTimeFormat writes with, for the method its options pick.
+    partsOf(date, method, locales, options) {
+      const parts = layout(date, method, locales, options);
+      return parts === undefined ? [{ type: "literal", value: engine[method].call(date, locales, options) }] : parts;
+    },
+  };
 })

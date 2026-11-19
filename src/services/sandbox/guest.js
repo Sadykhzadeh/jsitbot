@@ -2203,9 +2203,28 @@
   });
 
   lazyMethod("collate", String.prototype, "localeCompare");
-  lazyMethod("date", Date.prototype, "toLocaleString");
-  lazyMethod("date", Date.prototype, "toLocaleDateString");
-  lazyMethod("date", Date.prototype, "toLocaleTimeString");
+  // The date extra writes the three locale methods of Date.prototype, and the parts
+  // Intl.DateTimeFormat uses, so it is evaluated once, by the first call of any of them.
+  const engineDate = {
+    toLocaleString: Date.prototype.toLocaleString,
+    toLocaleDateString: Date.prototype.toLocaleDateString,
+    toLocaleTimeString: Date.prototype.toLocaleTimeString,
+  };
+  let dateExtra;
+  function loadDate() {
+    if (dateExtra === undefined) dateExtra = indirectEval(loadExtra("date"))(engineDate, zoneInfo);
+    return dateExtra;
+  }
+  loaders.date = loadDate;
+  for (const name of ["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]) {
+    const stub = {
+      [name]() {
+        return reflectApply(loadDate()[name], this, arguments);
+      },
+    }[name];
+    defineProperty(stub, "length", { value: engineDate[name].length, configurable: true });
+    defineProperty(Date.prototype, name, { value: stub, writable: true, configurable: true, enumerable: false });
+  }
   lazyMethod("datestring", Date.prototype, "toString");
   lazyMethod("datestring", Date.prototype, "toTimeString");
   lazyMethod("number", Number.prototype, "toLocaleString");

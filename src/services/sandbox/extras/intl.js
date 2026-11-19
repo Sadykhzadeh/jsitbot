@@ -6,9 +6,9 @@
 // toLocaleString of dates under another name, with the same formatting and the
 // same limits (see number.js, collate.js and date.js). PluralRules,
 // ListFormat and RelativeTimeFormat are written out here and know English only.
-// Only NumberFormat has formatToParts. `hostTimeZone` is the zone of the process, which
-// executionWrapper puts around this source.
-(function () {
+// `hostTimeZone` is the zone of the process, which executionWrapper puts around this source.
+// `host` is the set of host functions, which hands out the date extra's parts.
+(function (registerInspector, seeds, host) {
   "use strict";
 
   function define(object, name, value) {
@@ -219,9 +219,10 @@
       // for, so a date alone is not followed by a time.
       const hasDate = DATE_FORMAT_FIELDS.some((name) => given[name] !== undefined);
       const hasTime = TIME_FORMAT_FIELDS.some((name) => given[name] !== undefined);
-      const write = hasDate && !hasTime ? Date.prototype.toLocaleDateString
-        : hasTime && !hasDate ? Date.prototype.toLocaleTimeString
-        : Date.prototype.toLocaleString;
+      const method = hasDate && !hasTime ? "toLocaleDateString"
+        : hasTime && !hasDate ? "toLocaleTimeString"
+        : "toLocaleString";
+      const write = Date.prototype[method];
       // the arguments are checked now, as a constructor does, not at the first format;
       // the value a method refuses is named for this constructor, as Node names it
       try {
@@ -239,6 +240,11 @@
         return write.call(when, locales, given);
       };
       define(this, "format", format);
+      define(this, "formatToParts", (date) => {
+        const when = new Date(date === undefined ? Date.now() : Number(date));
+        if (when.getTime() !== when.getTime()) throw new RangeError("Invalid time value");
+        return host.extra("date").partsOf(when, method, locales, given);
+      });
       define(this, "resolvedOptions", () => {
         const zone = given.timeZone === undefined ? hostTimeZone : String(given.timeZone);
         const out = { locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: UTC_ZONES.indexOf(zone.toLowerCase()) === -1 ? zone : "UTC" };

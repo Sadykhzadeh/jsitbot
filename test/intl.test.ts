@@ -431,3 +431,35 @@ describe("Intl.getCanonicalLocales, checked against Node 26.13", () => {
     }
   });
 });
+
+describe("Intl.DateTimeFormat.formatToParts, checked against Node 26.13", () => {
+  test("gives the parts a date is written with, as Node does", async () => {
+    expect(await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", {}).formatToParts(new Date(Date.UTC(2024, 0, 5, 13, 7, 9, 45))))`)).toBe(
+      "[{\"type\":\"month\",\"value\":\"1\"},{\"type\":\"literal\",\"value\":\"/\"},{\"type\":\"day\",\"value\":\"5\"},{\"type\":\"literal\",\"value\":\"/\"},{\"type\":\"year\",\"value\":\"2024\"}]",
+    );
+    expect(await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", {"dateStyle":"full","timeStyle":"long","timeZone":"America/New_York"}).formatToParts(new Date(Date.UTC(2024, 0, 5, 13, 7, 9, 45))))`)).toBe(
+      "[{\"type\":\"weekday\",\"value\":\"Friday\"},{\"type\":\"literal\",\"value\":\", \"},{\"type\":\"month\",\"value\":\"January\"},{\"type\":\"literal\",\"value\":\" \"},{\"type\":\"day\",\"value\":\"5\"},{\"type\":\"literal\",\"value\":\", \"},{\"type\":\"year\",\"value\":\"2024\"},{\"type\":\"literal\",\"value\":\" at \"},{\"type\":\"hour\",\"value\":\"8\"},{\"type\":\"literal\",\"value\":\":\"},{\"type\":\"minute\",\"value\":\"07\"},{\"type\":\"literal\",\"value\":\":\"},{\"type\":\"second\",\"value\":\"09\"},{\"type\":\"literal\",\"value\":\" \"},{\"type\":\"dayPeriod\",\"value\":\"AM\"},{\"type\":\"literal\",\"value\":\" \"},{\"type\":\"timeZoneName\",\"value\":\"EST\"}]",
+    );
+    expect(await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", {"hour":"numeric","minute":"2-digit","second":"2-digit","fractionalSecondDigits":3,"hour12":false,"timeZone":"America/New_York"}).formatToParts(new Date(Date.UTC(2024, 0, 5, 13, 7, 9, 45))))`)).toBe(
+      "[{\"type\":\"hour\",\"value\":\"08\"},{\"type\":\"literal\",\"value\":\":\"},{\"type\":\"minute\",\"value\":\"07\"},{\"type\":\"literal\",\"value\":\":\"},{\"type\":\"second\",\"value\":\"09\"},{\"type\":\"literal\",\"value\":\".\"},{\"type\":\"fractionalSecond\",\"value\":\"045\"}]",
+    );
+    expect(await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", {"timeZoneName":"long","timeZone":"America/New_York"}).formatToParts(new Date(Date.UTC(2024, 0, 5, 13, 7, 9, 45))))`)).toBe(
+      "[{\"type\":\"month\",\"value\":\"1\"},{\"type\":\"literal\",\"value\":\"/\"},{\"type\":\"day\",\"value\":\"5\"},{\"type\":\"literal\",\"value\":\"/\"},{\"type\":\"year\",\"value\":\"2024\"},{\"type\":\"literal\",\"value\":\", \"},{\"type\":\"timeZoneName\",\"value\":\"Eastern Standard Time\"}]",
+    );
+    expect(await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", {"dateStyle":"medium","timeStyle":"short","timeZone":"UTC"}).formatToParts(new Date(Date.UTC(2024, 0, 5, 13, 7, 9, 45))))`)).toBe(
+      "[{\"type\":\"month\",\"value\":\"Jan\"},{\"type\":\"literal\",\"value\":\" \"},{\"type\":\"day\",\"value\":\"5\"},{\"type\":\"literal\",\"value\":\", \"},{\"type\":\"year\",\"value\":\"2024\"},{\"type\":\"literal\",\"value\":\", \"},{\"type\":\"hour\",\"value\":\"1\"},{\"type\":\"literal\",\"value\":\":\"},{\"type\":\"minute\",\"value\":\"07\"},{\"type\":\"literal\",\"value\":\" \"},{\"type\":\"dayPeriod\",\"value\":\"PM\"}]",
+    );
+  });
+
+  test("joins its parts into what format writes, also where the engine writes the date", async () => {
+    expect(
+      await value(`const d = new Date(Date.UTC(2024, 0, 5, 13, 7, 9, 45)); return [
+        { year: "2-digit", month: "narrow", weekday: "short", timeZone: "UTC" },
+        { era: "short", timeZone: "UTC" },
+        { dayPeriod: "short", hour: "numeric", timeZone: "UTC" },
+        { timeStyle: "medium", timeZone: "Asia/Kolkata" },
+        { month: "long", day: "numeric", timeZone: "America/New_York", timeZoneName: "short" },
+      ].map((o) => { const f = new Intl.DateTimeFormat("en-US", o); return f.formatToParts(d).map((p) => p.value).join("") === f.format(d) }).join()`),
+    ).toBe("true,true,true,true,true");
+  });
+});
