@@ -1,4 +1,4 @@
-import type { Api, Bot } from "grammy";
+import type { Bot } from "grammy";
 import type { Document, Message } from "grammy/types";
 
 import { createRunner, rateKey, type RunnerOptions } from "../runner";
@@ -6,7 +6,6 @@ import { stripCodeFence } from "../codeInput";
 import { ReplyTracker } from "../replyTracker";
 import {
   type CodeFileOptions,
-  type PrivateRequest,
   createPrivateAnswerer,
   isCodeFile,
   readCodeFile,
@@ -93,21 +92,6 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
   const runCode = createRunner(options);
   const answerer = createPrivateAnswerer(options);
 
-  // The code a request runs: its own, or the file it replies to. A file that
-  // cannot be read is refused in the chat and gives no code.
-  async function codeOf(api: Api, request: AddressedCode, ids: Omit<PrivateRequest, "code">): Promise<string | undefined> {
-    if (!request.file) {
-      return request.code;
-    }
-
-    const read = await readCodeFile(api, request.file, options);
-    if ("refusal" in read) {
-      await refuseFile(api, ids, options, read.refusal);
-      return undefined;
-    }
-    return read.code;
-  }
-
   // In a private chat the answer is handled like the answer to any message, so
   // that editing the command updates it.
   bot.on("message:text", async (ctx, next) => {
@@ -118,14 +102,27 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
     }
 
     const ids = { chatId: ctx.chat.id, userId: ctx.from.id, messageId: ctx.message.message_id };
-    const code = await codeOf(ctx.api, request, ids);
-    if (code === undefined) {
+    if (ctx.chat.type === "private") {
+      if (request.file) {
+        await answerer.sendFile(ctx.api, ids, request.file);
+      } else {
+        await answerer.send(ctx.api, { ...ids, code: request.code });
+      }
       return;
     }
 
-    if (ctx.chat.type === "private") {
-      await answerer.send(ctx.api, { ...ids, code });
-      return;
+    let code = request.code;
+    if (request.file) {
+      // A user over the limit gets no answer in a group, and the file is not downloaded for them.
+      if (!options.rateLimiter.check(rateKey(ctx.from.id), options.rateLimitPolicy).allowed) {
+        return;
+      }
+      const read = await readCodeFile(ctx.api, request.file, options);
+      if ("refusal" in read) {
+        await refuseFile(ctx.api, ids, options, read.refusal);
+        return;
+      }
+      code = read.code;
     }
 
     if (code.trim() === "") {
@@ -159,11 +156,10 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
     }
 
     const ids = { chatId: ctx.chat.id, userId: ctx.from.id, messageId: ctx.editedMessage.message_id };
-    const code = await codeOf(ctx.api, request, ids);
-    if (code === undefined) {
-      return;
+    if (request.file) {
+      await answerer.editFile(ctx.api, ids, request.file);
+    } else {
+      await answerer.edit(ctx.api, { ...ids, code: request.code });
     }
-
-    await answerer.edit(ctx.api, { ...ids, code });
   });
 }

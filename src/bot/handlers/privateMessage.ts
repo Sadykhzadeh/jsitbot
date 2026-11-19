@@ -186,6 +186,10 @@ export interface PrivateAnswerer {
   send(api: Api, request: PrivateRequest): Promise<void>;
   /** Updates the answer to the message, or answers it as new when there is none to update. */
   edit(api: Api, request: PrivateRequest): Promise<void>;
+  /** Answers a message that is a code file, or replies to one, as `send` does with the file's code. */
+  sendFile(api: Api, request: Omit<PrivateRequest, "code">, document: Document): Promise<void>;
+  /** Updates the answer to a message that is a code file, as `edit` does with the file's code. */
+  editFile(api: Api, request: Omit<PrivateRequest, "code">, document: Document): Promise<void>;
 }
 
 /**
@@ -246,7 +250,7 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
   /** Updates the earlier answer when there is one that can still be edited, sends a new one otherwise. */
   async function deliver(
     api: Api,
-    request: PrivateRequest,
+    request: Omit<PrivateRequest, "code">,
     answer: Answer,
     earlier: TrackedReply | undefined,
   ): Promise<number> {
@@ -310,18 +314,69 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
     replies.remember(request.chatId, request.messageId, { replyId, code: request.code, documentId });
   }
 
+  async function editCode(api: Api, request: PrivateRequest): Promise<void> {
+    const earlier = replies.find(request.chatId, request.messageId);
+
+    // Telegram also reports edits that left the text alone, such as formatting.
+    if (earlier?.code === request.code) {
+      return;
+    }
+
+    await run(api, request, earlier);
+  }
+
+  /** The notice for a user over the request limit, once per window. */
+  async function refuseOverLimit(api: Api, request: Omit<PrivateRequest, "code">, retryAfterMs: number): Promise<void> {
+    if (shouldNotify(request.userId)) {
+      const rejection = formatRejectionMessage(`Rate limit exceeded. Try again in ${Math.ceil(retryAfterMs / 1000)}s.`);
+      await deliver(api, request, { ...rejection, quote: true }, undefined);
+    }
+  }
+
+  /**
+   * A file that is sent is read only while its user is within the limit. The
+   * run that follows charges the request as for any message.
+   */
+  async function sendFileCode(api: Api, request: Omit<PrivateRequest, "code">, document: Document): Promise<void> {
+    const limit = options.rateLimiter.check(rateKey(request.userId), options.rateLimitPolicy);
+    if (!limit.allowed) {
+      await refuseOverLimit(api, request, limit.retryAfterMs);
+      return;
+    }
+
+    const read = await readCodeFile(api, document, options);
+    if ("refusal" in read) {
+      await refuseFile(api, request, options, read.refusal);
+      return;
+    }
+    await run(api, { ...request, code: read.code }, undefined);
+  }
+
+  /**
+   * Every edit of a file reads it again, and each read is a call to Telegram,
+   * so the read is charged to the limit before it is made, even when the code
+   * turns out to be what the answer already shows.
+   */
+  async function editFileCode(api: Api, request: Omit<PrivateRequest, "code">, document: Document): Promise<void> {
+    const charge = options.rateLimiter.consume(rateKey(request.userId), options.rateLimitPolicy);
+    if (!charge.allowed) {
+      await refuseOverLimit(api, request, charge.retryAfterMs);
+      return;
+    }
+
+    const read = await readCodeFile(api, document, options);
+    if ("refusal" in read) {
+      await refuseFile(api, request, options, read.refusal);
+      return;
+    }
+    await editCode(api, { ...request, code: read.code });
+  }
+
   return {
     send: (api, request) => run(api, request, undefined),
-    async edit(api, request) {
-      const earlier = replies.find(request.chatId, request.messageId);
-
-      // Telegram also reports edits that left the text alone, such as formatting.
-      if (earlier?.code === request.code) {
-        return;
-      }
-
-      await run(api, request, earlier);
-    },
+    edit: editCode,
+    sendFile: sendFileCode,
+    editFile: editFileCode,
   };
 }
 
@@ -362,18 +417,11 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       return;
     }
 
-    const request = {
-      chatId: ctx.chat.id,
-      userId: ctx.from.id,
-      messageId: ctx.message.message_id,
-    };
-    const read = await readCodeFile(ctx.api, ctx.message.document, options);
-    if ("refusal" in read) {
-      await refuseFile(ctx.api, request, options, read.refusal);
-      return;
-    }
-
-    await answerer.send(ctx.api, { ...request, code: read.code });
+    await answerer.sendFile(
+      ctx.api,
+      { chatId: ctx.chat.id, userId: ctx.from.id, messageId: ctx.message.message_id },
+      ctx.message.document,
+    );
   });
 
   bot.chatType("private").on("message:text", async (ctx) => {

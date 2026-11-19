@@ -236,6 +236,23 @@ describe("running code in a group", () => {
     expect(chat.sent()[0].text).toContain("File exceeds the 2000-character limit.");
   });
 
+  test("does not download a replied-to file for a user over the request limit", async () => {
+    let read = 0;
+    const chat = createBotUnderTest({
+      maxRequests: 1,
+      readFile: async () => {
+        read++;
+        return encode("6 * 7");
+      },
+    });
+
+    await chat.say("/run 1 + 1");
+    await chat.say("/run", { replyTo: { document: CODE_FILE } });
+
+    expect(read).toBe(0);
+    expect(chat.sent()).toHaveLength(1);
+  });
+
   test("runs a message addressed to the bot by name", async () => {
     const chat = createBotUnderTest();
 
@@ -340,6 +357,28 @@ describe("the same commands in a private chat", () => {
 
     expect(chat.sent()[0].text).toContain("*Result*\n```\n2\n```");
     expect(chat.edits()[0].text).toContain("*Result*\n```\n4\n```");
+  });
+
+  test("charges every read of a file on an edit, so repeated edits stop reading it at the limit", async () => {
+    let read = 0;
+    const chat = createBotUnderTest({
+      maxRequests: 3,
+      readFile: async () => {
+        read++;
+        return encode("6 * 7");
+      },
+    });
+
+    const id = await chat.say("/run", { chat: "private", replyTo: { document: CODE_FILE } });
+    for (let edit = 0; edit < 5; edit++) {
+      await chat.edit("/run", id, 42, "private", { document: CODE_FILE });
+    }
+
+    // The send reads the file and its run is charged; each of the first two edits is charged for its read.
+    expect(read).toBe(3);
+    expect(chat.edits()).toHaveLength(0);
+    const notices = chat.sent().filter((message) => message.text.includes("Rate limit exceeded"));
+    expect(notices).toHaveLength(1);
   });
 
   test("/run works, and a message that begins with the bot's name is run once", async () => {

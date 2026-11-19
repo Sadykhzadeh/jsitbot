@@ -39,6 +39,27 @@ describe("code files sent in a private chat", () => {
     expect(harness.callsTo("sendMessage")[0].payload.text).toContain("42");
   });
 
+  test("does not download a file for a user over the request limit, and says so once", async () => {
+    let read = 0;
+    const harness = createHarness({
+      maxRequests: 1,
+      readFile: async () => {
+        read++;
+        return encode("1 + 1");
+      },
+    });
+
+    await harness.sendMessage("1 + 1");
+    harness.calls.length = 0;
+    await harness.sendFile("one.js", 5, 11);
+    await harness.sendFile("two.js", 5, 12);
+
+    expect(read).toBe(0);
+    const replies = harness.callsTo("sendMessage");
+    expect(replies).toHaveLength(1);
+    expect(replies[0].payload.text).toContain("Rate limit exceeded");
+  });
+
   test("ignores a file whose name is not a JavaScript or TypeScript source", async () => {
     let read = 0;
     const harness = createHarness({

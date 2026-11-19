@@ -53,6 +53,19 @@ export class SlidingWindowRateLimiter {
     return { allowed: true, retryAfterMs: 0 };
   }
 
+  /** Whether a request would be allowed now, and if not how long to wait. Nothing is counted. */
+  check(key: string, policy: RateLimitPolicy, now = Date.now()): RateLimitResult {
+    const timestamps = this.buckets.get(key)?.timestamps ?? [];
+    const threshold = now - policy.windowMs;
+    const live = timestamps.filter((timestamp) => timestamp > threshold);
+    if (live.length < policy.maxRequests) {
+      return { allowed: true, retryAfterMs: 0 };
+    }
+
+    const blocking = live[live.length - policy.maxRequests];
+    return { allowed: false, retryAfterMs: Math.max(0, policy.windowMs - (now - blocking)) };
+  }
+
   /** Counts `count` more requests against a key without asking whether they are allowed. */
   charge(key: string, policy: RateLimitPolicy, count: number, now = Date.now()): void {
     const existing = this.buckets.get(key) ?? { timestamps: [], windowMs: policy.windowMs };

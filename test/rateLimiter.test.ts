@@ -26,6 +26,20 @@ describe("SlidingWindowRateLimiter", () => {
     expect(limiter.consume("user", policy, 1_001).allowed).toBe(true);
   });
 
+  test("says whether a request would be allowed without counting it", () => {
+    const limiter = new SlidingWindowRateLimiter();
+    const policy = { windowMs: 1_000, maxRequests: 2 };
+
+    expect(limiter.check("u", policy, 0)).toEqual({ allowed: true, retryAfterMs: 0 });
+    expect(limiter.check("u", policy, 0)).toEqual({ allowed: true, retryAfterMs: 0 });
+    limiter.consume("u", policy, 0);
+    limiter.consume("u", policy, 100);
+
+    expect(limiter.check("u", policy, 300)).toEqual({ allowed: false, retryAfterMs: 700 });
+    expect(limiter.check("u", policy, 300)).toEqual({ allowed: false, retryAfterMs: 700 });
+    expect(limiter.check("u", policy, 1_000)).toEqual({ allowed: true, retryAfterMs: 0 });
+  });
+
   test("validates shared code-length guards", () => {
     expect(isCodeLengthAllowed("12345", 5)).toBe(true);
     expect(isCodeLengthAllowed("123456", 5)).toBe(false);
