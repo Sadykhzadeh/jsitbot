@@ -111,7 +111,28 @@ describe("Number.prototype.toLocaleString", () => {
 
   test("leaves another language and options it does not know to the engine", async () => {
     expect(await value(`return (1234.5).toLocaleString("de-DE")`)).toBe("1234.5");
-    expect(await value(`return (1234.5).toLocaleString("en-US", { roundingMode: "ceil" })`)).toBe("1234.5");
+  });
+
+  test("rounds by the rounding mode the options name, as Node does", async () => {
+    const rounded = (n: string, options: string) => value(`return (${n}).toLocaleString("en-US", { ${options} })`);
+
+    expect(await rounded("-0.4", `roundingMode: "ceil", maximumFractionDigits: 0`)).toBe("-0");
+    expect(await rounded("2.1", `roundingMode: "ceil", maximumFractionDigits: 0`)).toBe("3");
+    expect(await rounded("-2.11", `roundingMode: "floor", maximumFractionDigits: 1`)).toBe("-2.2");
+    expect(await rounded("2.5", `roundingMode: "halfEven", maximumFractionDigits: 0`)).toBe("2");
+    expect(await rounded("3.5", `roundingMode: "halfEven", maximumFractionDigits: 0`)).toBe("4");
+    expect(await rounded("2.5", `roundingMode: "halfTrunc", maximumFractionDigits: 0`)).toBe("2");
+    expect(await rounded("-2.5", `roundingMode: "halfCeil", maximumFractionDigits: 0`)).toBe("-2");
+    expect(await rounded("-2.5", `roundingMode: "halfFloor", maximumFractionDigits: 0`)).toBe("-3");
+    expect(await rounded("1.21", `roundingMode: "expand", maximumSignificantDigits: 2`)).toBe("1.3");
+    expect(await rounded("19.9", `roundingMode: "trunc", maximumSignificantDigits: 2`)).toBe("19");
+    expect(await rounded("1.005", `roundingMode: "halfEven", maximumFractionDigits: 2`)).toBe("1");
+    expect(await rounded("1.015", `roundingMode: "halfEven", maximumFractionDigits: 2`)).toBe("1.02");
+    expect(await rounded("1234", `roundingMode: "ceil", notation: "compact"`)).toBe("1.3K");
+    expect(await rounded("1999", `roundingMode: "floor", notation: "compact"`)).toBe("1.9K");
+    expect(await rounded("123456", `roundingMode: "trunc", notation: "scientific", maximumFractionDigits: 1`)).toBe("1.2E5");
+    expect(await rounded("1.001", `roundingMode: "ceil", style: "currency", currency: "USD"`)).toBe("$1.01");
+    expect(await rounded("1.5", `roundingMode: "ceil", style: "currency", currency: "JPY"`)).toBe("¥2");
   });
 
   test("writes scientific and engineering notation", async () => {

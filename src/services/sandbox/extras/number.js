@@ -9,8 +9,8 @@
 // minimumSignificantDigits, maximumSignificantDigits, useGrouping, signDisplay
 // and notation "compact" (with compactDisplay), "scientific" and "engineering",
 // and for currencies currencyDisplay "symbol" and "code" and currencySign. The
-// number is rounded on the digits it is written with, half away from zero, so
-// 1.005 gives 1.01.
+// number is rounded on the digits it is written with, half away from zero by
+// default, so 1.005 gives 1.01, and the roundingMode option picks another rule.
 // For the style unit, the units are the ones Intl.supportedValuesOf lists for
 // units and the three per units that are most used, in the short, narrow and long
 // forms of English.
@@ -104,9 +104,7 @@
     signDisplay: ["auto", "never", "always", "exceptZero", "negative"],
     roundingMode: ["ceil", "floor", "expand", "trunc", "halfCeil", "halfFloor", "halfExpand", "halfTrunc", "halfEven"],
   };
-  const UNSUPPORTED = [
-    "roundingMode", "roundingIncrement",
-  ];
+  const UNSUPPORTED = ["roundingIncrement"];
   const SHORT_UNITS = ["", "K", "M", "B", "T"];
   const LONG_UNITS = ["", " thousand", " million", " billion", " trillion"];
 
@@ -144,15 +142,49 @@
     return { whole: digits.slice(0, point), fraction: digits.slice(point) };
   }
 
-  // Keeps `places` digits after the point, rounding half up on the digits;
-  // a negative number of places rounds to tens, hundreds and so on.
-  function roundAt(parts, places) {
+  // Whether the digits kept by a rounding step take one more, given the digits it
+  // drops, for the rounding mode the options name and a number that is negative or not.
+  function roundingRule(mode, negative) {
+    return function (kept, dropped) {
+      const first = dropped[0];
+      const beyondHalf = /[1-9]/.test(dropped.slice(1));
+      const above = first > "5" || (first === "5" && beyondHalf);
+      const half = first === "5" && !beyondHalf;
+      const any = /[1-9]/.test(dropped);
+      const odd = Number(kept.slice(-1)) % 2 === 1;
+      switch (mode) {
+        case "ceil":
+          return any && !negative;
+        case "floor":
+          return any && negative;
+        case "expand":
+          return any;
+        case "trunc":
+          return false;
+        case "halfCeil":
+          return above || (half && !negative);
+        case "halfFloor":
+          return above || (half && negative);
+        case "halfTrunc":
+          return above;
+        case "halfEven":
+          return above || (half && odd);
+        default:
+          return first >= "5";
+      }
+    };
+  }
+
+  // Keeps `places` digits after the point, rounding by `rule` on the digits; a
+  // negative number of places rounds to tens, hundreds and so on.
+  function roundAt(parts, places, rule) {
     if (places >= parts.fraction.length) return parts;
 
     const all = parts.whole + parts.fraction;
     const cut = parts.whole.length + places;
     let kept = cut > 0 ? all.slice(0, cut) : "";
-    if (cut >= 0 && all[cut] >= "5") kept = increment(kept);
+    const dropped = cut >= 0 ? all.slice(cut) : "0".repeat(-cut) + all;
+    if (rule(kept, dropped)) kept = increment(kept);
     if (kept === "") kept = "0";
 
     if (places >= 0) {
@@ -169,7 +201,7 @@
   }
 
   // Rounds to at most `maximum` significant digits and writes at least `minimum`.
-  function roundSignificant(parts, minimum, maximum) {
+  function roundSignificant(parts, minimum, maximum, rule) {
     const whole = parts.whole.replace(/^0+/, "");
     let places;
     if (whole !== "") {
@@ -179,7 +211,7 @@
       places = zeros === parts.fraction.length ? 0 : zeros + maximum;
     }
 
-    const rounded = roundAt(parts, places);
+    const rounded = roundAt(parts, places, rule);
     let fraction = rounded.fraction;
     let count = significant(rounded);
     if (count === 0) {
@@ -218,7 +250,7 @@
   // number is written as a smaller number with a word or a letter after it, and
   // one in scientific or engineering notation as a smaller number and a power
   // of ten.
-  function digits(magnitude, style, options, defaultMin, defaultMax, compact, notation) {
+  function digits(magnitude, negative, style, options, defaultMin, defaultMax, compact, notation) {
     let minimum = digitsOption(options, "minimumFractionDigits", undefined, 0, 100);
     let maximum = digitsOption(options, "maximumFractionDigits", undefined, 0, 100);
     if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
@@ -237,12 +269,13 @@
     if (leastSignificant > mostSignificant) throw new RangeError("maximumSignificantDigits value is out of range.");
 
     const shift = style === "percent" ? 2 : 0;
+    const rule = roundingRule(options.roundingMode, negative);
     const round = function (parts) {
-      if (bySignificant) return roundSignificant(parts, leastSignificant, mostSignificant);
+      if (bySignificant) return roundSignificant(parts, leastSignificant, mostSignificant, rule);
       if (compact && !fractionGiven) {
-        return parts.whole.replace(/^0+/, "").length >= 2 ? roundAt(parts, 0) : roundSignificant(parts, 1, 2);
+        return parts.whole.replace(/^0+/, "").length >= 2 ? roundAt(parts, 0, rule) : roundSignificant(parts, 1, 2, rule);
       }
-      return roundAt(parts, maximum);
+      return roundAt(parts, maximum, rule);
     };
 
     let parts = split(magnitude, shift);
@@ -329,7 +362,7 @@
     let text;
     if (magnitude !== magnitude) text = "NaN";
     else if (magnitude === Infinity) text = "∞";
-    else text = digits(magnitude, style, options, defaultMin, defaultMax, notation === "compact", notation);
+    else text = digits(magnitude, negative, style, options, defaultMin, defaultMax, notation === "compact", notation);
     const sign = signOf(negative, text, options);
     if (style === "percent") text += "%";
     if (style === "unit") text += unitSuffix(options, text);
