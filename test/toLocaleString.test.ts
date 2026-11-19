@@ -135,6 +135,16 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await rounded("1.5", `roundingMode: "ceil", style: "currency", currency: "JPY"`)).toBe("¥2");
   });
 
+  test("groups a number from five digits under useGrouping min2, and refuses a value it does not know", async () => {
+    expect(await value(`return (1234).toLocaleString("en-US", { useGrouping: "min2" })`)).toBe("1234");
+    expect(await value(`return (12345).toLocaleString("en-US", { useGrouping: "min2" })`)).toBe("12,345");
+    expect(await value(`return (1234567.5).toLocaleString("en-US", { useGrouping: "min2" })`)).toBe("1,234,567.5");
+    expect(await value(`return (1234).toLocaleString("en-US", { useGrouping: 0 })`)).toBe("1234");
+    expect(await value(`return (1234).toLocaleString("en-US", { useGrouping: "bogus" })`)).toBe(
+      "error: RangeError: Value bogus out of range for Number.prototype.toLocaleString options property useGrouping",
+    );
+  });
+
   test("writes scientific and engineering notation", async () => {
     const exponent = (n: string, notation: string, options = "") =>
       value(`return (${n}).toLocaleString("en-US", { notation: "${notation}"${options} })`);

@@ -98,6 +98,10 @@ describe("resolvedOptions", () => {
       await value(`const o = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
     ).toBe("2,3");
     expect(await value(`return new Intl.NumberFormat("en-US", { useGrouping: false }).resolvedOptions().useGrouping`)).toBe("false");
+    expect(await value(`return new Intl.NumberFormat("en-US", { useGrouping: "min2" }).resolvedOptions().useGrouping`)).toBe("min2");
+    expect(await value(`return new Intl.NumberFormat("en-US", { notation: "compact" }).resolvedOptions().useGrouping`)).toBe("min2");
+    expect(await value(`return new Intl.NumberFormat("en-US", { notation: "compact", useGrouping: "true" }).resolvedOptions().useGrouping`)).toBe("min2");
+    expect(await value(`return new Intl.NumberFormat("en-US", { useGrouping: "true" }).resolvedOptions().useGrouping`)).toBe("auto");
   });
 
   test("of a collator has the comparison options", async () => {
@@ -163,6 +167,7 @@ describe("Intl.NumberFormat options, checked against Node 26.13", () => {
       [`{ unitDisplay: "bogus", style: "unit", unit: "meter" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property unitDisplay"],
       [`{ signDisplay: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property signDisplay"],
       [`{ roundingMode: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property roundingMode"],
+      [`{ useGrouping: "bogus" }`, "RangeError: Value bogus out of range for Intl.NumberFormat options property useGrouping"],
       [`{ style: "currency", currency: "us" }`, "RangeError: Invalid currency code : us"],
       [`{ style: "currency", currency: "USDX" }`, "RangeError: Invalid currency code : USDX"],
       [`{ style: "currency", currency: 123 }`, "RangeError: Invalid currency code : 123"],

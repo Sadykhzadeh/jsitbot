@@ -309,10 +309,11 @@
     }
     if (whole.length < integers) whole = "0".repeat(integers - whole.length) + whole;
 
-    const grouping = options.useGrouping;
+    const grouping = groupingOf(options.useGrouping);
     // A compact number is only grouped when there are five digits to group, unless it is asked to always be.
-    const short = compact && whole.length < 5 && grouping !== true && grouping !== "always";
-    const text = grouping === false || grouping === "false" || short ? whole : group(whole);
+    // With min2 a number is grouped from five digits, as a group of one digit at the front is not written.
+    const short = compact && whole.length < 5 && grouping !== "always";
+    const text = grouping === false || short || (grouping === "min2" && whole.length < 5) ? whole : group(whole);
     const written = fraction === "" ? text : text + "." + fraction;
     if (notation === "scientific" || engineering) return written + "E" + exponent;
     return compact ? written + (options.compactDisplay === "long" && style !== "currency" ? LONG_UNITS : SHORT_UNITS)[exponent] : written;
@@ -411,6 +412,18 @@
     return forms[text === "1" ? 0 : 1];
   }
 
+  // What useGrouping asks for: true is always, a falsy value is never, and of the
+  // strings "always", "auto" and "min2" are read as they are, "true" and "false" as
+  // auto. Anything else is undefined, which is refused.
+  function groupingOf(value) {
+    if (value === undefined) return "auto";
+    if (value === true) return "always";
+    if (!value) return false;
+    const text = String(value);
+    if (text === "true" || text === "false") return "auto";
+    return text === "always" || text === "auto" || text === "min2" ? text : undefined;
+  }
+
   function checkOptions(options, owner) {
     if (options === undefined || options === null) return;
     for (const name of Object.keys(OPTION_VALUES)) {
@@ -418,6 +431,9 @@
       if (value !== undefined && OPTION_VALUES[name].indexOf(String(value)) === -1) {
         throw new RangeError("Value " + String(value) + " out of range for " + owner + " options property " + name);
       }
+    }
+    if (options.useGrouping !== undefined && groupingOf(options.useGrouping) === undefined) {
+      throw new RangeError("Value " + String(options.useGrouping) + " out of range for " + owner + " options property useGrouping");
     }
     if (options.currency !== undefined && !/^[A-Za-z]{3}$/.test(String(options.currency))) {
       throw new RangeError("Invalid currency code : " + String(options.currency));

@@ -117,7 +117,14 @@
       }
       if (asked.style === "unit" && asked.unit === undefined) throw new TypeError("Invalid unit argument for Intl.NumberFormat() ''");
       // the arguments are checked now, as a constructor does, not at the first format
-      Number.prototype.toLocaleString.call(0, locales, options);
+      try {
+        Number.prototype.toLocaleString.call(0, locales, options);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          throw new RangeError(error.message.replace(" for Number.prototype.toLocaleString options", " for Intl.NumberFormat options"));
+        }
+        throw error;
+      }
 
       const formatWith = (value, withOptions) =>
         typeof value === "bigint"
@@ -159,7 +166,12 @@
           out.minimumFractionDigits = min === undefined ? Math.min(base, max === undefined ? base : max) : min;
           out.maximumFractionDigits = max === undefined ? Math.max(top, out.minimumFractionDigits) : max;
         }
-        out.useGrouping = asked.useGrouping === undefined ? "auto" : asked.useGrouping === true ? "always" : asked.useGrouping;
+        const grouping = asked.useGrouping;
+        const compact = asked.notation === "compact" ? "min2" : "auto";
+        if (grouping === undefined) out.useGrouping = compact;
+        else if (grouping === true) out.useGrouping = "always";
+        else if (!grouping) out.useGrouping = false;
+        else out.useGrouping = ["always", "auto", "min2"].indexOf(String(grouping)) !== -1 ? String(grouping) : compact;
         out.notation = asked.notation === undefined ? "standard" : asked.notation;
         if (out.notation === "compact") out.compactDisplay = asked.compactDisplay === undefined ? "short" : asked.compactDisplay;
         out.signDisplay = asked.signDisplay === undefined ? "auto" : asked.signDisplay;
