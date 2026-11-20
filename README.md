@@ -214,6 +214,7 @@ One line per event, and never the code people send or the answers built from it:
 - `Last 60s: ...`, a line of counts (updates, the most calls to Telegram waiting at once, waits for a 429, retries, runs, timeouts, the slowest run, memory) every minute while the bot is busy, and nothing while it is idle
 - `Bot error in message#123: sendMessage failed with 429: ...`, when an update could not be handled: the kind of update and what failed, not what was in it
 - `Could not publish the command menu: setMyCommands failed with ...`, when the menu cannot be published at startup; the bot keeps running without it
+- `Could not get updates from Telegram, retrying: ...`, once when polling starts to fail, and `Telegram answers again` once it works: nothing is printed for the retries in between
 - `SIGTERM received` and `Stopped after N ms`, when the process is asked to end; it finishes the answers in progress first, for at most 8 s
 - `Crashed: ...`, once, when an error nothing handled reaches the top; the token is taken out of it and the process exits with status 1, so a supervisor can start it again
 

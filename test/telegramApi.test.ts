@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { HttpError } from "grammy";
 
 import { createApiGuard, type ApiPolicy } from "../src/runtime/telegramApi";
 import { FakeClock, settle } from "./fakeClock";
@@ -18,7 +19,7 @@ const failed = (code: number) => ({ ok: false, error_code: code, description: "b
 /** Runs `method` through the guard, with `answers` as what Telegram says to each try in turn. */
 function setup(answers: Array<unknown> = []) {
   const clock = new FakeClock();
-  const guard = createApiGuard(POLICY, clock);
+  const guard = createApiGuard(POLICY, clock, () => {});
   const tries: Array<{ method: string; at: number; chat?: unknown }> = [];
 
   const previous = async (method: string, payload: { chat_id?: unknown }) => {
@@ -198,7 +199,8 @@ describe("server errors and lost connections", () => {
 
 describe("long polling", () => {
   test("gives up on a poll that nobody answers once its own timeout and the slack are over", async () => {
-    const guard = createApiGuard(POLICY, new FakeClock());
+    const lines: string[] = [];
+    const guard = createApiGuard(POLICY, new FakeClock(), (line) => lines.push(line));
     let signal: AbortSignal | undefined;
     const previous = (_method: string, _payload: unknown, given: AbortSignal) =>
       new Promise((_resolve, reject) => {
@@ -210,10 +212,11 @@ describe("long polling", () => {
 
     await expect(result).rejects.toThrow("deadline");
     expect(signal?.aborted).toBe(true);
+    expect(lines).toEqual(["Telegram did not answer the poll in time, retrying"]);
   });
 
   test("still stops when the bot is stopped", async () => {
-    const guard = createApiGuard({ ...POLICY, pollSlackMs: 60_000 }, new FakeClock());
+    const guard = createApiGuard({ ...POLICY, pollSlackMs: 60_000 }, new FakeClock(), () => {});
     const stop = new AbortController();
     const previous = (_method: string, _payload: unknown, given: AbortSignal) =>
       new Promise((_resolve, reject) => given.addEventListener("abort", () => reject(new Error("stopped"))));
@@ -252,5 +255,47 @@ describe("pending calls", () => {
     await call("sendMessage").catch(() => undefined);
 
     expect(guard.stats.pending).toBe(0);
+  });
+});
+
+describe("polling during an outage", () => {
+  function polling(answers: unknown[]) {
+    const lines: string[] = [];
+    const guard = createApiGuard(POLICY, new FakeClock(), (line) => lines.push(line));
+    const previous = async () => {
+      const answer = answers.shift();
+      if (answer instanceof Error) {
+        throw answer;
+      }
+      return answer as never;
+    };
+    const poll = (signal?: AbortSignal) =>
+      guard.transformer(previous as never, "getUpdates" as never, { timeout: 0 } as never, signal as never);
+
+    return { lines, poll };
+  }
+
+  test("is reported once, and once more when Telegram answers again", async () => {
+    const outage = () => new HttpError("Network request for 'getUpdates' failed!", new Error("fetch failed"));
+    const { lines, poll } = polling([outage(), outage(), [], []]);
+
+    await expect(poll()).rejects.toThrow();
+    await expect(poll()).rejects.toThrow();
+    await poll();
+    await poll();
+
+    expect(lines).toEqual([
+      "Could not get updates from Telegram, retrying: no answer from Telegram for the call (fetch failed)",
+      "Telegram answers again",
+    ]);
+  });
+
+  test("is not reported when the poll is stopped", async () => {
+    const { lines, poll } = polling([new HttpError("Network request for 'getUpdates' failed!", new Error("aborted"))]);
+    const stop = new AbortController();
+    stop.abort();
+
+    await expect(poll(stop.signal)).rejects.toThrow();
+    expect(lines).toEqual([]);
   });
 });

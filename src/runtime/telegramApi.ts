@@ -1,5 +1,7 @@
 import type { Transformer } from "grammy";
 
+import { describeAnyError } from "./logError";
+
 export interface ApiPolicy {
   /** Messages the bot may send per second, over all chats. Telegram's own limit is about 30. */
   sendsPerSecond: number;
@@ -63,8 +65,14 @@ export interface ApiStats {
  * with it is mostly the per-chat one (a busy group), and holding every chat for
  * one of them would let a single group slow down everybody's answers.
  */
-export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
+export function createApiGuard(
+  policy: ApiPolicy,
+  clock: Clock = systemClock,
+  log: (line: string) => void = (line) => console.error(line),
+) {
   const interval = 1_000 / policy.sendsPerSecond;
+  // Whether the last poll failed, so that an outage is reported once and not on every retry.
+  let pollFailing = false;
   // The earliest moment the next paced call may go out.
   let nextSlot = 0;
   // Chats Telegram asked the bot to leave alone for a while, and until when.
@@ -115,7 +123,22 @@ export function createApiGuard(policy: ApiPolicy, clock: Clock = systemClock) {
       // grammY types its signal with the abort-controller package; the runtime one is the same thing.
       const combined = signal ? AbortSignal.any([signal as unknown as AbortSignal, deadline.signal]) : deadline.signal;
       try {
-        return await previous(method, payload, combined as never);
+        const updates = await previous(method, payload, combined as never);
+        if (pollFailing) {
+          pollFailing = false;
+          log("Telegram answers again");
+        }
+        return updates;
+      } catch (error) {
+        if (!pollFailing && !signal?.aborted) {
+          pollFailing = true;
+          log(
+            deadline.signal.aborted
+              ? "Telegram did not answer the poll in time, retrying"
+              : `Could not get updates from Telegram, retrying: ${describeAnyError(error)}`,
+          );
+        }
+        throw error;
       } finally {
         clearTimeout(timer);
       }
