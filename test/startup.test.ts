@@ -120,3 +120,18 @@ describe("starting with a token Telegram does not accept", () => {
     expect(run.output).toContain("BOT_TOKEN");
   });
 });
+
+describe("starting without a route to Telegram", () => {
+  test("says the token could not be checked and names the network in one line", async () => {
+    const closed = Bun.serve({ port: 0, fetch: () => new Response("") });
+    const port = closed.port;
+    closed.stop(true);
+
+    const preload = [join(root, "scripts/useFakeTelegram.ts")];
+    const run = await startBot({ BOT_TOKEN: PREVIEW_TOKEN, FAKE_TELEGRAM: `http://127.0.0.1:${port}` }, preload);
+
+    expectOneLine(run, PREVIEW_TOKEN);
+    expect(run.output).toContain("Could not reach Telegram to check BOT_TOKEN");
+    expect(run.output).toContain("Check the network connection.");
+  });
+});

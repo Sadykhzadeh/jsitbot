@@ -59,7 +59,7 @@ try {
     fail(`Telegram did not start the bot: ${error.method} failed with ${error.error_code}: ${error.description}. Check BOT_TOKEN in .env.`);
   }
   if (error instanceof HttpError) {
-    fail(`Could not reach Telegram: ${error.message}`);
+    fail(`Could not reach Telegram to check BOT_TOKEN (${error.message}). Check the network connection.`);
   }
   throw error;
 }
