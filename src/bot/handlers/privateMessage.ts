@@ -212,7 +212,7 @@ export function createPrivateAnswerer(options: RunnerOptions & { replies: ReplyT
    * is refused as well, and a reply to each would be a flood of its own.
    */
   function shouldNotify(userId: number): boolean {
-    const now = Date.now();
+    const now = performance.now();
     if ((notifiedUntil.get(userId) ?? 0) > now) {
       return false;
     }

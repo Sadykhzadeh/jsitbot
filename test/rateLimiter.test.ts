@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setSystemTime, test } from "bun:test";
 
 import {
   SandboxTimeBudget,
@@ -180,5 +180,29 @@ describe("SandboxTimeBudget", () => {
     }
 
     expect(budget.size).toBe(0);
+  });
+});
+
+describe("clock changes", () => {
+  test("a wall clock that steps back does not lock a user out for the length of the step", () => {
+    const limiter = new SlidingWindowRateLimiter();
+    const budget = new SandboxTimeBudget();
+    const policy = { windowMs: 10_000, maxRequests: 1 };
+    const budgetPolicy = { windowMs: 10_000, maxMs: 1_000 };
+
+    try {
+      setSystemTime(new Date("2026-11-20T10:00:00Z"));
+      expect(limiter.consume("user", policy).allowed).toBe(true);
+      budget.record("user", 700, budgetPolicy);
+      budget.record("user", 700, budgetPolicy);
+
+      setSystemTime(new Date("2026-11-20T09:00:00Z"));
+      const blocked = limiter.consume("user", policy);
+      expect(blocked.allowed).toBe(false);
+      expect(blocked.retryAfterMs).toBeLessThanOrEqual(policy.windowMs);
+      expect(budget.check("user", budgetPolicy).retryAfterMs).toBeLessThanOrEqual(budgetPolicy.windowMs);
+    } finally {
+      setSystemTime();
+    }
   });
 });

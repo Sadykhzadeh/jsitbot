@@ -23,6 +23,7 @@ const SWEEP_EVERY = 500;
  */
 export const TIMEOUT_PENALTY_REQUESTS = 2;
 
+// Times come from the monotonic clock: a wall clock set back would keep users blocked until it caught up.
 export class SlidingWindowRateLimiter {
   private readonly buckets = new Map<string, Entry>();
   private calls = 0;
@@ -31,7 +32,7 @@ export class SlidingWindowRateLimiter {
     return this.buckets.size;
   }
 
-  consume(key: string, policy: RateLimitPolicy, now = Date.now()): RateLimitResult {
+  consume(key: string, policy: RateLimitPolicy, now = performance.now()): RateLimitResult {
     this.sweepOccasionally(now);
 
     const existing = this.buckets.get(key) ?? { timestamps: [], windowMs: policy.windowMs };
@@ -54,7 +55,7 @@ export class SlidingWindowRateLimiter {
   }
 
   /** Whether a request would be allowed now, and if not how long to wait. Nothing is counted. */
-  check(key: string, policy: RateLimitPolicy, now = Date.now()): RateLimitResult {
+  check(key: string, policy: RateLimitPolicy, now = performance.now()): RateLimitResult {
     const timestamps = this.buckets.get(key)?.timestamps ?? [];
     const threshold = now - policy.windowMs;
     const live = timestamps.filter((timestamp) => timestamp > threshold);
@@ -67,7 +68,7 @@ export class SlidingWindowRateLimiter {
   }
 
   /** Counts `count` more requests against a key without asking whether they are allowed. */
-  charge(key: string, policy: RateLimitPolicy, count: number, now = Date.now()): void {
+  charge(key: string, policy: RateLimitPolicy, count: number, now = performance.now()): void {
     const existing = this.buckets.get(key) ?? { timestamps: [], windowMs: policy.windowMs };
 
     for (let charged = 0; charged < count; charged++) {
@@ -132,7 +133,7 @@ export class SandboxTimeBudget {
     return this.ledgers.size;
   }
 
-  check(key: string, policy: TimeBudgetPolicy, now = Date.now()): RateLimitResult {
+  check(key: string, policy: TimeBudgetPolicy, now = performance.now()): RateLimitResult {
     this.sweepOccasionally(now);
 
     const ledger = this.ledgers.get(key);
@@ -159,7 +160,7 @@ export class SandboxTimeBudget {
   }
 
   /** Adds the time a run took. A run too quick to measure still counts as a millisecond. */
-  record(key: string, ms: number, policy: TimeBudgetPolicy, now = Date.now()): void {
+  record(key: string, ms: number, policy: TimeBudgetPolicy, now = performance.now()): void {
     const ledger = this.ledgers.get(key) ?? { spent: [], windowMs: policy.windowMs };
     ledger.windowMs = policy.windowMs;
     ledger.spent.push({ at: now, ms: Math.max(1, ms) });
