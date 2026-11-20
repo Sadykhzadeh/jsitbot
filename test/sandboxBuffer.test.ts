@@ -847,3 +847,52 @@ str off 1 enc <Buffer 00 61 61>
 str off 1 enc bogus THROWS TypeError ERR_UNKNOWN_ENCODING Unknown encoding: bogus`);
   });
 });
+
+describe("Buffer range errors show their values as Node does, checked against Node 26.13", () => {
+  test("groups the digits of a large value, and names a bigint with its n", async () => {
+    const result = await sandbox.execute(`const t = (l, f) => { try { console.log(l, f()) } catch (e) { console.log(l, "THROWS", e.name, e.code, e.message) } };
+t("bigint offset", () => Buffer.from([7, 8]).readUInt8(1n));
+t("big bigint offset", () => Buffer.from([7, 8]).readUInt8(2n ** 40n));
+t("neg bigint", () => Buffer.from([7, 8]).readUInt8(-5n));
+t("read 1e10", () => Buffer.from([7, 8]).readUInt8(1e10));
+t("read -1e10", () => Buffer.from([7, 8]).readUInt8(-1e10));
+t("read 2**33 int", () => Buffer.from([7, 8]).readUInt8(2 ** 33));
+t("read 1.5e10", () => Buffer.from([7, 8]).readUInt8(1.5e10));
+t("alloc 2**53", () => Buffer.alloc(2 ** 53));
+t("alloc -2**40", () => Buffer.alloc(-(2 ** 40)));
+t("write off 1e10", () => Buffer.alloc(3).write("ab", 1e10));
+t("write off 1.5e10", () => Buffer.alloc(3).write("ab", 1.5e10));
+t("write offset 1.5", () => Buffer.alloc(3).write("ab", 1.5));
+t("writeUInt8 1e10 value", () => Buffer.alloc(3).writeUInt8(1e10));
+t("writeUInt8 neg", () => Buffer.alloc(3).writeUInt8(-1));
+t("writeUIntBE len", () => Buffer.alloc(3).writeUIntBE(1, 0, 7));
+t("writeUIntBE value 2**40", () => Buffer.alloc(3).writeUIntBE(2 ** 40, 0, 3));
+t("fill off 1e10", () => Buffer.alloc(3).fill(1, 1e10));
+t("fill end 1e10", () => Buffer.alloc(3).fill(1, 0, 1e10));
+t("compare -2**40", () => Buffer.alloc(3).compare(Buffer.alloc(1), -(2 ** 40)));
+t("symbol", () => Buffer.alloc(3).readUInt8(Symbol("q")));
+t("string 1", () => Buffer.alloc(3).readUInt8("1"));`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(`bigint offset THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type bigint (1n)
+big bigint offset THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type bigint (1099511627776n)
+neg bigint THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type bigint (-5n)
+read 1e10 THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 and <= 1. Received 10_000_000_000
+read -1e10 THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 and <= 1. Received -10_000_000_000
+read 2**33 int THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 and <= 1. Received 8_589_934_592
+read 1.5e10 THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 and <= 1. Received 15_000_000_000
+alloc 2**53 THROWS RangeError ERR_OUT_OF_RANGE The value of "size" is out of range. It must be >= 0 && <= 9007199254740991. Received 9_007_199_254_740_992
+alloc -2**40 THROWS RangeError ERR_OUT_OF_RANGE The value of "size" is out of range. It must be >= 0 && <= 9007199254740991. Received -1_099_511_627_776
+write off 1e10 THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 && <= 3. Received 10_000_000_000
+write off 1.5e10 THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 && <= 3. Received 15_000_000_000
+write offset 1.5 THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be an integer. Received 1.5
+writeUInt8 1e10 value THROWS RangeError ERR_OUT_OF_RANGE The value of "value" is out of range. It must be >= 0 and <= 255. Received 10_000_000_000
+writeUInt8 neg THROWS RangeError ERR_OUT_OF_RANGE The value of "value" is out of range. It must be >= 0 and <= 255. Received -1
+writeUIntBE len THROWS RangeError ERR_OUT_OF_RANGE The value of "byteLength" is out of range. It must be >= 1 and <= 6. Received 7
+writeUIntBE value 2**40 THROWS RangeError ERR_OUT_OF_RANGE The value of "value" is out of range. It must be >= 0 and <= 16777215. Received 1_099_511_627_776
+fill off 1e10 <Buffer 00 00 00>
+fill end 1e10 THROWS RangeError ERR_OUT_OF_RANGE The value of "end" is out of range. It must be >= 0 && <= 3. Received 10_000_000_000
+compare -2**40 THROWS RangeError ERR_OUT_OF_RANGE The value of "targetStart" is out of range. It must be >= 0 && <= 9007199254740991. Received -1_099_511_627_776
+symbol THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type symbol (Symbol(q))
+string 1 THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type string ('1')`);
+  });
+});

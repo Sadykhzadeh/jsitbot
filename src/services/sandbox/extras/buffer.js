@@ -34,6 +34,7 @@
     if (value === null) return "null";
     if (value === undefined) return "undefined";
     if (typeof value === "function") return "function " + value.name;
+    if (typeof value === "bigint") return "type bigint (" + String(value) + "n)";
     if (typeof value === "object") {
       const name = value.constructor && value.constructor.name;
       return "an instance of " + (name ? name : "Object");
@@ -259,7 +260,7 @@
       throw nodeError(
         RangeError,
         "ERR_OUT_OF_RANGE",
-        'The value of "size" is out of range. It must be >= 0 && <= ' + MAX_SAFE + ". Received " + size,
+        'The value of "size" is out of range. It must be >= 0 && <= ' + MAX_SAFE + ". Received " + received(size),
       );
     }
   }
@@ -367,7 +368,7 @@
   function checkOffset(buffer, offset, bytes, name) {
     if (typeof offset !== "number") throw argumentError(name, "must be of type number", offset);
     if (Math.floor(offset) !== offset) {
-      throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "' + name + '" is out of range. It must be an integer. Received ' + offset);
+      throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "' + name + '" is out of range. It must be an integer. Received ' + received(offset));
     }
     const length = buffer.length - bytes;
     if (length < 0) throw nodeError(RangeError, "ERR_BUFFER_OUT_OF_BOUNDS", "Attempt to access memory outside buffer bounds");
@@ -375,7 +376,7 @@
       throw nodeError(
         RangeError,
         "ERR_OUT_OF_RANGE",
-        'The value of "' + name + '" is out of range. It must be >= 0 and <= ' + length + ". Received " + offset,
+        'The value of "' + name + '" is out of range. It must be >= 0 and <= ' + length + ". Received " + received(offset),
       );
     }
   }
@@ -1035,13 +1036,13 @@
   function checkWriteOffset(value, max, name) {
     if (typeof value !== "number") throw argumentError(name, "must be of type number", value);
     if (Math.floor(value) !== value) {
-      throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "' + name + '" is out of range. It must be an integer. Received ' + value);
+      throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "' + name + '" is out of range. It must be an integer. Received ' + received(value));
     }
     if (!(value >= 0 && value <= max)) {
       throw nodeError(
         RangeError,
         "ERR_OUT_OF_RANGE",
-        'The value of "' + name + '" is out of range. It must be >= 0 && <= ' + max + ". Received " + value,
+        'The value of "' + name + '" is out of range. It must be >= 0 && <= ' + max + ". Received " + received(value),
       );
     }
   }
