@@ -234,8 +234,17 @@
       }
       return asBuffer(new Uint8Array(value));
     }
-    if (value !== null && typeof value === "object" && (Array.isArray(value) || typeof value.length === "number")) {
-      return asBuffer(new Uint8Array(value));
+    if (value !== null && typeof value === "object") {
+      const primitive = typeof value.valueOf === "function" ? value.valueOf() : undefined;
+      if (primitive != null && primitive !== value && (typeof primitive === "string" || typeof primitive === "object")) {
+        return from(primitive, encodingOrOffset, length);
+      }
+      if (Array.isArray(value) || typeof value.length === "number") {
+        return asBuffer(new Uint8Array(value));
+      }
+      if (value.type === "Buffer" && Array.isArray(value.data)) {
+        return asBuffer(new Uint8Array(value.data));
+      }
     }
     throw nodeError(
       TypeError,

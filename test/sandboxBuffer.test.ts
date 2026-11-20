@@ -742,3 +742,46 @@ console.log([1, 2].toLocaleString(), \`\${Buffer.from("ab")}\`);`);
     );
   });
 });
+
+describe("Buffer.from an object, checked against Node 26.13", () => {
+  test("reads a String object and a valueOf result, and the form toJSON writes", async () => {
+    const result = await sandbox.execute(`const t = (label, f) => {
+  try { console.log(label, f()) } catch (e) { console.log(label, "THROWS", e.name, e.code, e.message) }
+};
+t("valueOf", () => Buffer.from({ valueOf() { return "ab" } }));
+t("type data", () => Buffer.from({ type: "Buffer", data: [1, 2] }));
+t("String object", () => Buffer.from(new String("xy")));
+t("String object hex", () => Buffer.from(new String("6162"), "hex"));
+t("toJSON round trip", () => Buffer.from(JSON.parse(JSON.stringify(Buffer.from("hi")))));
+t("type data wrap", () => Buffer.from({ type: "Buffer", data: [257, -1, 3.9] }));
+t("type without data", () => Buffer.from({ type: "Buffer" }));
+t("type data not array", () => Buffer.from({ type: "Buffer", data: "ab" }));
+t("Number object", () => Buffer.from(new Number(5)));
+t("valueOf object", () => Buffer.from({ valueOf() { return [1, 2] } }));
+t("valueOf null", () => Buffer.from({ valueOf() { return null } }));
+t("valueOf same", () => Buffer.from({ length: 1, 0: 9, valueOf() { return this } }));
+t("Uint8 valueOf", () => Buffer.from(new Uint8Array([4, 5])));
+t("plain object", () => Buffer.from({ a: 1 }));
+t("valueOf string hex odd", () => Buffer.from({ valueOf() { return "6" } }, "hex"));`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(
+      [
+        "valueOf <Buffer 61 62>",
+        "type data <Buffer 01 02>",
+        "String object <Buffer 78 79>",
+        "String object hex <Buffer 61 62>",
+        "toJSON round trip <Buffer 68 69>",
+        "type data wrap <Buffer 01 ff 03>",
+        "type without data THROWS TypeError ERR_INVALID_ARG_TYPE The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received an instance of Object",
+        "type data not array THROWS TypeError ERR_INVALID_ARG_TYPE The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received an instance of Object",
+        "Number object THROWS TypeError ERR_INVALID_ARG_TYPE The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received an instance of Number",
+        "valueOf object <Buffer 01 02>",
+        "valueOf null THROWS TypeError ERR_INVALID_ARG_TYPE The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received an instance of Object",
+        "valueOf same <Buffer 09>",
+        "Uint8 valueOf <Buffer 04 05>",
+        "plain object THROWS TypeError ERR_INVALID_ARG_TYPE The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received an instance of Object",
+        "valueOf string hex odd <Buffer >",
+      ].join("\n"),
+    );
+  });
+});
