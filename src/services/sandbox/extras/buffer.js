@@ -257,22 +257,9 @@
 
   function alloc(size, fill, encoding) {
     checkSize(size);
-    const out = new Uint8Array(size);
-    if (fill === undefined) return asBuffer(out);
-    if (typeof fill === "string") {
-      const pattern = bytesOfString(fill, encodingOf(encoding));
-      if (pattern.length === 0) return asBuffer(out);
-      for (let i = 0; i < size; i++) out[i] = pattern[i % pattern.length];
-      return asBuffer(out);
-    }
-    if (ArrayBuffer.isView(fill)) {
-      const pattern = new Uint8Array(fill.buffer, fill.byteOffset, fill.byteLength);
-      if (pattern.length === 0) return asBuffer(out);
-      for (let i = 0; i < size; i++) out[i] = pattern[i % pattern.length];
-      return asBuffer(out);
-    }
-    out.fill(Number(fill) & 255);
-    return asBuffer(out);
+    const out = asBuffer(new Uint8Array(size));
+    if (fill === undefined) return out;
+    return out.fill(fill, 0, size, encoding);
   }
 
   function concat(list, totalLength) {

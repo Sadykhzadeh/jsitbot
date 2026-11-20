@@ -666,3 +666,34 @@ describe("Buffer integers of 5 and 6 bytes with a fraction, checked against Node
     ]);
   });
 });
+
+describe("Buffer.alloc with a fill, checked against Node 26.13", () => {
+  test("refuses a string fill that encodes to nothing, as fill does", async () => {
+    const result = await sandbox.execute(`const t = (label, f) => {
+  try { console.log(label, f()) } catch (e) { console.log(label, "THROWS", e.name, e.code, e.message) }
+};
+t("zz hex", () => Buffer.alloc(3, "zz", "hex"));
+t("empty hex", () => Buffer.alloc(3, "", "hex"));
+t("6162 hex", () => Buffer.alloc(4, "6162", "hex"));
+t("size 0 zz hex", () => Buffer.alloc(0, "zz", "hex"));
+t("size 0 bogus", () => Buffer.alloc(0, "x", "bogus"));
+t("size 3 bogus", () => Buffer.alloc(3, "x", "bogus"));
+t("ab", () => Buffer.alloc(5, "ab"));
+t("number", () => Buffer.alloc(4, 0x101));
+t("null", () => Buffer.alloc(2, null));`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(
+      [
+        "zz hex THROWS TypeError ERR_INVALID_ARG_VALUE The argument 'value' is invalid. Received 'zz'",
+        "empty hex <Buffer 00 00 00>",
+        "6162 hex <Buffer 61 62 61 62>",
+        "size 0 zz hex <Buffer >",
+        "size 0 bogus <Buffer >",
+        "size 3 bogus THROWS TypeError ERR_UNKNOWN_ENCODING Unknown encoding: bogus",
+        "ab <Buffer 61 62 61 62 61>",
+        "number <Buffer 01 01 01 01>",
+        "null <Buffer 00 00>",
+      ].join("\n"),
+    );
+  });
+});
