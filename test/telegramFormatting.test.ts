@@ -353,6 +353,34 @@ describe("curly quotes", () => {
   });
 });
 
+describe("look-alike characters", () => {
+  const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
+
+  test("an error caused by a dash, a sign or a zero-width space says so", async () => {
+    for (const code of ["2 \u2212 1", "let a = 3 \u00D7 4; a", "const s = 'a' \uFF0B 'b'; s", "const x\u200B= 5; x"]) {
+      const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+      expect(message.text).toContain("SyntaxError: unexpected character");
+      expect(message.text).toContain("Hint: the code has look-alike characters");
+    }
+  });
+
+  test("a look-alike inside a string that runs fine gets no hint", async () => {
+    const code = "'2 \u2212 1'";
+    const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+    expect(message.text).not.toContain("Hint");
+  });
+
+  test("an unexpected character that is not a look-alike gets no hint", async () => {
+    const code = "const c = \u2713;";
+    const execution = await sandbox.execute(code);
+
+    expect(execution.ok ? "" : execution.error).toContain("unexpected character");
+    expect(formatExecutionMessage(execution, code).text).not.toContain("Hint");
+  });
+});
+
 describe("import and export", () => {
   const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
 

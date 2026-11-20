@@ -13,10 +13,12 @@ const INLINE_TITLE_LIMIT = 64;
 const INLINE_DESCRIPTION_LIMIT = 128;
 const ERROR_SOURCE_EXCERPT_LIMIT = 60;
 
-// Phone keyboards turn " and ' into curly quotes, and the engine can only say
-// "unexpected character" about them.
+// Phone keyboards turn " and ' into curly quotes, and word processors turn -- into
+// a dash. The engine can only say "unexpected character" about them.
 const CURLY_QUOTES = /[\u2018\u2019\u201C\u201D]/;
 const CURLY_QUOTES_HINT = "Hint: the code has curly quotes (\u201C \u201D \u2018 \u2019), JavaScript needs straight ones (\" ').";
+const LOOKALIKE_CHARACTERS = /[\u2010-\u2015\u2212\u00D7\u00F7\u200B-\u200D\u2060\uFEFF\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF5E]/;
+const LOOKALIKE_HINT = "Hint: the code has look-alike characters (dashes, \u00D7, \u00F7, full-width signs, zero-width spaces), JavaScript needs the plain ones.";
 
 // Code copied from a tutorial often starts with an import. A script has none of
 // them, and the engine reports the first as "expecting '('" and the second as an
@@ -47,6 +49,9 @@ function describeError(execution: SandboxExecution, code: string): string {
   const located = locateError(execution, code);
   if (/^SyntaxError: unexpected character/.test(execution.error) && CURLY_QUOTES.test(code)) {
     return located + "\n" + CURLY_QUOTES_HINT;
+  }
+  if (/^SyntaxError: unexpected character/.test(execution.error) && LOOKALIKE_CHARACTERS.test(code)) {
+    return located + "\n" + LOOKALIKE_HINT;
   }
   if (MODULE_ERROR.test(execution.error) && MODULE_STATEMENT.test(code)) {
     return located + "\n" + MODULE_HINT;
