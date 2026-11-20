@@ -95,6 +95,7 @@ Known gaps, not fixed yet:
 - An object whose prototype chain has no constructor, such as `Object.create(Object.create(null))`, is shown as a null-prototype object, where Node adds the prototype after `Object <…>`.
 - A class instance whose prototype was removed prints as `[Object: null prototype]`; Node names the class it was made by, which the engine does not keep.
 - An async or generator function whose prototype is not the one of its kind is shown as a plain function, where Node names its kind.
+- A rejected promise that nothing handles does not stop the run, where Node stops with the error. The engine does not report such a rejection, so the sandbox only shows it when it is the value of the run; otherwise the run gives its own result, as if the rejection had been handled. An error thrown by a timer does stop the run, as in Node.
 
 ### Running the comparison
 
