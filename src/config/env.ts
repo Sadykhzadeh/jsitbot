@@ -29,6 +29,8 @@ const DEFAULT_TELEGRAM_API = {
   attempts: 3,
   maxWaitMs: 5_000,
   pollSlackMs: 10_000,
+  callTimeoutMs: 30_000,
+  uploadTimeoutMs: 60_000,
 };
 
 // After SIGTERM or SIGINT the bot stops taking messages and waits this long for

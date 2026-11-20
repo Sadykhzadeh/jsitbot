@@ -4,7 +4,7 @@ import { HttpError } from "grammy";
 import { createApiGuard, type ApiPolicy } from "../src/runtime/telegramApi";
 import { FakeClock, settle } from "./fakeClock";
 
-const POLICY: ApiPolicy = { sendsPerSecond: 10, attempts: 3, maxWaitMs: 5_000, pollSlackMs: 50 };
+const POLICY: ApiPolicy = { sendsPerSecond: 10, attempts: 3, maxWaitMs: 5_000, pollSlackMs: 50, callTimeoutMs: 60_000, uploadTimeoutMs: 60_000 };
 
 const ok = { ok: true, result: true } as const;
 const tooMany = (seconds: number) =>
@@ -194,6 +194,60 @@ describe("server errors and lost connections", () => {
 
     await expect(call("editMessageText", controller.signal)).rejects.toThrow("aborted");
     expect(tries).toHaveLength(1);
+  });
+});
+
+describe("calls Telegram leaves unanswered", () => {
+  test("gives up on a send after the call timeout, and does not send it again", async () => {
+    const guard = createApiGuard({ ...POLICY, callTimeoutMs: 50 }, undefined, () => {});
+    const tries: string[] = [];
+    const previous = (method: string, _payload: unknown, given: AbortSignal) => {
+      tries.push(method);
+      return new Promise((_resolve, reject) => given.addEventListener("abort", () => reject(new Error("aborted"))));
+    };
+
+    await expect(guard.transformer(previous as never, "sendMessage", { chat_id: 1 } as never, undefined)).rejects.toThrow(
+      "aborted",
+    );
+    expect(tries).toEqual(["sendMessage"]);
+    expect(guard.stats.pending).toBe(0);
+  });
+
+  test("gives an upload the upload timeout instead of the call timeout", async () => {
+    const guard = createApiGuard({ ...POLICY, callTimeoutMs: 50, uploadTimeoutMs: 1_000 }, undefined, () => {});
+    const previous = (_method: string, _payload: unknown, given: AbortSignal) =>
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(ok), 150);
+        given.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(new Error("aborted"));
+        });
+      });
+
+    expect(await guard.transformer(previous as never, "sendDocument", { chat_id: 1 } as never, undefined)).toEqual(
+      ok as never,
+    );
+    await expect(guard.transformer(previous as never, "sendMessage", { chat_id: 1 } as never, undefined)).rejects.toThrow(
+      "aborted",
+    );
+  });
+
+  test("tries an edit again after the call timeout", async () => {
+    const guard = createApiGuard({ ...POLICY, callTimeoutMs: 50 }, undefined, () => {});
+    let tries = 0;
+    let firstTry: AbortSignal | undefined;
+    const previous = (_method: string, _payload: unknown, given: AbortSignal) => {
+      tries++;
+      if (tries > 1) {
+        return Promise.resolve(ok as never);
+      }
+      firstTry = given;
+      return new Promise((_resolve, reject) => given.addEventListener("abort", () => reject(new Error("aborted"))));
+    };
+
+    expect(await guard.transformer(previous as never, "editMessageText", { chat_id: 1 } as never, undefined)).toEqual(ok as never);
+    expect(firstTry?.aborted).toBe(true);
+    expect(tries).toBe(2);
   });
 });
 

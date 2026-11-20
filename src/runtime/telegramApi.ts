@@ -15,6 +15,15 @@ export interface ApiPolicy {
    * default of 500 s runs out.
    */
   pollSlackMs: number;
+  /**
+   * How long one call other than a poll or an upload may take before the bot gives it
+   * up. A message is answered in a fraction of a second when Telegram is healthy, and a
+   * reply that stalls would otherwise hold a place in the bot's queue for as long as
+   * grammY's default of 500 s.
+   */
+  callTimeoutMs: number;
+  /** How long an upload (sendDocument) may take before the bot gives it up, since a file takes longer to send than a message. */
+  uploadTimeoutMs: number;
 }
 
 export interface Clock {
@@ -156,8 +165,14 @@ export function createApiGuard(
         }
 
         let response;
+        const deadline = new AbortController();
+        const timer = setTimeout(
+          () => deadline.abort(),
+          method === "sendDocument" ? policy.uploadTimeoutMs : policy.callTimeoutMs,
+        );
+        const combined = signal ? AbortSignal.any([signal as unknown as AbortSignal, deadline.signal]) : deadline.signal;
         try {
-          response = await previous(method, payload, signal);
+          response = await previous(method, payload, combined as never);
         } catch (error) {
           if (attempt >= policy.attempts || !REPEATABLE.has(method) || signal?.aborted) {
             throw error;
@@ -165,6 +180,8 @@ export function createApiGuard(
           stats.failedOver++;
           await clock.sleep(SERVER_ERROR_BACKOFF_MS * attempt);
           continue;
+        } finally {
+          clearTimeout(timer);
         }
 
         if (response.ok || attempt >= policy.attempts) {
