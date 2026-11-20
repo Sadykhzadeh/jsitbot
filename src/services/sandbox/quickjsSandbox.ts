@@ -161,6 +161,13 @@ function isSyntaxError(packed: Packed): boolean {
   return !packed.ok && packed.text.startsWith("SyntaxError");
 }
 
+/** Whether a position lies after the last character of the code, where the code ran out. */
+function isAfterCode(code: string, line: number, column: number): boolean {
+  const lines = code.split("\n");
+
+  return line === lines.length && column > Array.from(lines[line - 1]).length;
+}
+
 function readString(context: QuickJSContext, handle: QuickJSHandle): string | undefined {
   return context.typeof(handle) === "string" ? context.getString(handle) : undefined;
 }
@@ -435,7 +442,15 @@ export class QuickJsSandboxService implements SandboxService {
 
     const stack = typeof described?.stack === "string" ? described.stack : "";
     const at = /input\.js:(\d+):(\d+)/.exec(stack);
-    return at ? { ...packed, line: Number(at[1]), column: Number(at[2]) } : packed;
+    if (!at) {
+      return packed;
+    }
+
+    const line = Number(at[1]);
+    const column = Number(at[2]);
+    // The engine says it found an empty token there, or the wrapper's closing bracket, which the user did not write.
+    const ranOut = isSyntaxError(packed) && isAfterCode(code, line, column);
+    return { ...packed, line, column, text: ranOut ? "SyntaxError: unexpected end of input" : packed.text };
   }
 
   /**

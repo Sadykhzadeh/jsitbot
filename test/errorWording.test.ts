@@ -58,3 +58,16 @@ describe("errors the engine throws are worded the way Node words them", () => {
     expect(await failure(`throw new RangeError("out of range")`)).toBe("RangeError: out of range");
   });
 });
+
+describe("code that stops before its end", () => {
+  test("is reported as the end of the input, not as a bracket the user did not write", async () => {
+    for (const code of ["1 +", "[1, 2, 3].map(x => {", "function f() {\n  return 1 +", "const a = 1;\nlet b = 2 +", "x => "]) {
+      expect(await failure(code)).toBe("SyntaxError: unexpected end of input");
+    }
+  });
+
+  test("keeps the wording of a token the user did write", async () => {
+    expect(await failure("let b = ;")).toBe("SyntaxError: unexpected token in expression: ';'");
+    expect(await failure("'abc")).toBe("SyntaxError: unexpected end of string");
+  });
+});
