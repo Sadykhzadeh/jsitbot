@@ -302,6 +302,21 @@ describe("the child process", () => {
     }
   });
 
+  test("runs guest code in the time zone the bot was started with", async () => {
+    const original = process.env.TZ;
+    process.env.TZ = "Asia/Kathmandu";
+    const service = new ProcessSandboxService(options);
+
+    try {
+      const result = await service.execute("new Date(2026, 0, 1).getTimezoneOffset()");
+      expect(result.ok && result.result).toBe("-345");
+    } finally {
+      await service.dispose();
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
+  });
+
   test("a killed native loop leaves nothing behind to eat the memory", async () => {
     const service = new ProcessSandboxService(options);
     await service.warmUp();

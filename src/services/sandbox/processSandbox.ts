@@ -37,6 +37,7 @@ const CHILD_ENV_KEYS = [
   "SystemRoot",
   "USERPROFILE",
   "LANG",
+  "TZ",
 ];
 
 // Bun reads a .env file from the working directory on its own, which would hand
