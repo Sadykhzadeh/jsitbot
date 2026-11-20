@@ -49,7 +49,7 @@ listenForShutdown({
 });
 
 try {
-  ({ bot, concurrency } = await createBot(env, runStats));
+  ({ bot, concurrency } = await createBot(env, runStats, apiGuard));
 } catch (error) {
   // Both of these say what is wrong in a line; a stack trace adds nothing.
   if (error instanceof GrammyError && error.error_code === 401) {
@@ -63,10 +63,6 @@ try {
   }
   throw error;
 }
-
-// Updates are handled with the Api object of bot.api at the time, so this
-// reaches every call a handler makes.
-bot.api.config.use(apiGuard.transformer);
 
 // Replaces the handler createBot installs, which printed the whole error: for a
 // failed Telegram call that includes the message that was being sent.

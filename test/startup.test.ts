@@ -3,6 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HttpError } from "grammy";
+
+import { createBot } from "../src/bot/createBot";
+import { loadEnv } from "../src/config/env";
+import { createRunStats } from "../src/runtime/stats";
+import { createApiGuard } from "../src/runtime/telegramApi";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const PREVIEW_TOKEN = "123456789:AAHsecretValue0123456789abcdefghijk";
@@ -133,5 +139,25 @@ describe("starting without a route to Telegram", () => {
     expectOneLine(run, PREVIEW_TOKEN);
     expect(run.output).toContain("Could not reach Telegram to check BOT_TOKEN");
     expect(run.output).toContain("Check the network connection.");
+  });
+});
+
+describe("starting with a Telegram that accepts the connection and never answers", () => {
+  test("fails the start within seconds instead of waiting for grammY's default of 500 s", async () => {
+    const silent = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) });
+    const env = loadEnv({ BOT_TOKEN: PREVIEW_TOKEN });
+    const guard = createApiGuard({ ...env.telegramApi, callTimeoutMs: 50 }, undefined, () => {});
+
+    try {
+      const started = Date.now();
+      const failure = await createBot(env, createRunStats(), guard, `http://127.0.0.1:${silent.port}`).catch(
+        (error: unknown) => error,
+      );
+
+      expect(failure).toBeInstanceOf(HttpError);
+      expect(Date.now() - started).toBeLessThan(5_000);
+    } finally {
+      silent.stop(true);
+    }
   });
 });

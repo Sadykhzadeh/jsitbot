@@ -26,6 +26,8 @@ export interface ApiPolicy {
   uploadTimeoutMs: number;
 }
 
+export type ApiGuard = ReturnType<typeof createApiGuard>;
+
 export interface Clock {
   now(): number;
   sleep(ms: number): Promise<void>;

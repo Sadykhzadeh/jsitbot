@@ -12,12 +12,17 @@ import { registerStartHelpHandlers } from "./handlers/startHelp";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../security/rateLimiter";
 import { createSandbox } from "../services/sandbox/createSandbox";
 import { countRuns, type RunStats } from "../runtime/stats";
+import type { ApiGuard } from "../runtime/telegramApi";
 
 export async function createBot(
   config: AppEnv,
   runStats: RunStats,
+  apiGuard: Pick<ApiGuard, "transformer">,
+  apiRoot = "https://api.telegram.org",
 ): Promise<{ bot: Bot; concurrency: ConcurrentMiddleware<Context> }> {
-  const bot = new Bot(config.botToken);
+  const bot = new Bot(config.botToken, { client: { apiRoot } });
+  // Installed before the first call, so the check of the token is bounded like every other call.
+  bot.api.config.use(apiGuard.transformer);
   const me = await bot.api.getMe();
   const botUsername = me.username ?? "jsitbot";
 
