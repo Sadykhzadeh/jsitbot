@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { loadEnv } from "../src/config/env";
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 
 const sandbox = new QuickJsSandboxService();
@@ -56,5 +57,19 @@ describe("running out of stack", () => {
 
     expect(execution.ok).toBe(false);
     expect(execution.ok ? "" : execution.error).not.toContain("RangeError");
+  });
+});
+
+describe("the depth of recursion the bot allows", () => {
+  const bot = new QuickJsSandboxService(loadEnv({ BOT_TOKEN: "123456789:AAH-valid_token0123456789abcdefghijk" }).sandbox);
+
+  test("runs a recursion two thousand calls deep", async () => {
+    const execution = await bot.execute(`
+      function depth(n) { return n === 0 ? 0 : 1 + depth(n - 1); }
+      depth(2000);
+    `);
+
+    expect(execution.ok).toBe(true);
+    expect(execution.ok ? execution.result : "").toBe("2000");
   });
 });

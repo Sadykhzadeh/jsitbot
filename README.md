@@ -122,6 +122,7 @@ To add snippets, append them to a corpus file, separated by a line that holds on
 | --- | --- |
 | Time per run | 700 ms |
 | Guest memory | 64 MB |
+| Nested calls | at least 2,000 deep |
 | Code length | 2000 characters |
 | Console lines | 50, up to 2000 characters each |
 | Result | 4000 characters |
