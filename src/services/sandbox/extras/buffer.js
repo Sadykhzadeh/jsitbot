@@ -264,6 +264,7 @@
 
   function concat(list, totalLength) {
     if (!Array.isArray(list)) throw argumentError("list", "must be an instance of Array", list);
+    if (list.length === 0) return asBuffer(new Uint8Array(0));
     let total = 0;
     for (let i = 0; i < list.length; i++) {
       const item = list[i];

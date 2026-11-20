@@ -697,3 +697,26 @@ t("null", () => Buffer.alloc(2, null));`);
     );
   });
 });
+
+describe("Buffer.concat of an empty list, checked against Node 26.13", () => {
+  test("is empty whatever length it is given", async () => {
+    const result = await sandbox.execute(`const t = (label, f) => {
+  try { console.log(label, f()) } catch (e) { console.log(label, "THROWS", e.name, e.code, e.message) }
+};
+t("no length", () => Buffer.concat([]));
+t("length 3", () => Buffer.concat([], 3));
+t("length -1", () => Buffer.concat([], -1));
+t("length text", () => Buffer.concat([], "x"));
+t("one item length 3", () => Buffer.concat([Buffer.from("a")], 3));`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(
+      [
+        "no length <Buffer >",
+        "length 3 <Buffer >",
+        "length -1 <Buffer >",
+        "length text <Buffer >",
+        "one item length 3 <Buffer 61 00 00>",
+      ].join("\n"),
+    );
+  });
+});
