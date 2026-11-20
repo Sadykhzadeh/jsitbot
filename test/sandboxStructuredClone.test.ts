@@ -13,3 +13,27 @@ describe("structuredClone, checked against Node 26.13", () => {
     expect(result.ok ? result.result : result.error).toBe("transfer ok => 4,0,true,true\ntransfer typed => true,4,1,2,true,0\ntransfer number THROWS TypeError ERR_INVALID_ARG_TYPE \"Failed to execute 'structuredClone': transfer in Options[0] is not an object.\" false TypeError\ntransfer obj THROWS DataCloneError 25 \"Found invalid value in transferList.\" true DOMException\ntransfer 5 THROWS TypeError ERR_INVALID_ARG_TYPE \"Failed to execute 'structuredClone': transfer in Options cannot be converted to sequence.\" false TypeError\ntransfer null THROWS TypeError ERR_INVALID_ARG_TYPE \"Failed to execute 'structuredClone': transfer in Options cannot be converted to sequence.\" false TypeError\nopts 5 THROWS TypeError ERR_INVALID_ARG_TYPE \"Failed to execute 'structuredClone': Options cannot be converted to a dictionary\" false TypeError\nopts null => 1\ntransfer same twice THROWS DataCloneError 25 \"Transfer list contains duplicate ArrayBuffer\" true DOMException\ntransfer detached THROWS DataCloneError 25 \"Cannot transfer object of unsupported type.\" true DOMException\ntransfer not in value => 1,0,true\ntransfer sab THROWS DataCloneError 25 \"Found invalid value in transferList.\" true DOMException\ntransfer empty => 3\ntransfer with no arg THROWS TypeError ERR_MISSING_ARGS \"The \\\"The value argument must be specified\\\" argument must be specified\" false TypeError\nproxy THROWS DataCloneError 25 \"#<Object> could not be cloned.\" true DOMException\nproxy nested THROWS DataCloneError 25 \"[object Array] could not be cloned.\" true DOMException\ndetached in value => 4\ndetached source THROWS DataCloneError 25 \"An ArrayBuffer is detached and could not be cloned.\" true DOMException\nweakref THROWS DataCloneError 25 \"#<WeakRef> could not be cloned.\" true DOMException\nfn in arr THROWS DataCloneError 25 \"() => 1 could not be cloned.\" true DOMException\nerr stack => string Error\ndv => 2\nsab copy => true,false\ndate extra => 1,\narray holes => 3,false\narray extra => 2,1\nclass => Object,false\nsymbol key => {\"n\":2}0\ngetter => 5\nnonenum => 0:undefined\nboxed => object2\nerror name => Error,false\nerror props => ,\naggregate => Error,agg,");
   });
 });
+
+describe("structuredClone of a Blob and a File, checked against Node 26.13", () => {
+  test("copies them with their content, type and name, and keeps one copy per value", async () => {
+    const result = await sandbox.execute(`const b = structuredClone(new Blob(["hi", new Uint8Array([33])], { type: "Text/Plain" }));
+const f = structuredClone(new File(["x"], "n.txt", { type: "text/plain", lastModified: 42 }));
+const shared = new Blob(["s"]);
+const pair = structuredClone({ a: shared, b: shared });
+const empty = structuredClone(new Blob([]));
+[b instanceof Blob, b.size, b.type, await b.text(), f instanceof File, f.name, f.size, f.type, f.lastModified, pair.a === pair.b, pair.a !== shared, empty.size, empty.type === ""].join(" ");`);
+
+    expect(result.ok ? result.result : result.error).toBe("true 3 text/plain hi! true n.txt 1 text/plain 42 true true 0 true");
+  });
+});
+
+describe("structuredClone of an object that only claims to be a Blob, checked against Node 26.13", () => {
+  test("clones it as the ordinary object it is", async () => {
+    const result = await sandbox.execute(`const fakeBlob = structuredClone({ [Symbol.toStringTag]: "Blob" });
+const fakeFile = structuredClone({ [Symbol.toStringTag]: "File", a: 1 });
+const fromPrototype = structuredClone(Object.create(Blob.prototype));
+[JSON.stringify(fakeBlob), JSON.stringify(fakeFile), Object.getPrototypeOf(fromPrototype) === Object.prototype].join(" ");`);
+
+    expect(result.ok ? result.result : result.error).toBe('{} {"a":1} true');
+  });
+});

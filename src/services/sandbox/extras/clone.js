@@ -88,8 +88,22 @@
       if (seen.has(source)) return seen.get(source);
       if (host.isProxy(source)) throw cloneError(Array.isArray(source) ? "[object Array]" : "#<Object>");
 
-      const tag = Object.prototype.toString.call(source);
+      let tag = Object.prototype.toString.call(source);
       let out;
+
+      // A Blob or a File is copied only when it holds data. An object that only claims the tag,
+      // or has the prototype without the data, is cloned as an ordinary object, as Node does.
+      if (tag === "[object Blob]" || tag === "[object File]") {
+        const blob = host.extra("blob");
+        if (blob.isBlob(source)) {
+          out = source instanceof blob.File
+            ? new blob.File([source], source.name, { type: source.type, lastModified: source.lastModified })
+            : new blob.Blob([source], { type: source.type });
+          seen.set(source, out);
+          return out;
+        }
+        tag = "[object Object]";
+      }
 
       switch (tag) {
         case "[object Date]":

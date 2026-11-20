@@ -214,5 +214,5 @@
     };
   });
 
-  return { Blob, File };
+  return { Blob, File, isBlob };
 })
