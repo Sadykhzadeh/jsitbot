@@ -339,6 +339,14 @@
     );
   }
 
+  // A position that is given as a number: a whole number from min to max, or a range error.
+  function checkPosition(value, name, min, max) {
+    if (typeof value !== "number") throw argumentError(name, "must be of type number", value);
+    if (!Number.isInteger(value)) throw outOfRange(name, "an integer", value);
+    if (value < min || value > max) throw outOfRange(name, ">= " + min + " && <= " + max, value);
+    return value;
+  }
+
   // Reverses the bytes of each group of `width` bytes, in place.
   function swapBytes(buffer, width) {
     if (buffer.length % width !== 0) {
@@ -702,18 +710,16 @@
       let offset = 0;
       let end = this.length;
       let encoding = encodingArgument;
-      if (typeof offsetArgument === "string") {
+      if (typeof value === "string" && typeof offsetArgument === "string") {
         encoding = offsetArgument;
       } else {
-        if (offsetArgument !== undefined) offset = Math.trunc(+offsetArgument) || 0;
-        if (typeof endArgument === "string") {
+        if (offsetArgument !== undefined) offset = checkPosition(offsetArgument, "offset", 0, MAX_SAFE);
+        if (typeof value === "string" && typeof endArgument === "string") {
           encoding = endArgument;
         } else if (endArgument !== undefined) {
-          end = Math.min(this.length, Math.trunc(+endArgument) || 0);
+          end = checkPosition(endArgument, "end", 0, this.length);
         }
       }
-      if (offset < 0) offset = 0;
-      if (end > this.length) end = this.length;
       if (offset >= end) return this;
       if (typeof value === "string") {
         const pattern = bytesOfString(value, encodingOf(encoding));
@@ -785,10 +791,10 @@
 
     compare(target, targetStart, targetEnd, sourceStart, sourceEnd) {
       if (!(target instanceof Uint8Array)) throw argumentError("target", "must be an instance of Buffer or Uint8Array", target);
-      const from = sourceStart === undefined ? 0 : sourceStart;
-      const to = sourceEnd === undefined ? this.length : sourceEnd;
-      const tfrom = targetStart === undefined ? 0 : targetStart;
-      const tto = targetEnd === undefined ? target.length : targetEnd;
+      const tfrom = targetStart === undefined ? 0 : checkPosition(targetStart, "targetStart", 0, MAX_SAFE);
+      const tto = targetEnd === undefined ? target.length : checkPosition(targetEnd, "targetEnd", 0, target.length);
+      const from = sourceStart === undefined ? 0 : checkPosition(sourceStart, "sourceStart", 0, MAX_SAFE);
+      const to = sourceEnd === undefined ? this.length : checkPosition(sourceEnd, "sourceEnd", 0, this.length);
       return compareBytes(this.subarray(from, to), target.subarray(tfrom, tto));
     }
 

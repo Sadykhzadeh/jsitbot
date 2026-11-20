@@ -785,3 +785,65 @@ t("valueOf string hex odd", () => Buffer.from({ valueOf() { return "6" } }, "hex
     );
   });
 });
+
+describe("Buffer fill and compare positions, checked against Node 26.13", () => {
+  test("refuse a position that is not a whole number in range, and a string position for a number", async () => {
+    const result = await sandbox.execute(`const t = (label, f) => { try { console.log(label, f()) } catch (e) { console.log(label, "THROWS", e.name, e.code, e.message) } };
+const a = Buffer.from("abc"), b = Buffer.from("abc");
+t("cmp ts -1", () => a.compare(b, -1));
+t("cmp te 5", () => a.compare(b, 0, 5));
+t("cmp ss -1", () => a.compare(b, 0, 3, -1));
+t("cmp se 9", () => a.compare(b, 0, 3, 0, 9));
+t("cmp ts 1.5", () => a.compare(b, 1.5));
+t("cmp te 3 ok", () => a.compare(b, 0, 3));
+t("cmp ss>se", () => a.compare(b, 0, 3, 2, 1));
+t("cmp ts>te", () => a.compare(b, 2, 1));
+t("fill neg off", () => Buffer.alloc(4).fill("a", -1));
+t("fill end 9", () => Buffer.alloc(4).fill("a", 0, 9));
+t("fill end -1", () => Buffer.alloc(4).fill("a", 0, -1));
+t("fill off 1.5", () => Buffer.alloc(4).fill("a", 1.5));
+t("fill off 9", () => Buffer.alloc(4).fill("a", 9));
+t("fill off NaN", () => Buffer.alloc(4).fill("a", NaN));
+t("fill num neg off", () => Buffer.alloc(4).fill(1, -2));
+t("fill off '1'", () => Buffer.alloc(4).fill(1, "1"));
+t("fill end 1e20", () => Buffer.alloc(4).fill(1, 0, 1e20));
+t("num hex", () => Buffer.alloc(3).fill(1, "hex"));
+t("str hex", () => Buffer.alloc(3).fill("ab", "hex"));
+t("str bogus", () => Buffer.alloc(3).fill("ab", "bogus"));
+t("num bogus", () => Buffer.alloc(3).fill(1, "bogus"));
+t("num 1 end hex", () => Buffer.alloc(3).fill(1, 0, "hex"));
+t("str 1 end hex", () => Buffer.alloc(3).fill("ab", 1, "hex"));
+t("num 0 enc hex", () => Buffer.alloc(3).fill(1, 0, 2, "hex"));
+t("num off 1 end", () => Buffer.alloc(3).fill(1, 1, undefined));
+t("str off 1 enc", () => Buffer.alloc(3).fill("a", 1, "utf8"));
+t("str off 1 enc bogus", () => Buffer.alloc(3).fill("a", 1, "bogus"));`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(`cmp ts -1 THROWS RangeError ERR_OUT_OF_RANGE The value of "targetStart" is out of range. It must be >= 0 && <= 9007199254740991. Received -1
+cmp te 5 THROWS RangeError ERR_OUT_OF_RANGE The value of "targetEnd" is out of range. It must be >= 0 && <= 3. Received 5
+cmp ss -1 THROWS RangeError ERR_OUT_OF_RANGE The value of "sourceStart" is out of range. It must be >= 0 && <= 9007199254740991. Received -1
+cmp se 9 THROWS RangeError ERR_OUT_OF_RANGE The value of "sourceEnd" is out of range. It must be >= 0 && <= 3. Received 9
+cmp ts 1.5 THROWS RangeError ERR_OUT_OF_RANGE The value of "targetStart" is out of range. It must be an integer. Received 1.5
+cmp te 3 ok 0
+cmp ss>se -1
+cmp ts>te 1
+fill neg off THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 && <= 9007199254740991. Received -1
+fill end 9 THROWS RangeError ERR_OUT_OF_RANGE The value of "end" is out of range. It must be >= 0 && <= 4. Received 9
+fill end -1 THROWS RangeError ERR_OUT_OF_RANGE The value of "end" is out of range. It must be >= 0 && <= 4. Received -1
+fill off 1.5 THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be an integer. Received 1.5
+fill off 9 <Buffer 00 00 00 00>
+fill off NaN THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be an integer. Received NaN
+fill num neg off THROWS RangeError ERR_OUT_OF_RANGE The value of "offset" is out of range. It must be >= 0 && <= 9007199254740991. Received -2
+fill off '1' THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type string ('1')
+fill end 1e20 THROWS RangeError ERR_OUT_OF_RANGE The value of "end" is out of range. It must be >= 0 && <= 4. Received 100_000_000_000_000_000_000
+num hex THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type string ('hex')
+str hex <Buffer ab ab ab>
+str bogus THROWS TypeError ERR_UNKNOWN_ENCODING Unknown encoding: bogus
+num bogus THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type string ('bogus')
+num 1 end hex THROWS TypeError ERR_INVALID_ARG_TYPE The "end" argument must be of type number. Received type string ('hex')
+str 1 end hex <Buffer 00 ab ab>
+num 0 enc hex <Buffer 01 01 00>
+num off 1 end <Buffer 00 01 01>
+str off 1 enc <Buffer 00 61 61>
+str off 1 enc bogus THROWS TypeError ERR_UNKNOWN_ENCODING Unknown encoding: bogus`);
+  });
+});
