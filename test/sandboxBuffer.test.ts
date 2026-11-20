@@ -896,3 +896,28 @@ symbol THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of ty
 string 1 THROWS TypeError ERR_INVALID_ARG_TYPE The "offset" argument must be of type number. Received type string ('1')`);
   });
 });
+
+describe("Buffer.concat length, checked against Node 26.13", () => {
+  test("takes a whole number of bytes and refuses anything else as Node does", async () => {
+    const result = await sandbox.execute(`const t = (l, f) => { try { console.log(l, f()) } catch (e) { console.log(l, "THROWS", e.name, e.code, e.message) } };
+t("concat len str", () => Buffer.concat([Buffer.alloc(1)], "2"));
+t("concat len neg", () => Buffer.concat([Buffer.from("ab")], -1));
+t("concat len 1.5", () => Buffer.concat([Buffer.from("ab")], 1.5));
+t("concat len 0", () => Buffer.concat([Buffer.from("ab")], 0));
+t("concat len 4", () => Buffer.concat([Buffer.from("ab")], 4));
+t("concat len NaN", () => Buffer.concat([Buffer.from("ab")], NaN));
+t("concat len null", () => Buffer.concat([Buffer.from("ab")], null));
+t("concat len 2**53", () => Buffer.concat([Buffer.from("ab")], 2 ** 53));
+t("concat len undefined", () => Buffer.concat([Buffer.from("ab")], undefined));`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(`concat len str THROWS TypeError ERR_INVALID_ARG_TYPE The "length" argument must be of type number. Received type string ('2')
+concat len neg THROWS RangeError ERR_OUT_OF_RANGE The value of "length" is out of range. It must be >= 0 && <= 9007199254740991. Received -1
+concat len 1.5 THROWS RangeError ERR_OUT_OF_RANGE The value of "length" is out of range. It must be an integer. Received 1.5
+concat len 0 <Buffer >
+concat len 4 <Buffer 61 62 00 00>
+concat len NaN THROWS RangeError ERR_OUT_OF_RANGE The value of "length" is out of range. It must be an integer. Received NaN
+concat len null THROWS TypeError ERR_INVALID_ARG_TYPE The "length" argument must be of type number. Received null
+concat len 2**53 THROWS RangeError ERR_OUT_OF_RANGE The value of "length" is out of range. It must be >= 0 && <= 9007199254740991. Received 9_007_199_254_740_992
+concat len undefined <Buffer 61 62>`);
+  });
+});

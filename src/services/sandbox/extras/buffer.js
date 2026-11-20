@@ -284,8 +284,7 @@
       total += item.length;
     }
     if (totalLength !== undefined) {
-      if (typeof totalLength !== "number") throw argumentError("length", "must be of type number", totalLength);
-      total = totalLength;
+      total = checkPosition(totalLength, "length", 0, MAX_SAFE);
     }
     const out = new Uint8Array(total);
     let at = 0;
