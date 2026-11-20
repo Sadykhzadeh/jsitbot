@@ -137,7 +137,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 You need:
 
-- [Bun](https://bun.sh) 1.3 or newer (CI runs 1.4). Node is not needed.
+- [Bun](https://bun.sh) 1.3.10 or newer (CI runs 1.4.4). Node is not needed.
 - A Telegram bot token, see below.
 - Network access to the Telegram API. The bot uses long polling, so no public URL or webhook is required.
 
