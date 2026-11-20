@@ -25,9 +25,23 @@ const inWsl = setting.startsWith("wsl:");
 const nodeCommand = inWsl ? ["wsl", "-e", setting.slice("wsl:".length)] : [setting];
 const toNodePath = (path: string) => (inWsl ? path.replace(/^([A-Za-z]):/, (_, drive: string) => `/mnt/${drive.toLowerCase()}`).replace(/\\/g, "/") : path);
 
-const version = Bun.spawnSync([...nodeCommand, "-p", "process.versions.node"]).stdout.toString().trim();
+function nodeVersion(): string | undefined {
+  try {
+    const probe = Bun.spawnSync([...nodeCommand, "-p", "process.versions.node"]);
+    const printed = probe.stdout.toString().trim();
+    return probe.exitCode === 0 && printed !== "" ? printed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const version = nodeVersion();
+if (version === undefined) {
+  console.error(`NODE26 is not a Node binary that runs: ${setting}`);
+  process.exit(2);
+}
 if (!version.startsWith("26.")) {
-  console.error(`NODE26 points to Node ${version || "(not runnable)"}; the comparison is for Node 26.`);
+  console.error(`NODE26 points to Node ${version}; the comparison is for Node 26.`);
   process.exit(2);
 }
 
