@@ -27,7 +27,12 @@ const PROGRAMS: Array<[string, string]> = [
 ];
 
 const argument = process.argv.find((a) => a.startsWith("--runs="));
-const RUNS = argument ? Number(argument.slice("--runs=".length)) : 150;
+const runsText = argument ? argument.slice("--runs=".length) : "150";
+const RUNS = Number(runsText);
+if (!Number.isInteger(RUNS) || RUNS < 1) {
+  console.error(`--runs must be a whole number of at least 1, not "${runsText}"`);
+  process.exit(2);
+}
 const GAP_MS = 15;
 const SOAK_RUNS = 1000;
 const BURST = 200;

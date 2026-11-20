@@ -6,17 +6,27 @@
 // Usage: bun run soak [--starts=7] [--messages=300] [--latency=30] [--limit=30] [--users=60]
 import { startFakeTelegram, type FakeTelegram } from "./fakeTelegram";
 
-function option(name: string, fallback: number): number {
+function option(name: string, fallback: number, min: number): number {
   const argument = process.argv.find((a) => a.startsWith(`--${name}=`));
-  return argument ? Number(argument.slice(name.length + 3)) : fallback;
+  if (!argument) {
+    return fallback;
+  }
+
+  const text = argument.slice(name.length + 3);
+  const value = Number(text);
+  if (!Number.isInteger(value) || value < min) {
+    console.error(`--${name} must be a whole number of at least ${min}, not "${text}"`);
+    process.exit(2);
+  }
+  return value;
 }
 
-const STARTS = option("starts", 7);
-const MESSAGES = option("messages", 300);
-const LATENCY_MS = option("latency", 30);
+const STARTS = option("starts", 7, 1);
+const MESSAGES = option("messages", 300, 1);
+const LATENCY_MS = option("latency", 30, 0);
 // 0 for no limit; Telegram allows a bot about 30 messages per second.
-const SENDS_PER_SECOND = option("limit", 0);
-const USERS = option("users", 60);
+const SENDS_PER_SECOND = option("limit", 0, 0);
+const USERS = option("users", 60, 1);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
