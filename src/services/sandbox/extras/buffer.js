@@ -672,6 +672,10 @@
       return textOf(new Uint8Array(this.buffer, this.byteOffset + from, to - from), name);
     }
 
+    toLocaleString(encoding, start, end) {
+      return this.toString(encoding, start, end);
+    }
+
     equals(other) {
       if (!(other instanceof Uint8Array)) throw argumentError("otherBuffer", "must be an instance of Buffer or Uint8Array", other);
       if (this.length !== other.length) return false;

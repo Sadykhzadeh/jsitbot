@@ -720,3 +720,25 @@ t("one item length 3", () => Buffer.concat([Buffer.from("a")], 3));`);
     );
   });
 });
+
+describe("Buffer.prototype.toLocaleString, checked against Node 26.13", () => {
+  test("reads the buffer as toString does", async () => {
+    const result = await sandbox.execute(`console.log([
+  Buffer.from("ab").toLocaleString(),
+  Buffer.from("ab").toLocaleString("hex"),
+  Buffer.from("abc").toLocaleString(undefined, 1),
+  Buffer.from("").toLocaleString(),
+  Buffer.prototype.toLocaleString.length,
+].join(" | "));
+try { Buffer.from("ab").toLocaleString("bogus") } catch (e) { console.log(e.name, e.code, e.message) }
+console.log([1, 2].toLocaleString(), \`\${Buffer.from("ab")}\`);`);
+
+    expect(result.ok ? result.logs.join("\n") : result.error).toBe(
+      [
+        "ab | 6162 | bc |  | 3",
+        "TypeError ERR_UNKNOWN_ENCODING Unknown encoding: bogus",
+        "1,2 ab",
+      ].join("\n"),
+    );
+  });
+});
