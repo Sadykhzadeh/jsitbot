@@ -279,6 +279,11 @@ function position(code: string, index: number): { line: number; column: number }
   return { line, column };
 }
 
+/** The refusal for code that is JSX, which the transpiler reads as TypeScript and fails on. */
+function refusedJsx(code: string): Stripped | undefined {
+  return JSX_LIKE.test(code) ? { refusal: { message: JSX_REFUSAL } } : undefined;
+}
+
 /**
  * A syntax error of the transpiler, with its column counted in code points
  * from 1. Bun 1.4.4 counts UTF-16 code units and 1.3.14 counts code points, so
@@ -286,11 +291,6 @@ function position(code: string, index: number): { line: number; column: number }
  * the text of the line. `source` is the text that was transpiled, and `head`
  * the wrapper put in front of the code, which is not the user's.
  */
-/** The refusal for code that is JSX, which the transpiler reads as TypeScript and fails on. */
-function refusedJsx(code: string): Stripped | undefined {
-  return JSX_LIKE.test(code) ? { refusal: { message: JSX_REFUSAL } } : undefined;
-}
-
 function failure(error: unknown, source: string, head = ""): Stripped | undefined {
   const at = (error as { position?: { line?: unknown; column?: unknown } } | null)?.position;
   if (!at || typeof at.line !== "number") {
