@@ -2024,6 +2024,73 @@
   // formatter only looks proxies up after the first one was made.
   const proxyTargets = new WeakMap();
   let proxiesMade = false;
+  // Built-ins the extras use, captured before any program ran. An extra is
+  // evaluated the first time the program touches it, by which point the program
+  // may have replaced the prototypes these come from, so each extra reads them
+  // here instead of through a prototype the program can change.
+  const captured = {
+    slice: stringSlice,
+    split: uncurry(String.prototype.split),
+    replace: stringReplace,
+    toLowerCase: uncurry(String.prototype.toLowerCase),
+    toUpperCase: stringToUpper,
+    indexOf: stringIndexOf,
+    includes: uncurry(String.prototype.includes),
+    charCodeAt: stringCharCodeAt,
+    charAt: uncurry(String.prototype.charAt),
+    codePointAt: uncurry(String.prototype.codePointAt),
+    normalize: uncurry(String.prototype.normalize),
+    startsWith: uncurry(String.prototype.startsWith),
+    endsWith: uncurry(String.prototype.endsWith),
+    repeat: uncurry(String.prototype.repeat),
+    trim: uncurry(String.prototype.trim),
+    padStart: uncurry(String.prototype.padStart),
+    padEnd: uncurry(String.prototype.padEnd),
+    match: uncurry(String.prototype.match),
+    search: uncurry(String.prototype.search),
+    fromCharCode: String.fromCharCode,
+    fromCodePoint: String.fromCodePoint,
+    join: uncurry(Array.prototype.join),
+    indexOfIn: uncurry(Array.prototype.indexOf),
+    lastIndexOfIn: uncurry(Array.prototype.lastIndexOf),
+    sliceOf: uncurry(Array.prototype.slice),
+    map: uncurry(Array.prototype.map),
+    filter: uncurry(Array.prototype.filter),
+    forEach: uncurry(Array.prototype.forEach),
+    push: uncurry(Array.prototype.push),
+    pop: uncurry(Array.prototype.pop),
+    splice: arraySplice,
+    concat: uncurry(Array.prototype.concat),
+    includesIn: uncurry(Array.prototype.includes),
+    isArray,
+    from: toCharacters,
+    keys: getKeys,
+    values: Object.values,
+    assign: Object.assign,
+    is: Object.is,
+    hasOwn,
+    tag: objectToString,
+    defineProperty,
+    getPrototypeOf,
+    test: regExpTest,
+    exec: regExpExec,
+    floor: mathFloor,
+    ceil: Math.ceil,
+    round: mathRound,
+    trunc: Math.trunc,
+    abs: Math.abs,
+    min: mathMin,
+    max: mathMax,
+    number: Number,
+    string: String,
+    boolean: Boolean,
+    parseInteger,
+    parseDecimal,
+    Map,
+    Set,
+    Date,
+    RegExp,
+  };
   const hostFunctions = {
     setTimeout,
     queueMicrotask,
@@ -2063,7 +2130,7 @@
 
     function load() {
       if (exported === undefined) {
-        exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions);
+        exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions, captured);
         if (builtIns) markBuiltIns(exported);
       }
       return exported;
@@ -2096,7 +2163,7 @@
 
     function load() {
       if (exported === undefined) {
-        exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions);
+        exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions, captured);
         for (let i = 0; i < entries.length; i++) {
           const [owner, name] = entries[i];
           defineProperty(owner, name, { value: exported[name], writable: true, configurable: true, enumerable: false });
@@ -2125,7 +2192,7 @@
     let exported;
     const stub = {
       [name]() {
-        if (exported === undefined) exported = indirectEval(loadExtra(module))(original, owner, zoneInfo)[name];
+        if (exported === undefined) exported = indirectEval(loadExtra(module))(original, owner, zoneInfo, captured)[name];
         return reflectApply(exported, this, arguments);
       },
     }[name];
@@ -2257,7 +2324,7 @@
   };
   let dateExtra;
   function loadDate() {
-    if (dateExtra === undefined) dateExtra = indirectEval(loadExtra("date"))(engineDate, zoneInfo);
+    if (dateExtra === undefined) dateExtra = indirectEval(loadExtra("date"))(engineDate, zoneInfo, captured);
     return dateExtra;
   }
   loaders.date = loadDate;

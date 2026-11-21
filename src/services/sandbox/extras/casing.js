@@ -5,7 +5,7 @@
 // engine's mapping. The locale argument is read as Node reads it, so a malformed
 // tag is refused with "Invalid language tag". Evaluated the first time one of the
 // two is called; see lazyMethod in guest.js.
-(function (original, owner) {
+(function (original, owner, zoneInfo, builtins) {
   "use strict";
 
   const upper = original.name === "toLocaleUpperCase";
@@ -30,13 +30,13 @@
       return known;
     }
 
-    if (tag.includes("-")) {
-      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
+    if (builtins.includes(tag, "-")) {
+      const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
       if (new Set(singletons).size !== singletons.length) throw new RangeError("Invalid language tag: " + tag);
     }
-    if (!LANGUAGE_TAG.test(tag)) throw new RangeError("Invalid language tag: " + tag);
+    if (!builtins.test(LANGUAGE_TAG, tag)) throw new RangeError("Invalid language tag: " + tag);
 
-    const language = tag.toLowerCase().split("-")[0];
+    const language = builtins.split(builtins.toLowerCase(tag), "-")[0];
     if (checked.size >= 256) checked.clear();
     checked.set(tag, language);
     lastTag = tag;
@@ -55,21 +55,21 @@
     let first = locales;
     if (typeof locales !== "string") {
       const list = Object(locales);
-      if (!(Number(list.length) > 0)) return "";
+      if (!(builtins.number(list.length) > 0)) return "";
       first = list[0];
     }
 
     if (typeof first === "string") return languageOfTag(first);
-    if ((typeof first === "object" && first !== null) || typeof first === "function") return languageOfTag(String(first));
+    if ((typeof first === "object" && first !== null) || typeof first === "function") return languageOfTag(builtins.string(first));
     throw new TypeError("Language ID should be string or object.");
   }
 
   // The engine's own case mapping, which ignores the locale, is applied after the
   // Turkish letters are settled, so the rest of the text is mapped as it is elsewhere.
   function mapTurkish(text) {
-    if (upper) return original.call(text.replace(/i/g, "İ"));
+    if (upper) return original.call(builtins.replace(text, /i/g, "İ"));
     // The first replace takes an I with a dot above (I + U+0307), the second the capital dotted I (U+0130).
-    return original.call(text.replace(/İ/g, "i").replace(/İ/g, "i").replace(/I/g, "ı"));
+    return original.call(builtins.replace(builtins.replace(builtins.replace(text, /İ/g, "i"), /İ/g, "i"), /I/g, "ı"));
   }
 
   return {

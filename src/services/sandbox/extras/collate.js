@@ -10,7 +10,7 @@
 // locale is not looked at, and neither are the rules of one language for what
 // comes after "z". The options numeric, sensitivity, caseFirst and
 // ignorePunctuation are honoured.
-(function () {
+(function (original, owner, zoneInfo, builtins) {
   "use strict";
 
   // The order the root collation gives the ASCII punctuation and symbols.
@@ -34,15 +34,15 @@
   const SIGN = /^\p{P}$/u;
 
   function weight(letter) {
-    const code = letter.codePointAt(0);
+    const code = builtins.codePointAt(letter, 0);
     if ((code >= 97 && code <= 122) || (code >= 65 && code <= 90)) return LETTER_GROUP * GROUP + code;
-    const index = PUNCTUATION.indexOf(letter);
+    const index = builtins.indexOf(PUNCTUATION, letter);
     if (index >= 0) return (index === 0 ? WHITE_SPACE : PUNCTUATION_GROUP) * GROUP + index;
     if (code >= 48 && code <= 57) return DIGIT_GROUP * GROUP + code;
-    if (SEPARATOR.test(letter)) return WHITE_SPACE * GROUP + code;
-    if (LETTER.test(letter)) return LETTER_GROUP * GROUP + code;
-    if (NUMBER.test(letter)) return DIGIT_GROUP * GROUP + code;
-    return (SIGN.test(letter) ? PUNCTUATION_GROUP : SYMBOL_GROUP) * GROUP + code;
+    if (builtins.test(SEPARATOR, letter)) return WHITE_SPACE * GROUP + code;
+    if (builtins.test(LETTER, letter)) return LETTER_GROUP * GROUP + code;
+    if (builtins.test(NUMBER, letter)) return DIGIT_GROUP * GROUP + code;
+    return (builtins.test(SIGN, letter) ? PUNCTUATION_GROUP : SYMBOL_GROUP) * GROUP + code;
   }
 
   function isDigit(letter) {
@@ -53,45 +53,45 @@
   // With numeric, a run of digits is one element that has its number in `digits`.
   function elements(text, numeric, ignorePunctuation) {
     const list = [];
-    const letters = Array.from(`${text}`.normalize("NFD"));
+    const letters = builtins.from(builtins.normalize(`${text}`, "NFD"));
 
     for (let i = 0; i < letters.length; i++) {
       const letter = letters[i];
       const last = list[list.length - 1];
 
-      if (letter.codePointAt(0) >= 0x300 && MARK.test(letter)) {
-        if (last) last.marks.push(letter.codePointAt(0));
-        else list.push({ weight: 0, marks: [letter.codePointAt(0)], upper: false });
+      if (builtins.codePointAt(letter, 0) >= 0x300 && builtins.test(MARK, letter)) {
+        if (last) builtins.push(last.marks, builtins.codePointAt(letter, 0));
+        else builtins.push(list, { weight: 0, marks: [builtins.codePointAt(letter, 0)], upper: false });
         continue;
       }
 
       if (numeric && isDigit(letter)) {
         let end = i;
         while (end + 1 < letters.length && isDigit(letters[end + 1])) end++;
-        const run = letters.slice(i, end + 1).join("").replace(/^0+(?=\d)/, "");
-        list.push({ weight: DIGIT_GROUP * GROUP + 48, marks: [], upper: false, digits: run });
+        const run = builtins.replace(builtins.join(builtins.sliceOf(letters, i, end + 1), ""), /^0+(?=\d)/, "");
+        builtins.push(list, { weight: DIGIT_GROUP * GROUP + 48, marks: [], upper: false, digits: run });
         i = end;
         continue;
       }
 
-      const lower = letter.toLowerCase();
+      const lower = builtins.toLowerCase(letter);
       const upper = lower !== letter;
       const expansion = EXPANSIONS[lower];
       const marks = [];
       let base = lower;
       if (expansion) {
         // Compared as the two letters it stands for, and after them when those are all there is.
-        list.push({ weight: weight(expansion[0]), marks: [], upper });
+        builtins.push(list, { weight: weight(expansion[0]), marks: [], upper });
         base = expansion[1];
-        marks.push(1);
+        builtins.push(marks, 1);
       } else if (STROKED[lower]) {
         base = STROKED[lower];
-        marks.push(STROKE.codePointAt(0));
+        builtins.push(marks, builtins.codePointAt(STROKE, 0));
       }
 
       const element = { weight: weight(base), marks, upper };
       if (ignorePunctuation && element.weight < DIGIT_GROUP * GROUP) continue;
-      list.push(element);
+      builtins.push(list, element);
     }
 
     return list;
@@ -137,12 +137,12 @@
   const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
 
   function checkLocales(locales) {
-    const tags = Array.isArray(locales) ? locales : [locales];
+    const tags = builtins.isArray(locales) ? locales : [locales];
     for (let i = 0; i < tags.length; i++) {
       if (tags[i] === undefined) continue;
-      const tag = String(tags[i]);
-      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
-      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+      const tag = builtins.string(tags[i]);
+      const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
+      if (!builtins.test(LANGUAGE_TAG, tag) || new Set(singletons).size !== singletons.length) {
         throw new RangeError("Invalid language tag: " + tag);
       }
     }
@@ -158,10 +158,10 @@
   function checkCollatorOptions(options) {
     if (options === null) throw new TypeError("String.prototype.localeCompare called on null or undefined");
     if (options === undefined) return;
-    for (const name of Object.keys(COLLATOR_OPTION_VALUES)) {
+    for (const name of builtins.keys(COLLATOR_OPTION_VALUES)) {
       const value = options[name];
-      if (value !== undefined && COLLATOR_OPTION_VALUES[name].indexOf(String(value)) === -1) {
-        throw new RangeError("Value " + String(value) + " out of range for String.prototype.localeCompare options property " + name);
+      if (value !== undefined && builtins.indexOfIn(COLLATOR_OPTION_VALUES[name], builtins.string(value)) === -1) {
+        throw new RangeError("Value " + builtins.string(value) + " out of range for String.prototype.localeCompare options property " + name);
       }
     }
   }
@@ -178,8 +178,8 @@
     checkCollatorOptions(options);
     const numeric = options != null && !!options.numeric;
     const ignorePunctuation = options != null && !!options.ignorePunctuation;
-    const sensitivity = options != null && options.sensitivity !== undefined ? String(options.sensitivity) : "variant";
-    const upperFirst = options != null && String(options.caseFirst) === "upper";
+    const sensitivity = options != null && options.sensitivity !== undefined ? builtins.string(options.sensitivity) : "variant";
+    const upperFirst = options != null && builtins.string(options.caseFirst) === "upper";
 
     const a = parsed(`${this}`, numeric, ignorePunctuation);
     const b = parsed(`${that}`, numeric, ignorePunctuation);

@@ -3,7 +3,7 @@
 // of the zone in brackets. The name comes from the host, which has the time
 // zone data; see zoneInfo in date.js.
 // Evaluated the first time one of them is called; see lazyMethod in guest.js.
-(function (original, owner, zoneInfo) {
+(function (original, owner, zoneInfo, builtins) {
   "use strict";
 
   const getTime = Date.prototype.getTime;
@@ -12,8 +12,8 @@
     if (text === "Invalid Date") return text;
 
     const info = zoneInfo("", getTime.call(date), "long");
-    const bar = info.indexOf("|");
-    return bar === -1 ? text : text + " (" + info.slice(bar + 1) + ")";
+    const bar = builtins.indexOf(info, "|");
+    return bar === -1 ? text : text + " (" + builtins.slice(info, bar + 1) + ")";
   }
 
   const methods = {
