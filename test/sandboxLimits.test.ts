@@ -7,7 +7,7 @@ import { measure } from "./helpers/measure";
 // A generous clock: the memory cases must end because the memory ran out, not
 // because a slow machine ran out of time first.
 const sandbox = new QuickJsSandboxService({
-  timeoutMs: 4_000,
+  timeoutMs: 30_000,
   memoryLimitBytes: 64 * 1024 * 1024,
   maxStackSizeBytes: 512 * 1024,
   maxLogs: 50,
@@ -99,7 +99,7 @@ describe("memory limits", () => {
       expect(cpuMs).toBeLessThan(3_500);
 
       await expectStillHealthy();
-    });
+    }, 60_000);
   }
 
   test("reports a result too big to flatten as the memory limit, not as an unreadable result", async () => {
@@ -166,7 +166,7 @@ describe("giving memory back", () => {
   test("collects garbage after a run that filled much of the memory", async () => {
     expect(await collections(`"x".repeat(40e6).length`)).toBeGreaterThan(0);
     expect(await collections(`const kept = []; while (true) kept.push("x".repeat(1024 * 1024))`)).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   test("leaves an ordinary run alone", async () => {
     expect(await collections(`[1, 2, 3].map((n) => n * 2)`)).toBe(0);
