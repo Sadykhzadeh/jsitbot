@@ -472,7 +472,7 @@
   // which is loaded for the errors that take one.
   let codeWording;
   function wordingOf(error, name, message) {
-    if (name === "TypeError" && (message === "not a function" || message === " is not a constructor" || message === "value is not iterable" || endsWith(message, "' is read-only"))) {
+    if (name === "TypeError" && (message === "not a function" || message === " is not a constructor" || message === "value is not iterable" || startsWith(message, "cannot read property 'Symbol.iterator' of ") || endsWith(message, "' is read-only"))) {
       if (codeWording === undefined) codeWording = indirectEval(loadExtra("wording"))(registerInspector, [seed0, seed1, seed2, seed3], { where: whereOf, source: () => sourceText });
       const named = codeWording(error, message);
       if (named !== undefined) return named;

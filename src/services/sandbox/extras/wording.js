@@ -14,7 +14,15 @@
   const KEYWORD = /^(?:await|yield|return|typeof|void|delete|new|throw|in|of|instanceof)$/;
   const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
   const CALLEE_CHARACTER = /[\w$.]/;
-  const LOOP_OF = /\bfor\s*(?:await\s*)?\([^)]*?\bof\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\)/g;
+  const NAME = "([A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*)";
+  // What a line iterates: the object of a for-of loop, a spread in an array literal, and the
+  // value of an array pattern in a declaration or an assignment.
+  const ITERATED = [
+    new RegExp("\\bfor\\s*(?:await\\s*)?\\([^)]*?\\bof\\s+" + NAME + "\\s*\\)", "g"),
+    new RegExp("\\[(?:[^\\]]*,)?\\s*\\.\\.\\." + NAME + "\\s*[,\\]]", "g"),
+    new RegExp("\\]\\s*=\\s*" + NAME + "(?![\\w$.(\\[])", "g"),
+  ];
+  const NOT_ITERABLE_READ = "cannot read property 'Symbol.iterator' of ";
 
   function lineOf(text, number) {
     let start = 0;
@@ -85,13 +93,20 @@
     return IDENTIFIER.test(name) ? name : undefined;
   }
 
-  // What a for-of loop on the line of an error iterates, when the line has one such loop
-  // over a name or a chain of names: "obj" for for (const x of obj).
+  // What the line of an error iterates, when it has exactly one such place over a name or a
+  // chain of names: "obj" for for (const x of obj), or for [...obj] and const [a] = obj.
   function iteratedName(error) {
     const from = thrownFrom(error);
     if (from === undefined) return undefined;
-    const loops = [...from.text.matchAll(LOOP_OF)];
-    return loops.length === 1 ? loops[0][1] : undefined;
+    let found;
+    let count = 0;
+    for (const pattern of ITERATED) {
+      for (const match of from.text.matchAll(pattern)) {
+        found = match[1];
+        count++;
+      }
+    }
+    return count === 1 ? found : undefined;
   }
 
   // The message Node gives an error that the engine words without the name, or
@@ -104,9 +119,10 @@
         if (message === NOT_A_CONSTRUCTOR) return "(intermediate value)" + message;
         return undefined;
       }
-      if (message === NOT_ITERABLE) {
+      if (message === NOT_ITERABLE || message.indexOf(NOT_ITERABLE_READ) === 0) {
         const iterated = iteratedName(error);
-        return iterated === undefined ? undefined : iterated + " is not iterable";
+        if (iterated !== undefined) return iterated + " is not iterable";
+        return message === NOT_ITERABLE ? undefined : message.slice(NOT_ITERABLE_READ.length) + " is not iterable";
       }
       const constant = readOnlyName(message);
       return constant !== undefined && isConstAssignment(error, constant) ? "Assignment to constant variable." : undefined;
