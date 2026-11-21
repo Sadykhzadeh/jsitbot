@@ -4,7 +4,7 @@ import { ConfigError, loadEnv } from "./config/env";
 import { createBot } from "./bot/createBot";
 import type { ConcurrentMiddleware } from "./bot/concurrency";
 import { listenForCrashes } from "./runtime/crash";
-import { logBotError, redactConsoleErrors } from "./runtime/logError";
+import { describeAnyError, logBotError, redactConsoleErrors } from "./runtime/logError";
 import { listenForShutdown } from "./runtime/shutdown";
 import { createRunStats, logStatsPeriodically } from "./runtime/stats";
 import { createApiGuard } from "./runtime/telegramApi";
@@ -49,7 +49,11 @@ listenForShutdown({
 });
 
 try {
-  ({ bot, concurrency } = await createBot(env, runStats, apiGuard));
+  const created = await createBot(env, runStats, apiGuard);
+  ({ bot, concurrency } = created);
+  // The bot polls before the sandbox is ready, so a sandbox that cannot start
+  // is reported here and ends the process, as it did when startup waited for it.
+  created.sandboxReady.catch((error) => fail(`The sandbox could not start: ${describeAnyError(error)}`));
 } catch (error) {
   // Both of these say what is wrong in a line; a stack trace adds nothing.
   if (error instanceof GrammyError && error.error_code === 401) {

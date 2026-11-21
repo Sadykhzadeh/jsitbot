@@ -11,6 +11,7 @@ import { ReplyTracker } from "./replyTracker";
 import { registerStartHelpHandlers } from "./handlers/startHelp";
 import { SandboxTimeBudget, SlidingWindowRateLimiter } from "../security/rateLimiter";
 import { createSandbox } from "../services/sandbox/createSandbox";
+import type { SandboxService } from "../services/sandbox/types";
 import { countRuns, type RunStats } from "../runtime/stats";
 import type { ApiGuard } from "../runtime/telegramApi";
 
@@ -19,24 +20,31 @@ export async function createBot(
   runStats: RunStats,
   apiGuard: Pick<ApiGuard, "transformer">,
   apiRoot = "https://api.telegram.org",
-): Promise<{ bot: Bot; concurrency: ConcurrentMiddleware<Context> }> {
+  startSandbox: typeof createSandbox = createSandbox,
+): Promise<{ bot: Bot; concurrency: ConcurrentMiddleware<Context>; sandboxReady: Promise<SandboxService> }> {
   const bot = new Bot(config.botToken, { client: { apiRoot } });
   // Installed before the first call, so the check of the token is bounded like every other call.
   bot.api.config.use(apiGuard.transformer);
+  // The sandbox starts while the token is checked, and the bot takes updates
+  // before it is ready: a run waits for it. Its failure is for the caller to
+  // act on, since the bot is already polling when it happens.
+  const sandboxReady = startSandbox({
+    timeoutMs: config.sandbox.timeoutMs,
+    memoryLimitBytes: config.sandbox.memoryLimitBytes,
+    maxStackSizeBytes: config.sandbox.maxStackSizeBytes,
+    maxLogs: 50,
+    maxLogLength: 2_000,
+    maxResultLength: 4_000,
+  }).then((service) => countRuns(service, runStats));
+  // A failure while the token is checked is not an unhandled rejection: the
+  // caller still gets it from sandboxReady.
+  sandboxReady.catch(() => undefined);
   const me = await bot.api.getMe();
   const botUsername = me.username ?? "jsitbot";
 
-  const sandbox = countRuns(
-    await createSandbox({
-      timeoutMs: config.sandbox.timeoutMs,
-      memoryLimitBytes: config.sandbox.memoryLimitBytes,
-      maxStackSizeBytes: config.sandbox.maxStackSizeBytes,
-      maxLogs: 50,
-      maxLogLength: 2_000,
-      maxResultLength: 4_000,
-    }),
-    runStats,
-  );
+  const sandbox: SandboxService = {
+    execute: async (code) => (await sandboxReady).execute(code),
+  };
   const rateLimiter = new SlidingWindowRateLimiter();
   const timeBudget = new SandboxTimeBudget();
 
@@ -92,5 +100,5 @@ export async function createBot(
 
   bot.catch(logBotError);
 
-  return { bot, concurrency };
+  return { bot, concurrency, sandboxReady };
 }
