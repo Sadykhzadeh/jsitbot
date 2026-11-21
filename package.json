@@ -1,9 +1,17 @@
 {
   "name": "jsitbot",
   "version": "0.1.0",
+  "description": "Telegram bot for running JavaScript in an isolated sandbox",
   "private": true,
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://got.az/azer/jsitbot.git"
+  },
+  "engines": {
+    "bun": ">=1.3.10"
+  },
   "scripts": {
     "dev": "bun run src/index.ts",
     "start": "bun run src/index.ts",
