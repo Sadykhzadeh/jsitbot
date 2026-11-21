@@ -36,6 +36,59 @@ describe("String.prototype.toLocaleUpperCase and toLocaleLowerCase", () => {
     );
   });
 
+  test("refuses a malformed locale tag, as Node does", async () => {
+    expect(await value(`try { "i".toLocaleUpperCase("x_y") } catch (e) { return e.name + " " + e.message }`)).toBe(
+      "RangeError Invalid language tag: x_y",
+    );
+    expect(await value(`try { "I".toLocaleLowerCase("en--US") } catch (e) { return e.name + " " + e.message }`)).toBe(
+      "RangeError Invalid language tag: en--US",
+    );
+    expect(await value(`try { "i".toLocaleUpperCase(["x_y", "tr"]) } catch (e) { return e.name + " " + e.message }`)).toBe(
+      "RangeError Invalid language tag: x_y",
+    );
+    expect(await value(`try { "i".toLocaleUpperCase(null) } catch (e) { return e.name }`)).toBe("TypeError");
+  });
+
+  test("reads the first locale of a list, as Node does", async () => {
+    expect(await value(`return "i".toLocaleUpperCase(["tr", "x_y"])`)).toBe("\u0130");
+  });
+
+  test("reads the locale argument by its shape, as Node does", async () => {
+    const shapes = [
+      `[undefined]`,
+      `[1, "tr"]`,
+      `[null]`,
+      `[[]]`,
+      `[{}]`,
+      `"tr"`,
+      `[["tr"]]`,
+      `[{ toString() { return "tr" } }]`,
+      `[new String("tr")]`,
+      `["tr", undefined]`,
+      `[]`,
+      `{}`,
+      `5`,
+    ];
+    const code = `const out = []; for (const v of [${shapes.join(", ")}]) { try { out.push(JSON.stringify("i".toLocaleUpperCase(v))) } catch (e) { out.push(e.name) } } return out.join(" ")`;
+
+    expect(await value(code)).toBe(
+      'TypeError TypeError TypeError RangeError RangeError "\u0130" "\u0130" "\u0130" "\u0130" "\u0130" "I" "I" "I"',
+    );
+  });
+
+  test("still refuses a malformed tag after a valid one has been read, and after many tags", async () => {
+    expect(
+      await value(
+        `"i".toLocaleUpperCase("tr"); "i".toLocaleUpperCase("tr"); try { "i".toLocaleUpperCase("x_y") } catch (e) { return e.name }`,
+      ),
+    ).toBe("RangeError");
+    expect(
+      await value(
+        `for (let i = 0; i < 300; i++) "i".toLocaleUpperCase("en-x-t" + i); return "i".toLocaleUpperCase("tr")`,
+      ),
+    ).toBe("\u0130");
+  });
+
   test("keeps the final sigma of Greek", async () => {
     expect(await value(`return "\\u0391\\u03a3".toLocaleLowerCase("tr")`)).toBe("ας");
   });
