@@ -29,7 +29,9 @@ function formatterFor(zone: string, style: string): Intl.DateTimeFormat {
  * How far the zone is ahead of UTC at a moment, in milliseconds, and when a
  * style of zone name is asked for, the name, after a bar: "14400000|GMT+4".
  * An empty zone is the zone of this process. An empty string says the zone is
- * not one that exists, or the moment is out of range.
+ * not one that exists, or the moment is out of range. A zero offset is named
+ * GMT+0 or GMT+00:00 in the offset styles, and in the generic styles for UTC,
+ * as Node names it, whatever the host's data says.
  */
 export function zoneInfo(zone: string, ms: number, style: string): string {
   try {
@@ -47,6 +49,9 @@ export function zoneInfo(zone: string, ms: number, style: string): string {
 
     if (style === "") {
       return String(offset);
+    }
+    if (offset === 0 && (style === "shortOffset" || style === "longOffset" || (zone === "UTC" && style.endsWith("Generic")))) {
+      return `${offset}|${style.startsWith("short") ? "GMT+0" : "GMT+00:00"}`;
     }
     const name = formatterFor(zone, style).formatToParts(ms).find((part) => part.type === "timeZoneName");
 
