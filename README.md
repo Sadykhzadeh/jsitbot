@@ -74,8 +74,6 @@ Measured with `bun run compat` against Node 26.13.0: 397 snippets in `scripts/no
 | Targeted at single formatting rules (`targeted.txt`) | 89 | 87 |
 | Total | 397 | 390 |
 
-The 636 of 684 figure in earlier notes came from a corpus that was never committed, so it cannot be reproduced; the table above replaces it.
-
 Deliberate differences, with the reason:
 
 - Nested objects are shown three levels deep, Node shows two: a little more is visible without asking.
