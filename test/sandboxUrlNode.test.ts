@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 
-const sandbox = new QuickJsSandboxService();
+// The checks are about what the URL gives, not how fast it gives it, so a busy machine
+// gets the same answers from a longer clock.
+const sandbox = new QuickJsSandboxService({ timeoutMs: 10_000 });
 
 async function value(code: string): Promise<string> {
   const result = await sandbox.execute(code);
@@ -140,7 +142,7 @@ describe("URL, checked against Node 26.13", () => {
 
       expect(await value(code), `new URL(${ctorArgs}) with ${change ?? "no change"}`).toBe(expected);
     }
-  });
+  }, 30_000);
 
   test("an invalid URL is a TypeError with its code, input and base, as Node has them", async () => {
     expect(
