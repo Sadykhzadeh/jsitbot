@@ -45,7 +45,7 @@ Notes:
 
 ## Group Flow
 
-A group has many people in it and most of what they write is not code for the bot, so it only reacts to a message that is addressed to it: `/run code`, `@bot code`, or either of them as a reply, in which case the code is the code file the message that is replied to holds, or else its first code block, or its whole text (`src/bot/handlers/runCommand.ts`). The same handler answers in private chats, where `/run` is otherwise ignored like any other command.
+A group has many people in it and most of what they write is not code for the bot, so it only reacts to a message that is addressed to it: `/run code`, `@bot code`, either of them as the caption of a code file, in which case the code is the file, or either of them as a reply, in which case the code is the code file the message that is replied to holds, or else its first code block, or its whole text (`src/bot/handlers/runCommand.ts`). Code written in the message or caption itself wins over a file sent with it, as it wins over a replied-to message. The same handler answers in private chats, where `/run` is otherwise ignored like any other command.
 
 - the limits are the ones of private messages and the counters are shared (`src/bot/runner.ts`), so a user gets no more by mixing the two
 - a user who is over the request limit or the sandbox time budget gets no answer in a group, since an answer there is one more message for everybody; a message over the length limit does get one

@@ -35,7 +35,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Has `crypto.subtle.digest` (SHA-1, SHA-256, SHA-384 and SHA-512; nothing else of `crypto.subtle`), `crypto.getRandomValues` and `crypto.randomUUID`. The numbers are well spread and differ from run to run, but they come from a small generator inside the sandbox and are not secure; do not use them for secrets
 - Takes code pasted in a fenced block, with or without a language name
 - In a private chat, runs a `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` or `.cts` file sent as a document, with the same limits as a message, and answers as a reply to the file
-- Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, or `/run` as a reply to a message that has the code or to a `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` or `.cts` file. It ignores everything else that is said there
+- Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, `/run` or `@your_bot_name` as the caption of a `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` or `.cts` file, or `/run` as a reply to a message that has the code or to such a file. It ignores everything else that is said there
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors (a subclass of `Error` by its class: `ValidationError: bad input`), cycles, and a proxy as `Proxy(` its target `)` without running its traps. The items of a Map or Set iterator are not shown (`[Map Iterator] { <items unknown> }`), because reading them would use them up
 - Besides `console.log` and friends it has `console.table`, `assert`, `count`, `group` and `time`
 - Reports the line an error came from, and for a syntax error shows that line with a caret under the column (a line longer than 80 characters is cut around the column). When an error is printed, reading or writing a property of `undefined` or `null`, a name that is not defined, a variable used before its `let`, a symbol turned into a string or number, `reduce` of an empty array and an invalid array length are worded as Node words them (`Cannot read properties of undefined (reading 'x')`); `error.message` itself keeps the engine's wording, as do the other errors
@@ -269,7 +269,7 @@ Group chat:
 /run [1, 2, 3].map(n => n * 2)
 ```
 
-Or reply to a message that has code in it, or to a `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` or `.cts` file, with `/run`. The bot reads only what is addressed to it, so it works with Telegram's default privacy mode left on.
+Or reply to a message that has code in it, or to a `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` or `.cts` file, with `/run`, or send such a file with `/run` as its caption. The bot reads only what is addressed to it, so it works with Telegram's default privacy mode left on.
 
 Inline mode:
 

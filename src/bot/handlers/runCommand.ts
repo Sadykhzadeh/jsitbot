@@ -44,12 +44,12 @@ function codeIn(message: Message): string {
  * Finds out whether a message asks the bot to run something, and what. A chat
  * with many people in it is not a place to run every message that looks like
  * code, so the bot only reacts when it is addressed: `/run code`, `@bot code`,
- * or either of them as a reply to a message that holds the code or a code
- * file. Returns undefined for any other message, and an empty code for a
- * request that names nothing to run.
+ * either of them as the caption of a file, or either of them as a reply to a
+ * message that holds the code or a code file. Returns undefined for any other
+ * message, and an empty code for a request that names nothing to run.
  */
 export function addressedCode(message: Message, botUsername: string): AddressedCode | undefined {
-  const text = message.text;
+  const text = message.text ?? (message.document && isCodeFile(message.document) ? message.caption : undefined);
   if (text === undefined) {
     return undefined;
   }
@@ -77,6 +77,9 @@ export function addressedCode(message: Message, botUsername: string): AddressedC
     return { code: own };
   }
 
+  if (message.document && isCodeFile(message.document)) {
+    return { code: "", file: message.document };
+  }
   const quoted = message.reply_to_message;
   if (!quoted || quoted.from?.is_bot) {
     return { code: "" };
@@ -93,8 +96,13 @@ export function registerRunCommandHandler(bot: Bot, options: RunCommandOptions):
   const answerer = createPrivateAnswerer(options);
 
   // In a private chat the answer is handled like the answer to any message, so
-  // that editing the command updates it.
-  bot.on("message:text", async (ctx, next) => {
+  // that editing the command updates it. A file's caption is read only in a
+  // group: a file sent to the bot in private is run by the private handler as it always was.
+  bot.on(["message:text", "message:document"], async (ctx, next) => {
+    if (ctx.chat.type === "private" && ctx.message.text === undefined) {
+      await next();
+      return;
+    }
     const request = addressedCode(ctx.message, options.botUsername);
     if (!request || !ctx.from || ctx.from.is_bot) {
       await next();

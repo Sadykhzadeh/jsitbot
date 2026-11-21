@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Bot, type Api } from "grammy";
-import type { Message, MessageEntity, Update, UserFromGetMe } from "grammy/types";
+import type { Document, Message, MessageEntity, Update, UserFromGetMe } from "grammy/types";
 
 import { addressedCode, registerRunCommandHandler } from "../src/bot/handlers/runCommand";
 import { registerPrivateMessageHandler } from "../src/bot/handlers/privateMessage";
@@ -98,6 +98,24 @@ function createBotUnderTest(
           text,
           ...(extra.entities ? { entities: extra.entities } : {}),
           ...(extra.replyTo ? { reply_to_message: { message_id: 1, date: 0, chat, ...extra.replyTo } } : {}),
+        },
+      } as Update);
+      return id;
+    },
+
+    /** A file sent with a caption, the way a chat sends a document. */
+    async sendFile(caption: string | undefined, file: Partial<Document>, chat: "group" | "private" = "group"): Promise<number> {
+      const id = messageId++;
+      const target = chat === "private" ? { id: 42, type: "private" as const, first_name: "T" } : { id: GROUP_ID, type: "supergroup" as const, title: "Chat" };
+      await bot.handleUpdate({
+        update_id: updateId++,
+        message: {
+          message_id: id,
+          date: 0,
+          chat: target,
+          from: { id: 42, is_bot: false, first_name: "T" },
+          document: { ...CODE_FILE, ...file },
+          ...(caption !== undefined ? { caption } : {}),
         },
       } as Update);
       return id;
@@ -314,6 +332,54 @@ describe("running code in a group", () => {
     const chat = createBotUnderTest();
 
     await chat.say("/run@jsitbot 6 * 7");
+
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.sent()[0].text).toContain("42");
+  });
+
+  test("runs a code file that is sent with the command as its caption", async () => {
+    const chat = createBotUnderTest({ readFile: async () => encode("6 * 7") });
+
+    const id = await chat.sendFile("/run", CODE_FILE);
+
+    expect(chat.sent()).toHaveLength(1);
+    expect(chat.sent()[0].text).toContain("42");
+    expect(chat.sent()[0].reply_parameters).toEqual({ message_id: id, allow_sending_without_reply: true });
+  });
+
+  test("runs the code of a caption that is addressed to the bot over a file sent with it", async () => {
+    const chat = createBotUnderTest({ readFile: async () => encode("6 * 7") });
+
+    await chat.sendFile("@jsitbot 1 + 1", CODE_FILE);
+
+    expect(chat.sent()[0].text).toContain("*Result*\n```\n2\n```");
+  });
+
+  test("ignores a code file in a group that is not addressed to the bot", async () => {
+    const chat = createBotUnderTest({ readFile: async () => encode("6 * 7") });
+
+    await chat.sendFile("nice snippet", CODE_FILE);
+    await chat.sendFile(undefined, CODE_FILE);
+    await chat.settle();
+
+    expect(chat.sent()).toHaveLength(0);
+  });
+
+  test("ignores a caption on a file that is not code, even when the caption is the command", async () => {
+    const chat = createBotUnderTest({ readFile: async () => encode("6 * 7") });
+
+    await chat.sendFile("/run", { file_name: "notes.pdf" });
+    await chat.sendFile("@jsitbot 1 + 1", { file_name: "notes.txt" });
+    await chat.settle();
+
+    expect(chat.sent()).toHaveLength(0);
+  });
+
+  test("runs a code file sent in private whatever its caption says", async () => {
+    const chat = createBotUnderTest({ readFile: async () => encode("6 * 7") });
+
+    await chat.sendFile("/run 1 + 1", CODE_FILE, "private");
+    await chat.settle();
 
     expect(chat.sent()).toHaveLength(1);
     expect(chat.sent()[0].text).toContain("42");
