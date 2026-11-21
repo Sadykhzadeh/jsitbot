@@ -31,6 +31,9 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ["reduce of an empty array", `[].reduce((a, b) => a + b)`, "TypeError: Reduce of empty array with no initial value"],
     ["reduceRight of an empty array", `[].reduceRight((a, b) => a + b)`, "TypeError: Reduce of empty array with no initial value"],
     ["an array of a length that cannot be", `new Array(-1)`, "RangeError: Invalid array length"],
+    ["a date that is not a date", `new Date("nope").toISOString()`, "RangeError: Invalid time value"],
+    ["a bad escape in a URI", `decodeURIComponent("%")`, "URIError: URI malformed"],
+    ["a bad byte in a URI", `decodeURI("%C0%80")`, "URIError: URI malformed"],
     ["this used before super", `class A {} class B extends A { constructor() { this.x = 1 } } new B()`, "ReferenceError: Must call super constructor in derived class before accessing 'this' or returning from derived constructor"],
     ["a method that is not there", `const o = {}; o.method()`, "TypeError: o.method is not a function"],
     ["a name that is not a function", `let n = 5; n()`, "TypeError: n is not a function"],
@@ -76,6 +79,7 @@ describe("errors the engine throws are worded the way Node words them", () => {
 
   test("leaves other errors alone", async () => {
     expect(await failure(`throw new Error("x is not defined")`)).toBe("Error: x is not defined");
+    expect(await failure(`throw new URIError("custom")`)).toBe("URIError: custom");
     expect(await failure(`throw new TypeError("cannot read property of the moon")`)).toBe("TypeError: cannot read property of the moon");
   });
 

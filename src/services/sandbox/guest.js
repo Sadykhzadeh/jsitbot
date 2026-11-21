@@ -433,6 +433,9 @@
       }
     } else if (name === "RangeError") {
       if (message === "invalid array length") return "Invalid array length";
+      if (message === "Date value is NaN") return "Invalid time value";
+    } else if (name === "URIError") {
+      if (message === "expecting hex digit" || message === "expecting %" || message === "malformed UTF-8") return "URI malformed";
     } else if (name === "ReferenceError") {
       if (startsWith(message, "'") && endsWith(message, "' is not defined")) {
         return stringSlice(message, 1, message.length - "' is not defined".length) + " is not defined";
