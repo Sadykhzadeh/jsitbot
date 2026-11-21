@@ -136,6 +136,23 @@ describe("tampering with built-ins", () => {
     `)).toBe("{ a: 1, b: [ 2, 3 ] }");
   });
 
+  test("structuredClone copies maps, sets and buffers after their methods are replaced", async () => {
+    expect(await value(`
+      const map = new Map([[1, 2]]);
+      const set = new Set([3]);
+      const bytes = new ArrayBuffer(4);
+      Map.prototype.set = () => {};
+      Map.prototype.has = () => false;
+      Map.prototype.get = () => undefined;
+      Map.prototype.forEach = () => {};
+      Set.prototype.add = () => {};
+      Set.prototype.forEach = () => {};
+      ArrayBuffer.prototype.slice = () => new ArrayBuffer(0);
+      const copy = structuredClone({ map, set, bytes });
+      return [copy.map.size, copy.set.size, copy.bytes.byteLength];
+    `)).toBe("[ 1, 1, 4 ]");
+  });
+
   test("the encoding extra keeps working after String and Array methods are replaced", async () => {
     expect(await value(`
       String.fromCharCode = () => "X";

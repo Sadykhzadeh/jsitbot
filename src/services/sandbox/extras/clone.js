@@ -77,7 +77,7 @@
     const buffers = transferList(options);
     const seen = new Map();
     // A transferred buffer is copied here, and detached once the whole value has been copied.
-    for (const buffer of buffers) seen.set(buffer, buffer.slice(0));
+    for (const buffer of buffers) builtins.mapSet(seen, buffer, builtins.arrayBufferSlice(buffer, 0));
 
     function copy(source) {
       if (source === null || (typeof source !== "object" && typeof source !== "function")) {
@@ -85,7 +85,7 @@
         return source;
       }
       if (typeof source === "function") throw cloneError(builtins.string(source));
-      if (seen.has(source)) return seen.get(source);
+      if (builtins.mapHas(seen, source)) return builtins.mapGet(seen, source);
       if (host.isProxy(source)) throw cloneError(builtins.isArray(source) ? "[object Array]" : "#<Object>");
 
       let tag = builtins.tag(source);
@@ -99,7 +99,7 @@
           out = source instanceof blob.File
             ? new blob.File([source], source.name, { type: source.type, lastModified: source.lastModified })
             : new blob.Blob([source], { type: source.type });
-          seen.set(source, out);
+          builtins.mapSet(seen, source, out);
           return out;
         }
         tag = "[object Object]";
@@ -107,68 +107,68 @@
 
       switch (tag) {
         case "[object Date]":
-          out = new Date(source.getTime());
-          seen.set(source, out);
+          out = new Date(builtins.getTime(source));
+          builtins.mapSet(seen, source, out);
           return out;
         case "[object RegExp]":
           out = new RegExp(source.source, source.flags);
-          seen.set(source, out);
+          builtins.mapSet(seen, source, out);
           return out;
         case "[object Boolean]":
         case "[object Number]":
         case "[object String]":
         case "[object BigInt]":
           out = Object(source.valueOf());
-          seen.set(source, out);
+          builtins.mapSet(seen, source, out);
           return out;
         case "[object ArrayBuffer]":
           if (source.detached) throw dataCloneError("An ArrayBuffer is detached and could not be cloned.");
-          out = source.slice(0);
-          seen.set(source, out);
+          out = builtins.arrayBufferSlice(source, 0);
+          builtins.mapSet(seen, source, out);
           return out;
         case "[object SharedArrayBuffer]":
-          out = source.slice(0);
-          seen.set(source, out);
+          out = builtins.sharedArrayBufferSlice(source, 0);
+          builtins.mapSet(seen, source, out);
           return out;
         case "[object Map]":
           out = new Map();
-          seen.set(source, out);
-          source.forEach(function (item, key) {
-            out.set(copy(key), copy(item));
+          builtins.mapSet(seen, source, out);
+          builtins.mapForEach(source, function (item, key) {
+            builtins.mapSet(out, copy(key), copy(item));
           });
           return out;
         case "[object Set]":
           out = new Set();
-          seen.set(source, out);
-          source.forEach(function (item) {
-            out.add(copy(item));
+          builtins.mapSet(seen, source, out);
+          builtins.setForEach(source, function (item) {
+            builtins.setAdd(out, copy(item));
           });
           return out;
         case "[object Error]": {
           const Type = errorTypes[source.name] || Error;
           out = new Type(typeof source.message === "string" ? source.message : "");
-          seen.set(source, out);
+          builtins.mapSet(seen, source, out);
           if (typeof source.stack === "string") {
-            Object.defineProperty(out, "stack", { value: source.stack, writable: true, configurable: true });
+            builtins.defineProperty(out, "stack", { value: source.stack, writable: true, configurable: true });
           }
           if ("cause" in source) {
-            Object.defineProperty(out, "cause", { value: copy(source.cause), writable: true, configurable: true });
+            builtins.defineProperty(out, "cause", { value: copy(source.cause), writable: true, configurable: true });
           }
           return out;
         }
         case "[object DOMException]":
           out = new (host.extra("events").DOMException)(source.message, source.name);
-          seen.set(source, out);
+          builtins.mapSet(seen, source, out);
           return out;
         case "[object Array]":
           out = new Array(source.length);
-          seen.set(source, out);
+          builtins.mapSet(seen, source, out);
           copyProperties(source, out);
           return out;
         case "[object Object]":
         case "[object Arguments]":
           out = {};
-          seen.set(source, out);
+          builtins.mapSet(seen, source, out);
           copyProperties(source, out);
           return out;
       }
@@ -176,12 +176,12 @@
       const Typed = typedArrays[tag];
       if (Typed !== undefined) {
         out = new Typed(copy(source.buffer), source.byteOffset, source.length);
-        seen.set(source, out);
+        builtins.mapSet(seen, source, out);
         return out;
       }
       if (tag === "[object DataView]") {
         out = new DataView(copy(source.buffer), source.byteOffset, source.byteLength);
-        seen.set(source, out);
+        builtins.mapSet(seen, source, out);
         return out;
       }
 
@@ -193,7 +193,7 @@
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
         if (key === "__proto__") {
-          Object.defineProperty(out, key, { value: copy(source[key]), writable: true, enumerable: true, configurable: true });
+          builtins.defineProperty(out, key, { value: copy(source[key]), writable: true, enumerable: true, configurable: true });
         } else {
           out[key] = copy(source[key]);
         }
