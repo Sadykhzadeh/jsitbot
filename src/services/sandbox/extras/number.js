@@ -434,13 +434,15 @@
   }
 
   // The unit after the number, with its space when the form has one. A number of
-  // exactly one takes the singular.
+  // exactly one takes the singular, with no fraction digits shown: 001 and 1E0
+  // are one, as 1.0 is not.
   function unitSuffix(options, text) {
     const forms = UNITS[String(options.unit)];
     const display = unitDisplayOf(options);
+    const one = /^0*1(E0)?$/.test(text.replace(/,/g, ""));
     if (display === "narrow") return forms[2];
-    if (display === "long") return forms[text === "1" ? 3 : 4];
-    return forms[text === "1" ? 0 : 1];
+    if (display === "long") return forms[one ? 3 : 4];
+    return forms[one ? 0 : 1];
   }
 
   // What useGrouping asks for: true is always, a falsy value is never, and of the

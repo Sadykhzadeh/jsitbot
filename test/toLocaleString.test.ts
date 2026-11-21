@@ -122,6 +122,22 @@ describe("Number.prototype.toLocaleString", () => {
     ).toBe("1 km | 2 km | 1.5 kilometers | -1,234.5 liters | 20°C | 3km/h | 12K L | 0 days | 0.5% | 2 wks");
   });
 
+  test("takes the singular for a number of one that shows no fraction digits, however it is padded or written", async () => {
+    expect(
+      await value(`
+        const unit = (n, options) => n.toLocaleString("en-US", { style: "unit", unit: "kilometer", unitDisplay: "long", ...options });
+        return [
+          unit(1, { minimumIntegerDigits: 3 }),
+          unit(-1, { minimumIntegerDigits: 3 }),
+          unit(1, { notation: "scientific" }),
+          unit(2, { notation: "scientific" }),
+          unit(1, { minimumFractionDigits: 1 }),
+          unit(0.9999, { maximumFractionDigits: 0 }),
+        ].join(" | ");
+      `),
+    ).toBe("001 kilometer | -001 kilometer | 1E0 kilometer | 2E0 kilometers | 1.0 kilometers | 1 kilometer");
+  });
+
   test("refuses a unit that is not a unit, whatever the style", async () => {
     expect(await value(`return (3).toLocaleString("en-US", { style: "unit", unit: "bogus" })`)).toBe(
       "error: RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'bogus'",
