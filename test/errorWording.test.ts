@@ -35,6 +35,8 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ["a spread of an object", `const obj = {}; const all = [...obj]`, "TypeError: obj is not iterable"],
     ["an array pattern of a name that is not iterable", `let u; const [q] = u`, "TypeError: u is not iterable"],
     ["a spread of undefined", `[...undefined]`, "TypeError: undefined is not iterable"],
+    ["an array pattern of null", `const [q] = null`, "TypeError: null is not iterable"],
+    ["an array pattern of undefined", `const [q] = undefined`, "TypeError: undefined is not iterable"],
     ["a key list of null", `Object.keys(null)`, "TypeError: Cannot convert undefined or null to object"],
     ["an entry list of undefined on a line of its own", `const found = Object.entries(undefined);`, "TypeError: Cannot convert undefined or null to object"],
     ["a for-of loop over a method that is not called", `const m = new Map(); for (const e of m.entries) {}`, "TypeError: m.entries is not iterable"],
