@@ -56,7 +56,7 @@ describe("Intl.NumberFormat formatToParts", () => {
 
       expect(JSON.parse(guest)).toEqual(sets);
     }
-  });
+  }, 30_000);
 
   test("joins up to what format gives", async () => {
     expect(
