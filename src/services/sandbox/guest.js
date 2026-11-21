@@ -2089,6 +2089,8 @@
     boolean: Boolean,
     parseInteger,
     parseDecimal,
+    mapGet: uncurry(Map.prototype.get),
+    mapSet: uncurry(Map.prototype.set),
     Map,
     Set,
     Date,

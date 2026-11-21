@@ -119,6 +119,35 @@ describe("tampering with built-ins", () => {
     `)).toBe("[ 'hi', 'utf-16le', 'aGk=', 'hi' ]");
   });
 
+  test("the event extra keeps working after Array, Map and Math methods are replaced", async () => {
+    expect(await value(`
+      Array.prototype.slice = () => [];
+      Array.prototype.splice = () => [];
+      Map.prototype.get = () => undefined;
+      Map.prototype.set = function () { return this; };
+      Math.floor = () => -1;
+      let calls = 0;
+      const listener = () => calls++;
+      const target = new EventTarget();
+      target.addEventListener("ping", listener);
+      target.removeEventListener("ping", listener);
+      target.addEventListener("ping", listener);
+      target.dispatchEvent(new Event("ping"));
+      return [calls, AbortSignal.timeout(0) instanceof AbortSignal];
+    `)).toBe("[ 1, true ]");
+  });
+
+  test("the event extra keeps working after Reflect.apply is replaced", async () => {
+    expect(await value(`
+      Reflect.apply = () => "hijacked";
+      let calls = 0;
+      const target = new EventTarget();
+      target.addEventListener("ping", () => calls++);
+      target.dispatchEvent(new Event("ping"));
+      return calls;
+    `)).toBe("1");
+  });
+
   test("the console cannot be replaced or removed", async () => {
     const result = await sandbox.execute(`
       console.log = () => {};

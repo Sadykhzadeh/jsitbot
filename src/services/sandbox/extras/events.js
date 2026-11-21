@@ -6,10 +6,9 @@
 // target it is dispatched on, and `capture` is only part of a listener's
 // identity, as it is in Node. AbortSignal.timeout counts on the sandbox clock,
 // like setTimeout, and holds the run open until it fires.
-(function (register, seed, host) {
+(function (register, seed, host, builtins) {
   "use strict";
 
-  const apply = Reflect.apply;
   const setTimeout = host.setTimeout;
   const queueMicrotask = host.queueMicrotask;
   const now = host.now;
@@ -214,21 +213,21 @@
 
   function addListener(target, type, callback, capture, once, passive) {
     const listeners = listenersOf(target);
-    const list = listeners.get(type);
+    const list = builtins.mapGet(listeners, type);
     if (list === undefined) {
-      listeners.set(type, [{ callback, capture, once, passive, removed: false }]);
+      builtins.mapSet(listeners, type, [{ callback, capture, once, passive, removed: false }]);
     } else if (find(list, callback, capture) === -1) {
       list[list.length] = { callback, capture, once, passive, removed: false };
     }
   }
 
   function removeListener(target, type, callback, capture) {
-    const list = listenersOf(target).get(type);
+    const list = builtins.mapGet(listenersOf(target), type);
     if (list === undefined) return;
     const at = find(list, callback, capture);
     if (at === -1) return;
     list[at].removed = true;
-    list.splice(at, 1);
+    builtins.splice(list, at, 1);
   }
 
   function report(error) {
@@ -249,8 +248,8 @@
     state.phase = 2;
     state.stopped = false;
 
-    const list = listenersOf(target).get(state.type);
-    const snapshot = list === undefined ? [] : list.slice();
+    const list = builtins.mapGet(listenersOf(target), state.type);
+    const snapshot = list === undefined ? [] : builtins.sliceOf(list);
     for (let i = 0; i < snapshot.length && !state.stopped; i++) {
       const listener = snapshot[i];
       if (listener.removed) continue;
@@ -260,11 +259,11 @@
       try {
         const callback = listener.callback;
         if (typeof callback === "function") {
-          apply(callback, target, [event]);
+          builtins.apply(callback, target, [event]);
         } else {
           const handle = callback.handleEvent;
           if (typeof handle !== "function") throw new TypeError("The \"handleEvent\" property must be a function");
-          apply(handle, callback, [event]);
+          builtins.apply(handle, callback, [event]);
         }
       } catch (error) {
         report(error);
@@ -370,7 +369,7 @@
           "abort",
           (event) => {
             const current = this.#handler;
-            if (current !== null) apply(current, this, [event]);
+            if (current !== null) builtins.apply(current, this, [event]);
           },
           false,
           false,
@@ -390,7 +389,7 @@
     }
 
     static timeout(delay) {
-      const milliseconds = Math.floor(Number(delay));
+      const milliseconds = builtins.floor(Number(delay));
       if (!(milliseconds >= 0) || milliseconds === Infinity) {
         throw new TypeError("The \"delay\" argument must be a number from 0 up");
       }
