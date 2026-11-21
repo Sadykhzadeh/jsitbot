@@ -83,6 +83,12 @@ describe("errors the engine throws are worded the way Node words them", () => {
   });
 
 
+  test("keeps the engine's wording where the line does not say which name failed", async () => {
+    expect(await failure(`"use strict"; const o = Object.freeze({ x: 1 }); o.x = 2; const x = 1`)).toBe("TypeError: 'x' is read-only");
+    expect(await failure(`"use strict"; const o = Object.freeze({ x: 1 }); o.x = 2 // x = 3`)).toBe("TypeError: 'x' is read-only");
+    expect(await failure(`const o = {}; const p = {}; [...p, ...o]`)).toBe("TypeError: value is not iterable");
+  });
+
   test("leaves other errors alone", async () => {
     expect(await failure(`throw new Error("x is not defined")`)).toBe("Error: x is not defined");
     expect(await failure(`throw new URIError("custom")`)).toBe("URIError: custom");

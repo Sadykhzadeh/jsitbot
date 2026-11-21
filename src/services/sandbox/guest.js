@@ -471,9 +471,11 @@
   // The names that Node gives an error from the code it was thrown from are in an extra,
   // which is loaded for the errors that take one.
   let codeWording;
+  const regExpExec = uncurry(RegExp.prototype.exec);
+  const toCharacters = Array.from;
   function wordingOf(error, name, message) {
     if (name === "TypeError" && (message === "not a function" || message === " is not a constructor" || message === "value is not iterable" || startsWith(message, "cannot read property 'Symbol.iterator' of ") || message === "cannot convert to object" || endsWith(message, "' is read-only"))) {
-      if (codeWording === undefined) codeWording = indirectEval(loadExtra("wording"))(registerInspector, [seed0, seed1, seed2, seed3], { where: whereOf, source: () => sourceText });
+      if (codeWording === undefined) codeWording = indirectEval(loadExtra("wording"))(registerInspector, [seed0, seed1, seed2, seed3], { where: whereOf, source: () => sourceText, indexOf: stringIndexOf, slice: stringSlice, exec: regExpExec, characters: toCharacters });
       const named = codeWording(error, message);
       if (named !== undefined) return named;
     }
