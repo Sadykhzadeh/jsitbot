@@ -331,14 +331,14 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
   });
 
   test("name the zone as the host's time zone data does", async () => {
-    // Against the host itself, not literals: zone names come from its ICU, and
-    // one ICU says "GMT" for UTC's short offset where the next says "GMT+0".
+    // Against the host itself, not literals: these names come from the host's
+    // ICU. A zero offset is pinned to GMT+0 by the sandbox, as Node spells it,
+    // so that case is a literal in the table above instead.
     const noon = new Date("2024-01-01T12:00:00Z");
     const cases: Intl.DateTimeFormatOptions[] = [
       { timeZone: "America/New_York", hour: "numeric", timeZoneName: "long" },
       { timeZone: "Asia/Tokyo", hour: "numeric", timeZoneName: "shortOffset" },
       { timeZone: "Asia/Tokyo", hour: "numeric", timeZoneName: "longOffset" },
-      { timeZone: "UTC", hour: "numeric", timeZoneName: "shortOffset" },
       { timeZone: "Asia/Kolkata", dateStyle: "full", timeStyle: "full" },
     ];
     for (const options of cases) {
