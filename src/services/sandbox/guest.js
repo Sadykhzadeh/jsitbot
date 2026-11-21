@@ -2059,6 +2059,8 @@
     forEach: uncurry(Array.prototype.forEach),
     push: uncurry(Array.prototype.push),
     pop: uncurry(Array.prototype.pop),
+    unshift: uncurry(Array.prototype.unshift),
+    shift: uncurry(Array.prototype.shift),
     splice: arraySplice,
     concat: uncurry(Array.prototype.concat),
     includesIn: uncurry(Array.prototype.includes),

@@ -12,7 +12,7 @@
 // called then. Anything else, another language, an era, a day period, a
 // calendar or a numbering system, or a year outside 1 to 9999, is left to the
 // engine's own method, which is the `original` it is given.
-(function (engine, zoneInfo) {
+(function (engine, zoneInfo, builtins) {
   "use strict";
 
   const ENGLISH = /^en(-US)?$/i;
@@ -22,12 +22,12 @@
   const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
 
   function checkLocales(locales) {
-    const tags = Array.isArray(locales) ? locales : [locales];
+    const tags = builtins.isArray(locales) ? locales : [locales];
     for (let i = 0; i < tags.length; i++) {
       if (tags[i] === undefined) continue;
-      const tag = String(tags[i]);
-      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
-      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+      const tag = builtins.string(tags[i]);
+      const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
+      if (!builtins.test(LANGUAGE_TAG, tag) || new Set(singletons).size !== singletons.length) {
         throw new RangeError("Invalid language tag: " + tag);
       }
     }
@@ -52,15 +52,15 @@
   function choice(options, name, allowed, owner) {
     const given = options[name];
     if (given === undefined) return undefined;
-    const text = String(given);
-    if (allowed.indexOf(text) === -1) {
+    const text = builtins.string(given);
+    if (builtins.indexOfIn(allowed, text) === -1) {
       throw new RangeError("Value " + text + " out of range for " + owner + " options property " + name);
     }
     return text;
   }
 
   function pad(number) {
-    return number < 10 ? "0" + number : String(number);
+    return number < 10 ? "0" + number : builtins.string(number);
   }
 
   function has(fields, names) {
@@ -89,9 +89,9 @@
       timeZoneName: choice(options, "timeZoneName", ["short", "long", "shortOffset", "longOffset", "shortGeneric", "longGeneric"], owner),
     };
     if (options.fractionalSecondDigits !== undefined) {
-      const digits = Number(options.fractionalSecondDigits);
+      const digits = builtins.number(options.fractionalSecondDigits);
       if (!(digits >= 1 && digits <= 3)) throw new RangeError("fractionalSecondDigits value is out of range.");
-      f.fractionalSecondDigits = Math.floor(digits);
+      f.fractionalSecondDigits = builtins.floor(digits);
     }
     const hourCycle = choice(options, "hourCycle", ["h11", "h12", "h23", "h24"], owner);
     const dateStyle = choice(options, "dateStyle", STYLES, owner);
@@ -104,8 +104,8 @@
     let utc = false;
     let zone;
     if (options.timeZone !== undefined) {
-      const given = String(options.timeZone);
-      if (UTC_ZONES.indexOf(given.toLowerCase()) !== -1) {
+      const given = builtins.string(options.timeZone);
+      if (builtins.indexOfIn(UTC_ZONES, builtins.toLowerCase(given)) !== -1) {
         utc = true;
       } else {
         if (zoneInfo(given, 0, "") === "") throw new RangeError("Invalid time zone specified: " + given);
@@ -126,7 +126,7 @@
 
     let glue;
     if (dateStyle !== undefined || timeStyle !== undefined) {
-      const clash = DATE_FIELDS.concat(TIME_FIELDS, ["timeZoneName"]);
+      const clash = builtins.concat(DATE_FIELDS, TIME_FIELDS, ["timeZoneName"]);
       for (let i = 0; i < clash.length; i++) {
         if (f[clash[i]] !== undefined) {
           throw new TypeError("Invalid option : option");
@@ -135,7 +135,7 @@
       if (dateStyle !== undefined && required === "time") throw new TypeError("Invalid option : dateStyle");
       if (timeStyle !== undefined && required === "date") throw new TypeError("Invalid option : timeStyle");
 
-      if (dateStyle !== undefined) Object.assign(f, DATE_STYLES[dateStyle]);
+      if (dateStyle !== undefined) builtins.assign(f, DATE_STYLES[dateStyle]);
       if (timeStyle !== undefined) {
         f.hour = "numeric";
         f.minute = "2-digit";
@@ -176,7 +176,7 @@
   }
 
   function name(full, width) {
-    return width === "long" ? full : full.slice(0, width === "short" ? 3 : 1);
+    return width === "long" ? full : builtins.slice(full, 0, width === "short" ? 3 : 1);
   }
 
   // A date is written as parts: the date, then the time, then the zone name. A part
@@ -189,12 +189,12 @@
 
     let month;
     if (f.month !== undefined) {
-      if (f.month === "numeric") month = String(c.month + 1);
+      if (f.month === "numeric") month = builtins.string(c.month + 1);
       else if (f.month === "2-digit") month = pad(c.month + 1);
       else month = name(MONTHS[c.month], f.month);
     }
-    const day = f.day === undefined ? undefined : f.day === "2-digit" ? pad(c.day) : String(c.day);
-    const year = f.year === undefined ? undefined : f.year === "2-digit" ? pad(c.year % 100) : String(c.year);
+    const day = f.day === undefined ? undefined : f.day === "2-digit" ? pad(c.day) : builtins.string(c.day);
+    const year = f.year === undefined ? undefined : f.year === "2-digit" ? pad(c.year % 100) : builtins.string(c.year);
 
     if (f.month === "long" || f.month === "short" || f.month === "narrow") {
       add("month", month);
@@ -211,7 +211,7 @@
       if (month !== undefined) fields[fields.length] = ["month", month];
       if (day !== undefined) fields[fields.length] = ["day", day];
       if (year !== undefined) fields[fields.length] = ["year", year];
-      fields.forEach(([type, value], i) => {
+      builtins.forEach(fields, ([type, value], i) => {
         if (i > 0) add("literal", "/");
         add(type, value);
       });
@@ -221,7 +221,7 @@
       const weekday = name(WEEKDAYS[c.weekday], f.weekday);
       if (parts.length === 0) add("weekday", weekday);
       else if (f.day !== undefined && f.month !== undefined) {
-        parts.unshift({ type: "weekday", value: weekday }, { type: "literal", value: ", " });
+        builtins.unshift(parts, { type: "weekday", value: weekday }, { type: "literal", value: ", " });
       } else {
         add("literal", " ");
         add("weekday", weekday);
@@ -242,22 +242,22 @@
       let hour = c.hours;
       if (cycle === "h12") hour = hour % 12 || 12;
       else if (cycle === "h11") hour = hour % 12;
-      fields[fields.length] = ["hour", !twelve || f.hour === "2-digit" ? pad(hour) : String(hour)];
+      fields[fields.length] = ["hour", !twelve || f.hour === "2-digit" ? pad(hour) : builtins.string(hour)];
     }
     if (f.minute !== undefined) {
-      fields[fields.length] = ["minute", f.hour !== undefined || f.second !== undefined ? pad(c.minutes) : String(c.minutes)];
+      fields[fields.length] = ["minute", f.hour !== undefined || f.second !== undefined ? pad(c.minutes) : builtins.string(c.minutes)];
     }
     if (f.second !== undefined) {
-      fields[fields.length] = ["second", f.minute !== undefined ? pad(c.seconds) : String(c.seconds)];
+      fields[fields.length] = ["second", f.minute !== undefined ? pad(c.seconds) : builtins.string(c.seconds)];
     }
-    fields.forEach(([type, value], i) => {
+    builtins.forEach(fields, ([type, value], i) => {
       if (i > 0) add("literal", ":");
       add(type, value);
     });
 
     if (f.fractionalSecondDigits !== undefined && (f.second !== undefined || fields.length === 0)) {
       if (fields.length > 0) add("literal", ".");
-      add("fractionalSecond", String(c.milliseconds + 1000).slice(1, 1 + f.fractionalSecondDigits));
+      add("fractionalSecond", builtins.slice(builtins.string(c.milliseconds + 1000), 1, 1 + f.fractionalSecondDigits));
     }
     if (twelve && f.hour !== undefined) {
       add("literal", " ");
@@ -282,8 +282,8 @@
   // engine has to write.
   function layout(date, method, locales, options) {
     checkLocales(locales);
-    const tag = Array.isArray(locales) ? locales[0] : locales;
-    if (tag !== undefined && !ENGLISH.test(String(tag))) return undefined;
+    const tag = builtins.isArray(locales) ? locales[0] : locales;
+    if (tag !== undefined && !builtins.test(ENGLISH, builtins.string(tag))) return undefined;
 
     const time = Date.prototype.getTime.call(date);
     const asked = METHODS[method];
@@ -298,13 +298,13 @@
     let moved = date;
     if (!utc) {
       const info = zoneInfo(zone === undefined ? "" : zone, time, f.timeZoneName === undefined ? "" : f.timeZoneName);
-      const bar = info.indexOf("|");
+      const bar = builtins.indexOf(info, "|");
       if (info === "" || (f.timeZoneName !== undefined && bar === -1)) return undefined;
       if (zone !== undefined) {
-        moved = new Date(time + Number(bar === -1 ? info : info.slice(0, bar)));
+        moved = new Date(time + builtins.number(bar === -1 ? info : builtins.slice(info, 0, bar)));
         if (Date.prototype.getTime.call(moved) !== Date.prototype.getTime.call(moved)) return undefined;
       }
-      if (bar !== -1) zoneText = info.slice(bar + 1);
+      if (bar !== -1) zoneText = builtins.slice(info, bar + 1);
     }
     const c = utc || zone !== undefined
       ? {
@@ -321,7 +321,7 @@
     const timeParts = has(f, ["hour", "minute", "second", "fractionalSecondDigits"])
       ? timePart(f, c, cycle, zoneText)
       : f.timeZoneName !== undefined ? [{ type: "timeZoneName", value: zoneText }] : [];
-    if (dateParts.length === 0 || timeParts.length === 0) return dateParts.concat(timeParts);
+    if (dateParts.length === 0 || timeParts.length === 0) return builtins.concat(dateParts, timeParts);
 
     let glue = wanted;
     if (glue === undefined) {
@@ -334,7 +334,7 @@
 
   function format(date, method, locales, options) {
     const parts = layout(date, method, locales, options);
-    return parts === undefined ? engine[method].call(date, locales, options) : parts.map((part) => part.value).join("");
+    return parts === undefined ? engine[method].call(date, locales, options) : builtins.join(builtins.map(parts, (part) => part.value), "");
   }
 
   const methods = {

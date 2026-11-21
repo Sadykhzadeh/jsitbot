@@ -77,6 +77,19 @@ describe("tampering with built-ins", () => {
     `)).toBe("-1|\u0130|\u0131|1,234.5");
   });
 
+  test("date formatting keeps working after its prototypes are replaced", async () => {
+    expect(await value(`
+      String.prototype.indexOf = () => -1;
+      String.prototype.slice = () => "hijacked";
+      Array.prototype.concat = () => [];
+      Array.prototype.map = () => [];
+      Array.prototype.join = () => "hijacked";
+      Array.prototype.forEach = () => {};
+      Array.prototype.unshift = () => {};
+      return new Date(0).toLocaleString("en-US", { timeZone: "UTC", month: "short", day: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
+    `)).toBe("Jan 01, 1970, 12:00:00.000 AM");
+  });
+
   test("the console cannot be replaced or removed", async () => {
     const result = await sandbox.execute(`
       console.log = () => {};
