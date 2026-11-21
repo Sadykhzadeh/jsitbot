@@ -69,6 +69,8 @@ try {
     });
     if (run.exitCode !== 0) {
       console.error(`${file}: the Node run failed`);
+      // process.exit skips the finally block below, so the work directory goes here.
+      rmSync(workDir, { recursive: true, force: true });
       process.exit(1);
     }
     const expected: Record[] = JSON.parse(readFileSync(nodeOut, "utf8"));
