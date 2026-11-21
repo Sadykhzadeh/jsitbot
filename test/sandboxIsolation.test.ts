@@ -98,6 +98,27 @@ describe("tampering with built-ins", () => {
     `)).toBe("{ a: 1, b: [ 2, 3 ] }");
   });
 
+  test("the encoding extra keeps working after String and Array methods are replaced", async () => {
+    expect(await value(`
+      String.fromCharCode = () => "X";
+      Function.prototype.apply = () => "hijacked";
+      Array.prototype.push = () => 0;
+      Array.prototype.join = () => "J";
+      String.prototype.charCodeAt = () => 0;
+      String.prototype.trim = () => "";
+      String.prototype.toLowerCase = () => "x";
+      String.prototype.indexOf = () => -1;
+      String.prototype.replace = () => "";
+      RegExp.prototype.test = () => true;
+      return [
+        new TextDecoder("UTF-8").decode(new Uint8Array([104, 105])),
+        new TextDecoder(" utf-16le ").encoding,
+        btoa("hi"),
+        atob("aGk="),
+      ];
+    `)).toBe("[ 'hi', 'utf-16le', 'aGk=', 'hi' ]");
+  });
+
   test("the console cannot be replaced or removed", async () => {
     const result = await sandbox.execute(`
       console.log = () => {};

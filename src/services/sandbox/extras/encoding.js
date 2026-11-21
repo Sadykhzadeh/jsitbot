@@ -1,6 +1,6 @@
 // TextEncoder, TextDecoder, atob and btoa, for the guest. Evaluated the first
 // time the code asks for one of them; see lazyGlobals in guest.js.
-(function (register, seed, host) {
+(function (register, seed, host, builtins) {
   "use strict";
 
   const REPLACEMENT = 0xfffd;
@@ -19,7 +19,7 @@
     } else if (typeof value === "object" || typeof value === "function") {
       received = "Received an instance of " + (value.constructor && value.constructor.name ? value.constructor.name : "Object");
     } else {
-      received = "Received type " + typeof value + " (" + String(value) + ")";
+      received = "Received type " + typeof value + " (" + builtins.string(value) + ")";
     }
     return nodeError(TypeError, "ERR_INVALID_ARG_TYPE", 'The "' + name + '" argument must be ' + expected + ". " + received);
   }
@@ -35,10 +35,10 @@
     let read = 0;
 
     for (let i = 0; i < text.length; ) {
-      let code = text.charCodeAt(i);
+      let code = builtins.charCodeAt(text, i);
       let units = 1;
       if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
-        const next = text.charCodeAt(i + 1);
+        const next = builtins.charCodeAt(text, i + 1);
         if (next >= 0xdc00 && next <= 0xdfff) {
           code = 0x10000 + ((code - 0xd800) << 10) + (next - 0xdc00);
           units = 2;
@@ -81,7 +81,7 @@
     }
 
     encode(input = "") {
-      const text = String(input);
+      const text = builtins.string(input);
       const bytes = new Uint8Array(text.length * 3);
       const { written } = encode(text, bytes, bytes.length);
 
@@ -92,7 +92,7 @@
       if (!(destination instanceof Uint8Array)) {
         throw argumentError("dest", "an instance of Uint8Array", destination);
       }
-      return encode(String(source), destination, destination.length);
+      return encode(builtins.string(source), destination, destination.length);
     }
   }
 
@@ -122,13 +122,13 @@
     let rest = null;
 
     function flush() {
-      pieces.push(String.fromCharCode.apply(null, units));
+      builtins.push(pieces, builtins.apply(builtins.fromCharCode, null, units));
       units.length = 0;
     }
 
     function invalid() {
       if (fatal) throw nodeError(TypeError, "ERR_ENCODING_INVALID_ENCODED_DATA", "The encoded data was not valid for encoding " + label);
-      units.push(REPLACEMENT);
+      builtins.push(units, REPLACEMENT);
     }
 
     if (dropBom && bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) i = 3;
@@ -137,7 +137,7 @@
       const start = i;
       const first = bytes[i++];
       if (first < 0x80) {
-        units.push(first);
+        builtins.push(units, first);
       } else {
         let needed = 0;
         let code = 0;
@@ -180,9 +180,9 @@
           } else if (!complete) {
             invalid();
           } else if (code >= 0x10000) {
-            units.push(0xd800 + ((code - 0x10000) >> 10), 0xdc00 + ((code - 0x10000) & 0x3ff));
+            builtins.push(units, 0xd800 + ((code - 0x10000) >> 10), 0xdc00 + ((code - 0x10000) & 0x3ff));
           } else {
-            units.push(code);
+            builtins.push(units, code);
           }
         }
       }
@@ -190,7 +190,7 @@
     }
     flush();
 
-    return { text: pieces.join(""), rest };
+    return { text: builtins.join(pieces, ""), rest };
   }
 
   // UTF-16 little endian. A lone surrogate is an error, and so is a last byte
@@ -202,7 +202,7 @@
 
     function invalid() {
       if (fatal) throw nodeError(TypeError, "ERR_ENCODING_INVALID_ENCODED_DATA", "The encoded data was not valid for encoding " + label);
-      units.push(REPLACEMENT);
+      builtins.push(units, REPLACEMENT);
     }
 
     const at = (index) => (bigEndian ? (bytes[index] << 8) | bytes[index + 1] : bytes[index] | (bytes[index + 1] << 8));
@@ -223,7 +223,7 @@
         }
         const next = at(i + 2);
         if (next >= 0xdc00 && next <= 0xdfff) {
-          units.push(unit, next);
+          builtins.push(units, unit, next);
           i += 4;
         } else {
           i += 2;
@@ -233,7 +233,7 @@
         i += 2;
         invalid();
       } else {
-        units.push(unit);
+        builtins.push(units, unit);
         i += 2;
       }
     }
@@ -244,9 +244,9 @@
     }
 
     const pieces = [];
-    for (let k = 0; k < units.length; k += 8192) pieces.push(String.fromCharCode.apply(null, units.slice(k, k + 8192)));
+    for (let k = 0; k < units.length; k += 8192) builtins.push(pieces, builtins.apply(builtins.fromCharCode, null, builtins.sliceOf(units, k, k + 8192)));
 
-    return { text: pieces.join(""), rest };
+    return { text: builtins.join(pieces, ""), rest };
   }
 
   // What windows-1252 has in place of the control characters 0x80 to 0x9f.
@@ -258,14 +258,14 @@
   function decodeWindows1252(bytes) {
     const pieces = [];
     for (let k = 0; k < bytes.length; k += 8192) {
-      const chunk = Array.prototype.slice.call(bytes, k, k + 8192);
+      const chunk = builtins.sliceOf(bytes, k, k + 8192);
       for (let j = 0; j < chunk.length; j++) {
         if (chunk[j] >= 0x80 && chunk[j] <= 0x9f) chunk[j] = WINDOWS_1252[chunk[j] - 0x80];
       }
-      pieces.push(String.fromCharCode.apply(null, chunk));
+      builtins.push(pieces, builtins.apply(builtins.fromCharCode, null, chunk));
     }
 
-    return { text: pieces.join(""), rest: null };
+    return { text: builtins.join(pieces, ""), rest: null };
   }
 
   // The labels of the Encoding Standard for the encodings that are there.
@@ -280,9 +280,9 @@
   };
 
   function encodingOf(label) {
-    const name = String(label).trim().toLowerCase();
+    const name = builtins.toLowerCase(builtins.trim(builtins.string(label)));
     for (const encoding in LABELS) {
-      if (LABELS[encoding].indexOf(name) !== -1) return encoding;
+      if (builtins.indexOfIn(LABELS[encoding], name) !== -1) return encoding;
     }
     throw nodeError(RangeError, "ERR_ENCODING_NOT_SUPPORTED", 'The "' + label + '" encoding is not supported');
   }
@@ -359,9 +359,9 @@
     let out = "";
 
     for (let i = 0; i < text.length; i += 3) {
-      const a = text.charCodeAt(i);
-      const b = i + 1 < text.length ? text.charCodeAt(i + 1) : -1;
-      const c = i + 2 < text.length ? text.charCodeAt(i + 2) : -1;
+      const a = builtins.charCodeAt(text, i);
+      const b = i + 1 < text.length ? builtins.charCodeAt(text, i + 1) : -1;
+      const c = i + 2 < text.length ? builtins.charCodeAt(text, i + 2) : -1;
       if (a > 255 || b > 255 || c > 255) {
         throw domError("Invalid character");
       }
@@ -377,9 +377,9 @@
 
   function atob(input) {
     if (arguments.length === 0) throw nodeError(TypeError, "ERR_MISSING_ARGS", 'The "input" argument must be specified');
-    let text = `${input}`.replace(/[\t\n\f\r ]+/g, "");
-    if (text.length % 4 === 0) text = text.replace(/==?$/, "");
-    if (/[^A-Za-z0-9+/]/.test(text)) throw domError("Invalid character");
+    let text = builtins.replace(`${input}`, /[\t\n\f\r ]+/g, "");
+    if (text.length % 4 === 0) text = builtins.replace(text, /==?$/, "");
+    if (builtins.test(/[^A-Za-z0-9+/]/, text)) throw domError("Invalid character");
     if (text.length % 4 === 1) {
       throw domError("The string to be decoded is not correctly encoded.");
     }
@@ -388,11 +388,11 @@
     let buffer = 0;
     let bits = 0;
     for (let i = 0; i < text.length; i++) {
-      buffer = (buffer << 6) | ALPHABET.indexOf(text[i]);
+      buffer = (buffer << 6) | builtins.indexOf(ALPHABET, text[i]);
       bits += 6;
       if (bits >= 8) {
         bits -= 8;
-        out += String.fromCharCode((buffer >> bits) & 255);
+        out += builtins.fromCharCode((buffer >> bits) & 255);
       }
     }
 

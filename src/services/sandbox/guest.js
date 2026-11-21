@@ -2050,6 +2050,7 @@
     search: uncurry(String.prototype.search),
     fromCharCode: String.fromCharCode,
     fromCodePoint: String.fromCodePoint,
+    apply: reflectApply,
     join: uncurry(Array.prototype.join),
     indexOfIn: uncurry(Array.prototype.indexOf),
     lastIndexOfIn: uncurry(Array.prototype.lastIndexOf),
