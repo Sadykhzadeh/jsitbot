@@ -559,3 +559,23 @@ describe("syntax error carets in a message, from a real run", () => {
     expect(caret.indexOf("^")).toBe(source.indexOf("1"));
   });
 });
+
+describe("code fences that are never closed", () => {
+  const sandbox = new QuickJsSandboxService({ timeoutMs: 300 });
+
+  test("a fence that is opened and not closed gets a hint", async () => {
+    for (const code of ["```js\nconst a = 1;\na + 1", "```js 1 + 1", "```"]) {
+      const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+      expect(message.text).toContain("Hint: the code starts with a code fence that is never closed");
+    }
+  });
+
+  test("a fence that is closed, or code that does not start with one, gets no hint", async () => {
+    for (const code of ["```js\n1 + 1\n``` + nope", "const a = 1; ```x", "1 +"]) {
+      const message = formatExecutionMessage(await sandbox.execute(code), code);
+
+      expect(message.text).not.toContain("Hint: the code starts with a code fence");
+    }
+  });
+});

@@ -32,6 +32,11 @@ const MODULE_HINT = "Hint: this runs as a script, not a module, so import and ex
 const HOST_ERROR = /^ReferenceError: '?(?:require|module|exports|process|fetch|fs|__dirname|__filename)'? is not defined$/;
 const HOST_HINT = "Hint: the sandbox has no require, process, fetch or file system: it runs JavaScript with no access to files or the network.";
 
+// A code fence that is opened and never closed is not taken off, so the engine
+// reads its backticks as template literals and reports the end of the input.
+const OPENING_FENCE = /^\s*```/;
+const FENCE_HINT = "Hint: the code starts with a code fence that is never closed. Send the code without the fence, or add the closing fence at the end.";
+
 // A program can print half of a surrogate pair. Telegram cannot store that, so
 // it is shown as the replacement character. This runs on the text that is
 // about to be sent, after the cut: a whole megabyte of output is never scanned.
@@ -47,6 +52,10 @@ function describeError(execution: SandboxExecution, code: string): string {
   }
 
   const located = locateError(execution, code);
+  const opening = code.indexOf("```");
+  if (OPENING_FENCE.test(code) && !code.includes("```", opening + 3)) {
+    return located + "\n" + FENCE_HINT;
+  }
   if (/^SyntaxError: unexpected character/.test(execution.error) && CURLY_QUOTES.test(code)) {
     return located + "\n" + CURLY_QUOTES_HINT;
   }
