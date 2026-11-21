@@ -280,7 +280,7 @@ Inline mode:
 
 Note:
 
-- Enable inline mode in `@BotFather`
+- Enable inline mode with `/setinline` in [@BotFather](https://t.me/BotFather), as [Getting a bot token](#getting-a-bot-token) shows
 - Send `/help` for examples
 
 ## Contributing
