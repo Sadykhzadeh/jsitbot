@@ -8,11 +8,12 @@
 // ListFormat and RelativeTimeFormat are written out here and know English only.
 // `hostTimeZone` is the zone of the process, which executionWrapper puts around this source.
 // `host` is the set of host functions, which hands out the date extra's parts.
-(function (registerInspector, seeds, host) {
+// `builtins` holds the built-ins captured before the program ran; see captured in guest.js.
+(function (registerInspector, seeds, host, builtins) {
   "use strict";
 
   function define(object, name, value) {
-    Object.defineProperty(object, name, { value, writable: true, configurable: true, enumerable: false });
+    builtins.defineProperty(object, name, { value, writable: true, configurable: true, enumerable: false });
   }
 
   // Options that were given, in the order resolvedOptions lists them.
@@ -36,7 +37,7 @@
     let i = 0;
 
     function add(type, value) {
-      parts.push({ type, value });
+      builtins.push(parts, { type, value });
     }
 
     while (i < text.length) {
@@ -44,7 +45,7 @@
       if (c >= "0" && c <= "9") {
         let end = i;
         while (end < text.length && text[end] >= "0" && text[end] <= "9") end++;
-        add(exponent ? "exponentInteger" : point ? "fraction" : "integer", text.slice(i, end));
+        add(exponent ? "exponentInteger" : point ? "fraction" : "integer", builtins.slice(text, i, end));
         i = end;
         continue;
       }
@@ -61,7 +62,7 @@
         add("infinity", c);
       } else if (c === "(" || c === ")" || c === " " || c === "\u00a0") {
         add("literal", c);
-      } else if (text.startsWith("NaN", i)) {
+      } else if (builtins.startsWith(text, "NaN", i)) {
         add("nan", "NaN");
         i += 3;
         continue;
@@ -70,10 +71,10 @@
         add("exponentSeparator", c);
       } else {
         let end = i;
-        while (end < text.length && !/[\d\s\u00a0()+\-.,%\u221e]/.test(text[end]) && !text.startsWith("NaN", end)) end++;
-        const run = text.slice(i, end);
+        while (end < text.length && !builtins.test(/[\d\s\u00a0()+\-.,%\u221e]/, text[end]) && !builtins.startsWith(text, "NaN", end)) end++;
+        const run = builtins.slice(text, i, end);
         const afterNumber = last === "integer" || last === "fraction" || (last === "literal" && parts.length > 1 && parts[parts.length - 2].type !== "currency");
-        add(afterNumber && COMPACT_WORDS.indexOf(run) !== -1 ? "compact" : "currency", run);
+        add(afterNumber && builtins.indexOfIn(COMPACT_WORDS, run) !== -1 ? "compact" : "currency", run);
         i = end;
         continue;
       }
@@ -87,11 +88,11 @@
   // a compact letter such as the K of 12KB is cut off from a unit that starts with one.
   function unitStyleParts(text, bare) {
     const parts = numberParts(bare);
-    const rest = text.slice(bare.length);
+    const rest = builtins.slice(text, bare.length);
     if (rest.length === 0) return parts;
     const space = rest[0] === " " || rest[0] === "\u00a0";
-    if (space) parts.push({ type: "literal", value: rest[0] });
-    parts.push({ type: "unit", value: space ? rest.slice(1) : rest });
+    if (space) builtins.push(parts, { type: "literal", value: rest[0] });
+    builtins.push(parts, { type: "unit", value: space ? builtins.slice(rest, 1) : rest });
     return parts;
   }
 
@@ -111,29 +112,29 @@
   class NumberFormat {
     constructor(locales, options) {
       const asked = options === undefined || options === null ? {} : Object(options);
-      for (const name of Object.keys(NUMBER_OPTION_VALUES)) choose(asked, name, NUMBER_OPTION_VALUES[name], undefined, "NumberFormat");
-      if (asked.currency !== undefined && !/^[A-Za-z]{3}$/.test(String(asked.currency))) {
-        throw new RangeError("Invalid currency code : " + String(asked.currency));
+      for (const name of builtins.keys(NUMBER_OPTION_VALUES)) choose(asked, name, NUMBER_OPTION_VALUES[name], undefined, "NumberFormat");
+      if (asked.currency !== undefined && !builtins.test(/^[A-Za-z]{3}$/, builtins.string(asked.currency))) {
+        throw new RangeError("Invalid currency code : " + builtins.string(asked.currency));
       }
       if (asked.style === "unit" && asked.unit === undefined) throw new TypeError("Invalid unit argument for Intl.NumberFormat() ''");
       // the arguments are checked now, as a constructor does, not at the first format
       try {
-        Number.prototype.toLocaleString.call(0, locales, options);
+        builtins.numberToLocaleString(0, locales, options);
       } catch (error) {
         if (error instanceof RangeError) {
-          throw new RangeError(error.message.replace(" for Number.prototype.toLocaleString options", " for Intl.NumberFormat options").replace("for Number.prototype.toLocaleString() ", "for Intl.NumberFormat() "));
+          throw new RangeError(builtins.replace(builtins.replace(error.message, " for Number.prototype.toLocaleString options", " for Intl.NumberFormat options"), "for Number.prototype.toLocaleString() ", "for Intl.NumberFormat() "));
         }
         throw error;
       }
 
       const formatWith = (value, withOptions) =>
         typeof value === "bigint"
-          ? BigInt.prototype.toLocaleString.call(value, locales, withOptions)
-          : Number.prototype.toLocaleString.call(Number(value), locales, withOptions);
+          ? builtins.bigintToLocaleString(value, locales, withOptions)
+          : builtins.numberToLocaleString(builtins.number(value), locales, withOptions);
       const format = (value) => formatWith(value, options);
       define(this, "format", format);
       const layout = given(options, ["style", "notation"]);
-      const bareOptions = Object.assign({}, options, { style: undefined, unit: undefined, unitDisplay: undefined });
+      const bareOptions = builtins.assign({}, options, { style: undefined, unit: undefined, unitDisplay: undefined });
       define(this, "formatToParts", (value) => {
         const text = format(value);
         return layout.style === "unit" ? unitStyleParts(text, formatWith(value, bareOptions)) : numberParts(text);
@@ -144,34 +145,34 @@
           "minimumFractionDigits", "maximumFractionDigits", "minimumSignificantDigits", "maximumSignificantDigits",
           "useGrouping", "notation", "compactDisplay", "signDisplay",
         ]);
-        const style = asked.style === undefined ? "decimal" : String(asked.style);
+        const style = asked.style === undefined ? "decimal" : builtins.string(asked.style);
         const out = { locale: "en-US", numberingSystem: "latn", style };
         if (style === "currency") {
-          out.currency = String(asked.currency).toUpperCase();
+          out.currency = builtins.toUpperCase(builtins.string(asked.currency));
           out.currencyDisplay = asked.currencyDisplay === undefined ? "symbol" : asked.currencyDisplay;
           out.currencySign = asked.currencySign === undefined ? "standard" : asked.currencySign;
         } else if (style === "unit") {
           out.unit = asked.unit;
           out.unitDisplay = asked.unitDisplay === undefined ? "short" : asked.unitDisplay;
         }
-        out.minimumIntegerDigits = asked.minimumIntegerDigits === undefined ? 1 : Number(asked.minimumIntegerDigits);
+        out.minimumIntegerDigits = asked.minimumIntegerDigits === undefined ? 1 : builtins.number(asked.minimumIntegerDigits);
         if (asked.minimumSignificantDigits !== undefined || asked.maximumSignificantDigits !== undefined) {
-          out.minimumSignificantDigits = asked.minimumSignificantDigits === undefined ? 1 : Number(asked.minimumSignificantDigits);
-          out.maximumSignificantDigits = asked.maximumSignificantDigits === undefined ? 21 : Number(asked.maximumSignificantDigits);
+          out.minimumSignificantDigits = asked.minimumSignificantDigits === undefined ? 1 : builtins.number(asked.minimumSignificantDigits);
+          out.maximumSignificantDigits = asked.maximumSignificantDigits === undefined ? 21 : builtins.number(asked.maximumSignificantDigits);
         } else {
           const base = style === "currency" ? 2 : 0;
           const top = style === "currency" ? 2 : style === "percent" ? 0 : 3;
-          const min = asked.minimumFractionDigits === undefined ? undefined : Number(asked.minimumFractionDigits);
-          const max = asked.maximumFractionDigits === undefined ? undefined : Number(asked.maximumFractionDigits);
-          out.minimumFractionDigits = min === undefined ? Math.min(base, max === undefined ? base : max) : min;
-          out.maximumFractionDigits = max === undefined ? Math.max(top, out.minimumFractionDigits) : max;
+          const min = asked.minimumFractionDigits === undefined ? undefined : builtins.number(asked.minimumFractionDigits);
+          const max = asked.maximumFractionDigits === undefined ? undefined : builtins.number(asked.maximumFractionDigits);
+          out.minimumFractionDigits = min === undefined ? builtins.min(base, max === undefined ? base : max) : min;
+          out.maximumFractionDigits = max === undefined ? builtins.max(top, out.minimumFractionDigits) : max;
         }
         const grouping = asked.useGrouping;
         const compact = asked.notation === "compact" ? "min2" : "auto";
         if (grouping === undefined) out.useGrouping = compact;
         else if (grouping === true) out.useGrouping = "always";
         else if (!grouping) out.useGrouping = false;
-        else out.useGrouping = ["always", "auto", "min2"].indexOf(String(grouping)) !== -1 ? String(grouping) : compact;
+        else out.useGrouping = builtins.indexOfIn(["always", "auto", "min2"], builtins.string(grouping)) !== -1 ? builtins.string(grouping) : compact;
         out.notation = asked.notation === undefined ? "standard" : asked.notation;
         if (out.notation === "compact") out.compactDisplay = asked.compactDisplay === undefined ? "short" : asked.compactDisplay;
         out.signDisplay = asked.signDisplay === undefined ? "auto" : asked.signDisplay;
@@ -188,7 +189,7 @@
       choose(asked, "usage", ["sort", "search"], undefined, "Collator");
       choose(asked, "sensitivity", ["base", "accent", "case", "variant"], undefined, "Collator");
       choose(asked, "caseFirst", ["upper", "lower", "false"], undefined, "Collator");
-      const compare = (a, b) => String(a).localeCompare(String(b), locales, options);
+      const compare = (a, b) => builtins.localeCompare(builtins.string(a), builtins.string(b), locales, options);
       define(this, "compare", compare);
       define(this, "resolvedOptions", () => {
         const asked = given(options, ["usage", "sensitivity", "ignorePunctuation", "numeric", "caseFirst"]);
@@ -199,7 +200,7 @@
           ignorePunctuation: asked.ignorePunctuation === undefined ? false : Boolean(asked.ignorePunctuation),
           collation: "default",
           numeric: asked.numeric === undefined ? false : Boolean(asked.numeric),
-          caseFirst: asked.caseFirst === undefined ? "false" : String(asked.caseFirst),
+          caseFirst: asked.caseFirst === undefined ? "false" : builtins.string(asked.caseFirst),
         };
       });
     }
@@ -224,42 +225,44 @@
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
       let given = options === undefined ? {} : Object(options);
       // with nothing asked for, a date is written; toLocaleString would add the time
-      if (!FORMAT_FIELDS.some((name) => given[name] !== undefined)) {
-        given = Object.assign({}, given, { year: "numeric", month: "numeric", day: "numeric" });
+      if (!builtins.some(FORMAT_FIELDS, (name) => given[name] !== undefined)) {
+        given = builtins.assign({}, given, { year: "numeric", month: "numeric", day: "numeric" });
       }
       // A language the engine answers itself gets the engine's method for the parts asked
       // for, so a date alone is not followed by a time.
-      const hasDate = DATE_FORMAT_FIELDS.some((name) => given[name] !== undefined);
-      const hasTime = TIME_FORMAT_FIELDS.some((name) => given[name] !== undefined);
+      const hasDate = builtins.some(DATE_FORMAT_FIELDS, (name) => given[name] !== undefined);
+      const hasTime = builtins.some(TIME_FORMAT_FIELDS, (name) => given[name] !== undefined);
       const method = hasDate && !hasTime ? "toLocaleDateString"
         : hasTime && !hasDate ? "toLocaleTimeString"
         : "toLocaleString";
-      const write = Date.prototype[method];
+      const write = method === "toLocaleDateString" ? builtins.dateToLocaleDateString
+        : method === "toLocaleTimeString" ? builtins.dateToLocaleTimeString
+        : builtins.dateToLocaleString;
       // the arguments are checked now, as a constructor does, not at the first format;
       // the value a method refuses is named for this constructor, as Node names it
       try {
-        write.call(new Date(0), locales, given);
+        write(new Date(0), locales, given);
       } catch (error) {
         if (error instanceof RangeError) {
-          throw new RangeError(error.message.replace(/ for Date\.prototype\.\w+ options/, " for Intl.DateTimeFormat options"));
+          throw new RangeError(builtins.replace(error.message, / for Date\.prototype\.\w+ options/, " for Intl.DateTimeFormat options"));
         }
         throw error;
       }
 
       const format = (date) => {
-        const when = new Date(date === undefined ? Date.now() : Number(date));
-        if (when.getTime() !== when.getTime()) throw new RangeError("Invalid time value");
-        return write.call(when, locales, given);
+        const when = new Date(date === undefined ? builtins.dateNow() : builtins.number(date));
+        if (builtins.getTime(when) !== builtins.getTime(when)) throw new RangeError("Invalid time value");
+        return write(when, locales, given);
       };
       define(this, "format", format);
       define(this, "formatToParts", (date) => {
-        const when = new Date(date === undefined ? Date.now() : Number(date));
-        if (when.getTime() !== when.getTime()) throw new RangeError("Invalid time value");
+        const when = new Date(date === undefined ? builtins.dateNow() : builtins.number(date));
+        if (builtins.getTime(when) !== builtins.getTime(when)) throw new RangeError("Invalid time value");
         return host.extra("date").partsOf(when, method, locales, given);
       });
       define(this, "resolvedOptions", () => {
-        const zone = given.timeZone === undefined ? hostTimeZone : String(given.timeZone);
-        const out = { locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: UTC_ZONES.indexOf(zone.toLowerCase()) === -1 ? zone : "UTC" };
+        const zone = given.timeZone === undefined ? hostTimeZone : builtins.string(given.timeZone);
+        const out = { locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: builtins.indexOfIn(UTC_ZONES, builtins.toLowerCase(zone)) === -1 ? zone : "UTC" };
         if (given.hour !== undefined || given.timeStyle !== undefined) {
           const cycle = given.hourCycle !== undefined ? given.hourCycle : given.hour12 === undefined ? "h12" : given.hour12 ? "h12" : "h23";
           out.hourCycle = cycle;
@@ -278,12 +281,12 @@
   const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
 
   function checkLocales(locales) {
-    const tags = Array.isArray(locales) ? locales : [locales];
+    const tags = builtins.isArray(locales) ? locales : [locales];
     for (let i = 0; i < tags.length; i++) {
       if (tags[i] === undefined) continue;
-      const tag = String(tags[i]);
-      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
-      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+      const tag = builtins.string(tags[i]);
+      const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
+      if (!builtins.test(LANGUAGE_TAG, tag) || new Set(singletons).size !== singletons.length) {
         throw new RangeError("Invalid language tag: " + tag);
       }
     }
@@ -293,17 +296,17 @@
   // rather than answered with English rules.
   function checkLocale(locales, ending) {
     checkLocales(locales);
-    const tag = Array.isArray(locales) ? locales[0] : locales;
+    const tag = builtins.isArray(locales) ? locales[0] : locales;
     if (tag === undefined) return "en-US";
-    if (!ending.test(String(tag))) throw new RangeError("Incorrect locale information provided");
-    return String(tag);
+    if (!builtins.test(ending, builtins.string(tag))) throw new RangeError("Incorrect locale information provided");
+    return builtins.string(tag);
   }
 
   function choose(options, name, allowed, fallback, owner) {
     const given = options[name];
     if (given === undefined) return fallback;
-    const text = String(given);
-    if (allowed.indexOf(text) === -1) {
+    const text = builtins.string(given);
+    if (builtins.indexOfIn(allowed, text) === -1) {
       throw new RangeError("Value " + text + " out of range for Intl." + owner + " options property " + name);
     }
     return text;
@@ -312,7 +315,7 @@
   // The end of a range of numbers, which is refused when it is not one, as Node names it.
   function rangeEnd(value, which) {
     if (value === undefined) throw new TypeError("Invalid " + which + " : undefined");
-    if (Number.isNaN(+value)) throw new RangeError("Invalid " + which + " : NaN");
+    if (builtins.numberIsNaN(+value)) throw new RangeError("Invalid " + which + " : NaN");
   }
 
   class PluralRules {
@@ -329,7 +332,7 @@
       if (given.minimumFractionDigits !== undefined) this.#digits.minimumFractionDigits = given.minimumFractionDigits;
       if (given.maximumFractionDigits !== undefined) this.#digits.maximumFractionDigits = given.maximumFractionDigits;
       // the digits are checked now, as a constructor does
-      Number.prototype.toLocaleString.call(0, "en-US", this.#digits);
+      builtins.numberToLocaleString(0, "en-US", this.#digits);
     }
 
     // English puts every range of numbers in "other", whatever the ends are.
@@ -344,25 +347,25 @@
     select(value) {
       const type = this.#type;
       const number = +value;
-      if (!Number.isFinite(number)) return "other";
+      if (!builtins.numberIsFinite(number)) return "other";
 
       // The digits as they are shown decide the category, so 1.0 is not "one".
-      const shown = Number.prototype.toLocaleString.call(Math.abs(number), "en-US", this.#digits);
-      const point = shown.indexOf(".");
-      const whole = point === -1 ? shown : shown.slice(0, point);
+      const shown = builtins.numberToLocaleString(builtins.abs(number), "en-US", this.#digits);
+      const point = builtins.indexOf(shown, ".");
+      const whole = point === -1 ? shown : builtins.slice(shown, 0, point);
       if (point !== -1) return "other";
       if (type === "cardinal") return whole === "1" ? "one" : "other";
 
-      const last = whole.charCodeAt(whole.length - 1) - 48;
-      const tens = whole.length > 1 ? whole.charCodeAt(whole.length - 2) - 48 : 0;
+      const last = builtins.charCodeAt(whole, whole.length - 1) - 48;
+      const tens = whole.length > 1 ? builtins.charCodeAt(whole, whole.length - 2) - 48 : 0;
       if (tens === 1) return "other";
       return last === 1 ? "one" : last === 2 ? "two" : last === 3 ? "few" : "other";
     }
 
     resolvedOptions() {
       const digits = this.#digits;
-      const min = digits.minimumFractionDigits === undefined ? 0 : Number(digits.minimumFractionDigits);
-      const max = digits.maximumFractionDigits === undefined ? Math.max(3, min) : Number(digits.maximumFractionDigits);
+      const min = digits.minimumFractionDigits === undefined ? 0 : builtins.number(digits.minimumFractionDigits);
+      const max = digits.maximumFractionDigits === undefined ? builtins.max(3, min) : builtins.number(digits.maximumFractionDigits);
       return {
         locale: this.#locale,
         type: this.#type,
@@ -395,7 +398,7 @@
     }
 
     format(list) {
-      return this.#parts(list).map((part) => part.value).join("");
+      return builtins.join(builtins.map(this.#parts(list), (part) => part.value), "");
     }
 
     formatToParts(list) {
@@ -407,14 +410,14 @@
       const items = [];
       if (list !== undefined) {
         for (const item of list) {
-          if (typeof item !== "string") throw new TypeError("Iterable yielded " + String(item) + " which is not a string");
+          if (typeof item !== "string") throw new TypeError("Iterable yielded " + builtins.string(item) + " which is not a string");
           items[items.length] = item;
         }
       }
 
       const parts = [];
-      const element = (value) => parts.push({ type: "element", value });
-      const literal = (value) => parts.push({ type: "literal", value });
+      const element = (value) => builtins.push(parts, { type: "element", value });
+      const literal = (value) => builtins.push(parts, { type: "literal", value });
       if (items.length < 3) {
         if (items.length > 0) element(items[0]);
         if (items.length === 2) {
@@ -470,7 +473,7 @@
     }
 
     format(value, unit) {
-      return this.#parts(value, unit, "format").map((part) => part.value).join("");
+      return builtins.join(builtins.map(this.#parts(value, unit, "format"), (part) => part.value), "");
     }
 
     formatToParts(value, unit) {
@@ -479,20 +482,20 @@
 
     // The errors name the method that was called, as Node does.
     #parts(value, unit, method) {
-      const number = Number(value);
-      const text = String(unit);
-      const name = text.endsWith("s") ? text.slice(0, -1) : text;
-      if (!Object.prototype.hasOwnProperty.call(UNIT_NAMES.long, name)) {
+      const number = builtins.number(value);
+      const text = builtins.string(unit);
+      const name = builtins.endsWith(text, "s") ? builtins.slice(text, 0, -1) : text;
+      if (!builtins.hasOwn(UNIT_NAMES.long, name)) {
         throw new RangeError("Invalid unit argument for Intl.RelativeTimeFormat.prototype." + method + "() '" + text + "'");
       }
-      if (!Number.isFinite(number)) {
+      if (!builtins.numberIsFinite(number)) {
         throw new RangeError("Value need to be finite number for Intl.RelativeTimeFormat.prototype." + method + "()");
       }
 
       const style = this.#style;
       const word = (text) => [{ type: "literal", value: text }];
       if (this.#numeric === "auto" && (number === -1 || number === 0 || number === 1)) {
-        const key = Object.is(number, -0) ? 0 : number;
+        const key = builtins.is(number, -0) ? 0 : number;
         if (name === "day") return word(DAY_WORDS[key]);
         if (name === "second" && key === 0) return word("now");
         if ((name === "minute" || name === "hour") && key === 0) return word("this " + name);
@@ -502,12 +505,12 @@
         }
       }
 
-      const shown = Number.prototype.toLocaleString.call(Math.abs(number), "en-US");
+      const shown = builtins.numberToLocaleString(builtins.abs(number), "en-US");
       const names = UNIT_NAMES[style][name];
       const unitName = typeof names === "string" ? names : names[shown === "1" ? 0 : 1];
-      const amount = numberParts(shown).map((part) => ({ type: part.type, value: part.value, unit: name }));
+      const amount = builtins.map(numberParts(shown), (part) => ({ type: part.type, value: part.value, unit: name }));
       const tail = (style === "narrow" ? "" : " ") + unitName;
-      if (number < 0 || Object.is(number, -0)) return [...amount, { type: "literal", value: tail + " ago" }];
+      if (number < 0 || builtins.is(number, -0)) return [...amount, { type: "literal", value: tail + " ago" }];
       return [{ type: "literal", value: "in " }, ...amount, { type: "literal", value: tail }];
     }
 
@@ -540,15 +543,15 @@
       const granularity = this.#granularity;
       const pattern = new RegExp(SEGMENT_PATTERNS[granularity].source, "gu");
       let match;
-      while ((match = pattern.exec(input)) !== null && match[0] !== "") {
+      while ((match = builtins.exec(pattern, input)) !== null && match[0] !== "") {
         const entry = { segment: match[0], index: match.index, input };
-        if (granularity === "word") entry.isWordLike = /[\p{L}\p{N}]/u.test(match[0]);
+        if (granularity === "word") entry.isWordLike = builtins.test(/[\p{L}\p{N}]/u, match[0]);
         yield entry;
       }
     }
 
     containing(index) {
-      const at = Math.trunc(Number(index)) || 0;
+      const at = builtins.trunc(builtins.number(index)) || 0;
       if (at < 0 || at >= this.#input.length) return undefined;
       for (const entry of this) {
         if (at < entry.index + entry.segment.length) return entry;
@@ -568,7 +571,7 @@
     }
 
     segment(input) {
-      return new Segments(String(input), this.#granularity);
+      return new Segments(builtins.string(input), this.#granularity);
     }
 
     resolvedOptions() {
@@ -576,13 +579,13 @@
     }
   }
 
-  Object.defineProperty(NumberFormat.prototype, Symbol.toStringTag, { value: "Intl.NumberFormat", configurable: true });
-  Object.defineProperty(DateTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.DateTimeFormat", configurable: true });
-  Object.defineProperty(Collator.prototype, Symbol.toStringTag, { value: "Intl.Collator", configurable: true });
-  Object.defineProperty(Segmenter.prototype, Symbol.toStringTag, { value: "Intl.Segmenter", configurable: true });
-  Object.defineProperty(RelativeTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.RelativeTimeFormat", configurable: true });
-  Object.defineProperty(PluralRules.prototype, Symbol.toStringTag, { value: "Intl.PluralRules", configurable: true });
-  Object.defineProperty(ListFormat.prototype, Symbol.toStringTag, { value: "Intl.ListFormat", configurable: true });
+  builtins.defineProperty(NumberFormat.prototype, Symbol.toStringTag, { value: "Intl.NumberFormat", configurable: true });
+  builtins.defineProperty(DateTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.DateTimeFormat", configurable: true });
+  builtins.defineProperty(Collator.prototype, Symbol.toStringTag, { value: "Intl.Collator", configurable: true });
+  builtins.defineProperty(Segmenter.prototype, Symbol.toStringTag, { value: "Intl.Segmenter", configurable: true });
+  builtins.defineProperty(RelativeTimeFormat.prototype, Symbol.toStringTag, { value: "Intl.RelativeTimeFormat", configurable: true });
+  builtins.defineProperty(PluralRules.prototype, Symbol.toStringTag, { value: "Intl.PluralRules", configurable: true });
+  builtins.defineProperty(ListFormat.prototype, Symbol.toStringTag, { value: "Intl.ListFormat", configurable: true });
 
   // Called without new, as the real ones may be
   function callable(Class) {
@@ -902,18 +905,18 @@
     }
 
     of(code) {
-      const text = String(code);
+      const text = builtins.string(code);
       let name;
       if (this.#type === "region") {
-        if (!/^(?:[a-z]{2}|\d{3})$/i.test(text)) throw new RangeError("invalid_argument");
+        if (!builtins.test(/^(?:[a-z]{2}|\d{3})$/i, text)) throw new RangeError("invalid_argument");
         if (this.#style !== "long" && SHORT_REGION_NAMES[text] !== undefined) name = SHORT_REGION_NAMES[text];
         else name = REGION_NAMES[text];
       } else if (this.#type === "currency") {
-        if (!/^[a-z]{3}$/i.test(text)) throw new RangeError("invalid_argument");
-        name = CURRENCY_NAMES[text.toUpperCase()];
+        if (!builtins.test(/^[a-z]{3}$/i, text)) throw new RangeError("invalid_argument");
+        name = CURRENCY_NAMES[builtins.toUpperCase(text)];
       } else {
-        if (!LANGUAGE_TAG.test(text)) throw new RangeError("invalid_argument");
-        if (text.indexOf("-") === -1) name = LANGUAGE_NAMES[text.toLowerCase()];
+        if (!builtins.test(LANGUAGE_TAG, text)) throw new RangeError("invalid_argument");
+        if (builtins.indexOf(text, "-") === -1) name = LANGUAGE_NAMES[builtins.toLowerCase(text)];
       }
       if (name !== undefined) return name;
       return this.#fallback === "none" ? undefined : text;
@@ -926,7 +929,7 @@
     }
   }
 
-  Object.defineProperty(DisplayNames.prototype, Symbol.toStringTag, { value: "Intl.DisplayNames", configurable: true });
+  builtins.defineProperty(DisplayNames.prototype, Symbol.toStringTag, { value: "Intl.DisplayNames", configurable: true });
 
   // A constructor that Node has refuse a call without new
   function requiresNew(Class, name) {
@@ -941,7 +944,7 @@
   }
 
   function titleCase(text) {
-    return text.charAt(0).toUpperCase() + text.slice(1);
+    return builtins.toUpperCase(builtins.charAt(text, 0)) + builtins.slice(text, 1);
   }
 
   // A Unicode extension keeps its attributes sorted and its keywords sorted by
@@ -950,33 +953,33 @@
   function canonicalExtensions(parts) {
     const groups = [];
     for (const part of parts) {
-      if (part.length === 1) groups.push([part]);
-      else groups[groups.length - 1].push(part);
+      if (part.length === 1) builtins.push(groups, [part]);
+      else builtins.push(groups[groups.length - 1], part);
     }
 
-    return groups.flatMap((group) => (group[0] === "u" ? unicodeExtension(group) : group));
+    return builtins.flatMap(groups, (group) => (group[0] === "u" ? unicodeExtension(group) : group));
   }
 
   function unicodeExtension(group) {
     const attributes = [];
     const keywords = [];
     let at = 1;
-    while (at < group.length && group[at].length !== 2) attributes.push(group[at++]);
+    while (at < group.length && group[at].length !== 2) builtins.push(attributes, group[at++]);
     while (at < group.length) {
       const key = group[at++];
       const values = [];
-      while (at < group.length && group[at].length !== 2) values.push(group[at++]);
-      keywords.push([key, values]);
+      while (at < group.length && group[at].length !== 2) builtins.push(values, group[at++]);
+      builtins.push(keywords, [key, values]);
     }
 
     // A keyword whose value is "true" is written without the value.
     for (const keyword of keywords) {
       if (keyword[1].length === 1 && keyword[1][0] === "true") keyword[1] = [];
     }
-    keywords.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-    const unique = keywords.filter((keyword) => keywords.findIndex((other) => other[0] === keyword[0]) === keywords.indexOf(keyword));
+    builtins.sort(keywords, (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const unique = builtins.filter(keywords, (keyword) => builtins.findIndex(keywords, (other) => other[0] === keyword[0]) === builtins.indexOfIn(keywords, keyword));
 
-    return ["u", ...[...new Set(attributes)].sort(), ...unique.flatMap(([key, values]) => [key, ...values])];
+    return ["u", ...builtins.sort([...new Set(attributes)]), ...builtins.flatMap(unique, ([key, values]) => [key, ...values])];
   }
 
   class Locale {
@@ -987,46 +990,46 @@
     #rest;
 
     constructor(tag, options) {
-      if (tag === undefined || String(tag) === "") {
+      if (tag === undefined || builtins.string(tag) === "") {
         throw tag === undefined
           ? new TypeError("First argument to Intl.Locale constructor can't be empty or missing")
           : new RangeError("First argument to Intl.Locale constructor can't be empty or missing");
       }
-      const text = String(tag);
-      const singletons = text.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
-      if (!LANGUAGE_TAG.test(text) || new Set(singletons).size !== singletons.length) {
+      const text = builtins.string(tag);
+      const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(text), "-x-")[0], "-"), (subtag) => subtag.length === 1);
+      if (!builtins.test(LANGUAGE_TAG, text) || new Set(singletons).size !== singletons.length) {
         throw new RangeError("Incorrect locale information provided");
       }
       if (options === null) throw new TypeError("Intl.Locale called on null or undefined");
       const given = options === undefined ? {} : Object(options);
 
-      const parts = text.toLowerCase().split("-");
+      const parts = builtins.split(builtins.toLowerCase(text), "-");
       let at = 1;
       let script;
       let region;
-      if (/^[a-z]{4}$/.test(parts[at] || "")) script = titleCase(parts[at++]);
-      if (/^(?:[a-z]{2}|\d{3})$/.test(parts[at] || "")) region = parts[at++].toUpperCase();
+      if (builtins.test(/^[a-z]{4}$/, parts[at] || "")) script = titleCase(parts[at++]);
+      if (builtins.test(/^(?:[a-z]{2}|\d{3})$/, parts[at] || "")) region = builtins.toUpperCase(parts[at++]);
       const variants = [];
-      while (at < parts.length && parts[at].length !== 1) variants.push(parts[at++]);
-      const rest = parts.slice(at);
+      while (at < parts.length && parts[at].length !== 1) builtins.push(variants, parts[at++]);
+      const rest = builtins.sliceOf(parts, at);
 
       this.#language = parts[0];
       this.#script = script;
       this.#region = region;
-      this.#variants = variants.sort();
+      this.#variants = builtins.sort(variants);
       this.#rest = canonicalExtensions(rest);
       if (given.language !== undefined) {
-        const language = String(given.language).toLowerCase();
-        if (!/^(?:[a-z]{2,3}|[a-z]{5,8})$/.test(language)) throw new RangeError("Incorrect locale information provided");
+        const language = builtins.toLowerCase(builtins.string(given.language));
+        if (!builtins.test(/^(?:[a-z]{2,3}|[a-z]{5,8})$/, language)) throw new RangeError("Incorrect locale information provided");
         this.#language = language;
       }
       if (given.script !== undefined) {
-        if (!/^[a-z]{4}$/i.test(String(given.script))) throw new RangeError("Incorrect locale information provided");
-        this.#script = titleCase(String(given.script).toLowerCase());
+        if (!builtins.test(/^[a-z]{4}$/i, builtins.string(given.script))) throw new RangeError("Incorrect locale information provided");
+        this.#script = titleCase(builtins.toLowerCase(builtins.string(given.script)));
       }
       if (given.region !== undefined) {
-        if (!/^(?:[a-z]{2}|\d{3})$/i.test(String(given.region))) throw new RangeError("Incorrect locale information provided");
-        this.#region = String(given.region).toUpperCase();
+        if (!builtins.test(/^(?:[a-z]{2}|\d{3})$/i, builtins.string(given.region))) throw new RangeError("Incorrect locale information provided");
+        this.#region = builtins.toUpperCase(builtins.string(given.region));
       }
     }
 
@@ -1043,22 +1046,22 @@
     }
 
     get baseName() {
-      return this.#baseParts().join("-");
+      return builtins.join(this.#baseParts(), "-");
     }
 
     toString() {
-      return this.#baseParts().concat(this.#rest).join("-");
+      return builtins.join(builtins.concat(this.#baseParts(), this.#rest), "-");
     }
 
     #baseParts() {
       const parts = [this.#language];
-      if (this.#script !== undefined) parts.push(this.#script);
-      if (this.#region !== undefined) parts.push(this.#region);
-      return parts.concat(this.#variants);
+      if (this.#script !== undefined) builtins.push(parts, this.#script);
+      if (this.#region !== undefined) builtins.push(parts, this.#region);
+      return builtins.concat(parts, this.#variants);
     }
   }
 
-  Object.defineProperty(Locale.prototype, Symbol.toStringTag, { value: "Intl.Locale", configurable: true });
+  builtins.defineProperty(Locale.prototype, Symbol.toStringTag, { value: "Intl.Locale", configurable: true });
 
   // What Intl.supportedValuesOf lists, as Node 26.13 lists it
   const SUPPORTED_VALUES = {
@@ -1196,14 +1199,14 @@
   };
 
   function supportedValuesOf(key) {
-    const name = String(key);
-    if (!Object.prototype.hasOwnProperty.call(SUPPORTED_VALUES, name)) throw new RangeError("Invalid key : " + name);
-    return SUPPORTED_VALUES[name].slice();
+    const name = builtins.string(key);
+    if (!builtins.hasOwn(SUPPORTED_VALUES, name)) throw new RangeError("Invalid key : " + name);
+    return builtins.sliceOf(SUPPORTED_VALUES[name]);
   }
 
   function canonicalTag(text) {
-    const singletons = text.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
-    if (!LANGUAGE_TAG.test(text) || new Set(singletons).size !== singletons.length) {
+    const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(text), "-x-")[0], "-"), (subtag) => subtag.length === 1);
+    if (!builtins.test(LANGUAGE_TAG, text) || new Set(singletons).size !== singletons.length) {
       throw new RangeError("Invalid language tag: " + text);
     }
     return new Locale(text).toString();
@@ -1216,14 +1219,14 @@
     const list = typeof locales === "string" || locales instanceof Locale ? [locales] : Object(locales);
 
     const found = new Set();
-    const length = Number(list.length) || 0;
+    const length = builtins.number(list.length) || 0;
     for (let i = 0; i < length; i++) {
       if (!(i in list)) continue;
       const item = list[i];
       if (item === null || (typeof item !== "string" && typeof item !== "object" && typeof item !== "function")) {
         throw new TypeError("Language ID should be string or object.");
       }
-      found.add(canonicalTag(String(item)));
+      builtins.setAdd(found, canonicalTag(builtins.string(item)));
     }
 
     return [...found];
@@ -1241,7 +1244,7 @@
   define(Intl, "Locale", requiresNew(Locale, "Locale"));
   define(Intl, "supportedValuesOf", supportedValuesOf);
   define(Intl, "getCanonicalLocales", getCanonicalLocales);
-  Object.defineProperty(Intl, Symbol.toStringTag, { value: "Intl", configurable: true });
+  builtins.defineProperty(Intl, Symbol.toStringTag, { value: "Intl", configurable: true });
 
   return { Intl };
 })

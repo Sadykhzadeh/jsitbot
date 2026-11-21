@@ -2065,6 +2065,10 @@
     splice: arraySplice,
     concat: uncurry(Array.prototype.concat),
     includesIn: uncurry(Array.prototype.includes),
+    sort: uncurry(Array.prototype.sort),
+    some: uncurry(Array.prototype.some),
+    findIndex: uncurry(Array.prototype.findIndex),
+    flatMap: uncurry(Array.prototype.flatMap),
     isArray,
     from: toCharacters,
     keys: getKeys,
@@ -2087,13 +2091,18 @@
     number: Number,
     string: String,
     boolean: Boolean,
+    numberIsFinite: Number.isFinite,
+    numberIsNaN: Number.isNaN,
     parseInteger,
     parseDecimal,
     mapGet: uncurry(Map.prototype.get),
     mapSet: uncurry(Map.prototype.set),
+    setAdd: uncurry(Set.prototype.add),
     Map,
     Set,
     Date,
+    dateNow: Date.now,
+    getTime: uncurry(Date.prototype.getTime),
     RegExp,
   };
   const hostFunctions = {
@@ -2348,6 +2357,14 @@
   lazyMethod("number", BigInt.prototype, "toLocaleString");
   lazyMethod("arrays", Array.prototype, "join");
   lazyMethod("arrays", Array.prototype, "toLocaleString");
+  // The formatters the extras install are read once they are in place, so these
+  // reach the extras and not the engine's own methods.
+  captured.localeCompare = uncurry(String.prototype.localeCompare);
+  captured.numberToLocaleString = uncurry(Number.prototype.toLocaleString);
+  captured.bigintToLocaleString = uncurry(BigInt.prototype.toLocaleString);
+  captured.dateToLocaleString = uncurry(Date.prototype.toLocaleString);
+  captured.dateToLocaleDateString = uncurry(Date.prototype.toLocaleDateString);
+  captured.dateToLocaleTimeString = uncurry(Date.prototype.toLocaleTimeString);
   lazyGlobals("clone", ["structuredClone"]);
   lazyGlobals("proxy", ["Proxy"]);
   lazyGlobals("digest", []);

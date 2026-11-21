@@ -90,6 +90,44 @@ describe("tampering with built-ins", () => {
     `)).toBe("Jan 01, 1970, 12:00:00.000 AM");
   });
 
+  test("the Intl extra keeps working after its prototypes are replaced", async () => {
+    expect(await value(`
+      Array.prototype.join = () => "J";
+      Array.prototype.push = () => 0;
+      Array.prototype.map = () => [];
+      Array.prototype.filter = () => [];
+      Array.prototype.some = () => false;
+      Array.prototype.slice = () => [];
+      String.prototype.slice = () => "hijacked";
+      String.prototype.split = () => ["hijacked"];
+      String.prototype.toLowerCase = () => "hijacked";
+      String.prototype.toUpperCase = () => "hijacked";
+      String.prototype.indexOf = () => -1;
+      String.prototype.charCodeAt = () => 0;
+      String.prototype.endsWith = () => false;
+      String.prototype.startsWith = () => false;
+      RegExp.prototype.test = () => false;
+      Math.abs = () => -1;
+      Math.max = () => -1;
+      Math.min = () => -1;
+      Object.prototype.hasOwnProperty = () => false;
+      Set.prototype.add = function () { return this; };
+      return new Intl.ListFormat("en").format(["a", "b", "c"]) + "|" +
+        new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(1234.5) + "|" +
+        new Intl.NumberFormat("en-US").formatToParts(-1234.5).length + "|" +
+        new Intl.PluralRules("en", { type: "ordinal" }).select(22) + "|" +
+        new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(-1, "day") + "|" +
+        new Intl.RelativeTimeFormat("en").format(3, "hours") + "|" +
+        new Intl.Collator("en").compare("a", "B") + "|" +
+        new Intl.DateTimeFormat("en-US", { timeZone: "UTC" }).format(new Date(0)) + "|" +
+        [...new Intl.Segmenter("en", { granularity: "word" }).segment("hi there")].length + "|" +
+        new Intl.Locale("en-Latn-US").toString() + "|" +
+        new Intl.DisplayNames("en", { type: "region" }).of("US") + "|" +
+        Intl.getCanonicalLocales("EN-us")[0] + "|" +
+        new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).resolvedOptions().maximumFractionDigits;
+    `)).toBe("a, b, and c|$1,234.50|6|two|yesterday|in 3 hours|-1|1/1/1970|3|en-Latn-US|United States|en-US|2");
+  });
+
   test("structuredClone keeps its properties after Object.keys is replaced", async () => {
     expect(await value(`
       Object.keys = () => [];
