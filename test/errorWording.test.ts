@@ -40,6 +40,9 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ["a method of this", `class K { m() { this.zz() } } new K().m()`, "TypeError: this.zz is not a function"],
     ["a method awaited at the top", `const q = {}; await q.later()`, "TypeError: q.later is not a function"],
     ["a method on a later line", `const ok = 1;\nconst o = {};\n  o.run()`, "TypeError: o.run is not a function"],
+    ["an assignment to a const", `const c = 1; c = 2`, "TypeError: Assignment to constant variable."],
+    ["an update of a const", `const n = 1; n++`, "TypeError: Assignment to constant variable."],
+    ["a compound assignment to a const on a later line", `const total = 0;\nfor (const v of [1]) total += v`, "TypeError: Assignment to constant variable."],
     ["a method in a type-annotated snippet", `const o: any = {}; o.method(1 as number)`, "TypeError: o.method is not a function"],
   ];
 
@@ -77,7 +80,6 @@ describe("errors the engine throws are worded the way Node words them", () => {
   });
 
   test("leaves the messages it cannot improve as they are", async () => {
-    expect(await failure(`const c = 1; c = 2`)).toBe("TypeError: 'c' is read-only");
     expect(await failure(`throw new RangeError("out of range")`)).toBe("RangeError: out of range");
   });
 });
