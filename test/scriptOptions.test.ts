@@ -40,4 +40,14 @@ describe("the options of the benchmark and the soak test", () => {
     expect(latency.code).toBe(2);
     expect(latency.output).toContain('--latency must be a whole number of at least 0, not "0.5"');
   });
+
+  test("bench and soak refuse an argument they do not know, so a typo is not ignored", async () => {
+    const bench = await run("bench.ts", ["--runs", "5"]);
+    expect(bench.code).toBe(2);
+    expect(bench.output).toContain('Unknown argument "--runs". The only option is --runs=<count>');
+
+    const soak = await run("soak.ts", ["--starts", "1", "--limt=30"]);
+    expect(soak.code).toBe(2);
+    expect(soak.output).toContain('Unknown argument "--starts". Options take a value after an equals sign');
+  });
 });

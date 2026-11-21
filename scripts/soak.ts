@@ -21,6 +21,14 @@ function option(name: string, fallback: number, min: number): number {
   return value;
 }
 
+const OPTIONS = ["starts", "messages", "latency", "limit", "users"];
+for (const argument of process.argv.slice(2)) {
+  if (!OPTIONS.some((name) => argument.startsWith(`--${name}=`))) {
+    console.error(`Unknown argument "${argument}". Options take a value after an equals sign: ${OPTIONS.map((name) => `--${name}=`).join(", ")}`);
+    process.exit(2);
+  }
+}
+
 const STARTS = option("starts", 7, 1);
 const MESSAGES = option("messages", 300, 1);
 const LATENCY_MS = option("latency", 30, 0);

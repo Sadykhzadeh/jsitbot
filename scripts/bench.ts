@@ -26,6 +26,12 @@ const PROGRAMS: Array<[string, string]> = [
   ["typescript", `interface Point { x: number; y: number }\nconst p: Point = { x: 1, y: 2 };\nconst len = (q: Point): number => Math.hypot(q.x, q.y);\nlen(p)`],
 ];
 
+for (const unknown of process.argv.slice(2)) {
+  if (!unknown.startsWith("--runs=")) {
+    console.error(`Unknown argument "${unknown}". The only option is --runs=<count>`);
+    process.exit(2);
+  }
+}
 const argument = process.argv.find((a) => a.startsWith("--runs="));
 const runsText = argument ? argument.slice("--runs=".length) : "150";
 const RUNS = Number(runsText);

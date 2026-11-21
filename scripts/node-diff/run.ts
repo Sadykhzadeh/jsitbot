@@ -12,6 +12,12 @@ import { QuickJsSandboxService } from "../../src/services/sandbox/quickjsSandbox
 const here = import.meta.dir;
 const corpusDir = join(here, "corpus");
 const oracle = join(here, "node-oracle.mjs");
+for (const unknown of process.argv.slice(2)) {
+  if (unknown !== "--verbose") {
+    console.error(`Unknown argument "${unknown}". The only option is --verbose`);
+    process.exit(2);
+  }
+}
 const verbose = process.argv.includes("--verbose");
 
 // On Windows, a Node that lives in WSL is named as wsl:<path inside WSL>, and

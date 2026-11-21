@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
-async function runCompat(nodePath: string | undefined, temp?: string) {
+async function runCompat(nodePath: string | undefined, temp?: string, args: string[] = []) {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && key !== "NODE26" && key !== "TMPDIR") {
@@ -20,7 +20,7 @@ async function runCompat(nodePath: string | undefined, temp?: string) {
     env.TMPDIR = temp;
   }
 
-  const run = Bun.spawn([process.execPath, "run", "scripts/node-diff/run.ts"], {
+  const run = Bun.spawn([process.execPath, "run", "scripts/node-diff/run.ts", ...args], {
     cwd: root,
     env,
     stdout: "pipe",
@@ -66,5 +66,12 @@ describe("the Node comparison script", () => {
     } finally {
       rmSync(temp, { recursive: true, force: true });
     }
+  });
+
+  test("refuses an argument it does not know before it asks for NODE26", async () => {
+    const run = await runCompat(undefined, undefined, ["--verbos"]);
+
+    expect(run.code).toBe(2);
+    expect(run.output).toContain('Unknown argument "--verbos". The only option is --verbose');
   });
 });
