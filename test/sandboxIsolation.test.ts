@@ -157,6 +157,18 @@ describe("tampering with built-ins", () => {
     `)).toBe("[ 'hi', 'utf-16le', 'aGk=', 'hi' ]");
   });
 
+  test("TextEncoder and streamed TextDecoder keep working after typed array methods are replaced", async () => {
+    expect(await value(`
+      Uint8Array.prototype.slice = () => new Uint8Array(0);
+      Uint8Array.prototype.set = () => {};
+      const decoder = new TextDecoder();
+      return [
+        new TextEncoder().encode("hi").length,
+        decoder.decode(new Uint8Array([0xe2, 0x82]), { stream: true }) + decoder.decode(new Uint8Array([0xac])),
+      ];
+    `)).toBe("[ 2, '€' ]");
+  });
+
   test("the event extra keeps working after Array, Map and Math methods are replaced", async () => {
     expect(await value(`
       Array.prototype.slice = () => [];

@@ -2112,6 +2112,7 @@
     setAdd: uncurry(Set.prototype.add),
     typedArrayFrom: Uint8Array.from.bind(Uint8Array),
     typedArrayOf: Uint8Array.of.bind(Uint8Array),
+    typedArraySlice: uncurry(Uint8Array.prototype.slice),
     typedArraySet: uncurry(Uint8Array.prototype.set),
     typedArraySubarray: uncurry(Uint8Array.prototype.subarray),
     dataViewGetBigInt64: uncurry(DataView.prototype.getBigInt64),

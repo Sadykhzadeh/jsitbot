@@ -78,7 +78,7 @@
     const bytes = new Uint8Array(text.length * 3);
     const { written } = encode(text, bytes, bytes.length);
 
-    return bytes.slice(0, written);
+    return builtins.typedArraySlice(bytes, 0, written);
   }
 
   class TextEncoder {
@@ -170,7 +170,7 @@
           let complete = true;
           for (let seen = 0; seen < needed; seen++) {
             if (i >= bytes.length && stream) {
-              rest = bytes.slice(start);
+              rest = builtins.typedArraySlice(bytes, start);
               break;
             }
             if (i >= bytes.length || bytes[i] < lower || bytes[i] > upper) {
@@ -220,7 +220,7 @@
       if (unit >= 0xd800 && unit <= 0xdbff) {
         if (i + 3 >= bytes.length) {
           if (stream) {
-            rest = bytes.slice(i);
+            rest = builtins.typedArraySlice(bytes, i);
             break;
           }
           i += 2;
@@ -245,7 +245,7 @@
     }
 
     if (!rest && i < bytes.length) {
-      if (stream) rest = bytes.slice(i);
+      if (stream) rest = builtins.typedArraySlice(bytes, i);
       else invalid();
     }
 
@@ -330,8 +330,8 @@
       const stream = Boolean(options && options.stream);
       if (this.#pending) {
         const joined = new Uint8Array(this.#pending.length + bytes.length);
-        joined.set(this.#pending);
-        joined.set(bytes, this.#pending.length);
+        builtins.typedArraySet(joined, this.#pending);
+        builtins.typedArraySet(joined, bytes, this.#pending.length);
         bytes = joined;
       }
 
