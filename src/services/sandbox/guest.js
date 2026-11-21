@@ -467,115 +467,15 @@
   function setSource(code) {
     sourceText = code;
   }
-  const NOT_A_FUNCTION = "not a function";
-  const NOT_A_CONSTRUCTOR = " is not a constructor";
-  const NOT_ITERABLE = "value is not iterable";
-  const LOOP_OF = /\bfor\s*(?:await\s*)?\([^)]*?\bof\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\)/g;
-  const CALLEE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
-  const KEYWORD = /^(?:await|yield|return|typeof|void|delete|new|throw|in|of|instanceof)$/;
-  const CALLEE_CHARACTER = /[\w$.]/;
-  const toCharacters = Array.from;
-  const READ_ONLY = "' is read-only";
-  const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 
-  function lineOf(text, number) {
-    let start = 0;
-    for (let i = 1; i < number; i++) {
-      const next = stringIndexOf(text, "\n", start);
-      if (next === -1) return undefined;
-      start = next + 1;
-    }
-    const end = stringIndexOf(text, "\n", start);
-    return end === -1 ? stringSlice(text, start) : stringSlice(text, start, end);
-  }
-
-  // The code line an error was thrown from, and the column it was thrown at (0 when the
-  // stack does not give one). Undefined when the stack does not say, or when the error
-  // was thrown by a built-in, whose frame comes first.
-  function thrownFrom(error) {
-    try {
-      const stack = error.stack;
-      if (typeof stack !== "string") return undefined;
-      const end = stringIndexOf(stack, "\n");
-      if (stringIndexOf(end === -1 ? stack : stringSlice(stack, 0, end), "(native)") !== -1) return undefined;
-
-      const where = whereOf(error);
-      const colon = stringIndexOf(where, ":");
-      const line = +(colon === -1 ? where : stringSlice(where, 0, colon));
-      if (!(line >= 1)) return undefined;
-
-      const text = lineOf(sourceText, line);
-      if (text === undefined) return undefined;
-      return { text, column: colon === -1 ? 0 : +stringSlice(where, colon + 1) };
-    } catch (ignored) {
-      return undefined;
-    }
-  }
-
-  // What a call tried to call, as Node names it: "obj.run is not a function", or
-  // "obj.Run is not a constructor" after new. The engine does not say, so the name is
-  // read from the code at the place the call was thrown from: a "(" after a plain
-  // name or a chain of them.
-  function calleeWording(error) {
-    const from = thrownFrom(error);
-    if (from === undefined || !(from.column >= 1)) return undefined;
-    const characters = toCharacters(from.text);
-    const at = from.column - 1;
-    if (characters[at] !== "(") return undefined;
-
-    let start = at;
-    while (start > 0 && CALLEE_CHARACTER.test(characters[start - 1])) start--;
-    let callee = "";
-    for (let i = start; i < at; i++) callee += characters[i];
-    if (!CALLEE.test(callee) || KEYWORD.test(callee)) return undefined;
-
-    let before = start;
-    while (before > 0 && characters[before - 1] === " ") before--;
-    const constructs = before >= 3 && characters[before - 3] + characters[before - 2] + characters[before - 1] === "new" && (before === 3 || !CALLEE_CHARACTER.test(characters[before - 4]));
-
-    return callee + (constructs ? NOT_A_CONSTRUCTOR : " is not a function");
-  }
-
-  // The engine names an assignment to a const as a read-only name, which a frozen
-  // property gives too in strict code. The name is a constant when the line the error
-  // was thrown from assigns it, and it is not a property of something.
-  function isConstAssignment(error, name) {
-    const from = thrownFrom(error);
-    if (from === undefined) return false;
-    return new NativeRegExp("(?:^|[^\\w$.])" + name.split("$").join("\\$") + "\\s*(?:\\+\\+|--|(?:\\*\\*|<<|>>>|>>|&&|\\|\\||\\?\\?|[-+*/%&|^])?=(?!=))").test(from.text);
-  }
-
-  // The name a "'name' is read-only" message gives, or undefined for any other message.
-  function readOnlyName(message) {
-    if (!startsWith(message, "'") || !endsWith(message, READ_ONLY)) return undefined;
-    const name = stringSlice(message, 1, message.length - READ_ONLY.length);
-    return IDENTIFIER.test(name) ? name : undefined;
-  }
-
-  // What a for-of loop on the line of an error iterates, when the line has one such loop
-  // over a name or a chain of names: "obj" for for (const x of obj).
-  function iteratedName(error) {
-    const from = thrownFrom(error);
-    if (from === undefined) return undefined;
-    const loops = [...from.text.matchAll(LOOP_OF)];
-    return loops.length === 1 ? loops[0][1] : undefined;
-  }
-
-  // The message of an error as Node words it. The engine's stays where Node has no
-  // rule for it, and the names of the callee and of the constant come from the code.
+  // The names that Node gives an error from the code it was thrown from are in an extra,
+  // which is loaded for the errors that take one.
+  let codeWording;
   function wordingOf(error, name, message) {
-    if (name === "TypeError") {
-      if (message === NOT_A_FUNCTION || message === NOT_A_CONSTRUCTOR) {
-        const named = calleeWording(error);
-        if (named !== undefined) return named;
-        if (message === NOT_A_CONSTRUCTOR) return "(intermediate value)" + message;
-      }
-      if (message === NOT_ITERABLE) {
-        const iterated = iteratedName(error);
-        if (iterated !== undefined) return iterated + " is not iterable";
-      }
-      const constant = readOnlyName(message);
-      if (constant !== undefined && isConstAssignment(error, constant)) return "Assignment to constant variable.";
+    if (name === "TypeError" && (message === "not a function" || message === " is not a constructor" || message === "value is not iterable" || endsWith(message, "' is read-only"))) {
+      if (codeWording === undefined) codeWording = indirectEval(loadExtra("wording"))(registerInspector, [seed0, seed1, seed2, seed3], { where: whereOf, source: () => sourceText });
+      const named = codeWording(error, message);
+      if (named !== undefined) return named;
     }
     return nodeWording(name, message);
   }
