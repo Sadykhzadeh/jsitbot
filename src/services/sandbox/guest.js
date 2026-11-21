@@ -469,6 +469,8 @@
   }
   const NOT_A_FUNCTION = "not a function";
   const NOT_A_CONSTRUCTOR = " is not a constructor";
+  const NOT_ITERABLE = "value is not iterable";
+  const LOOP_OF = /\bfor\s*(?:await\s*)?\([^)]*?\bof\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\)/g;
   const CALLEE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
   const KEYWORD = /^(?:await|yield|return|typeof|void|delete|new|throw|in|of|instanceof)$/;
   const CALLEE_CHARACTER = /[\w$.]/;
@@ -550,6 +552,15 @@
     return IDENTIFIER.test(name) ? name : undefined;
   }
 
+  // What a for-of loop on the line of an error iterates, when the line has one such loop
+  // over a name or a chain of names: "obj" for for (const x of obj).
+  function iteratedName(error) {
+    const from = thrownFrom(error);
+    if (from === undefined) return undefined;
+    const loops = [...from.text.matchAll(LOOP_OF)];
+    return loops.length === 1 ? loops[0][1] : undefined;
+  }
+
   // The message of an error as Node words it. The engine's stays where Node has no
   // rule for it, and the names of the callee and of the constant come from the code.
   function wordingOf(error, name, message) {
@@ -558,6 +569,10 @@
         const named = calleeWording(error);
         if (named !== undefined) return named;
         if (message === NOT_A_CONSTRUCTOR) return "(intermediate value)" + message;
+      }
+      if (message === NOT_ITERABLE) {
+        const iterated = iteratedName(error);
+        if (iterated !== undefined) return iterated + " is not iterable";
       }
       const constant = readOnlyName(message);
       if (constant !== undefined && isConstAssignment(error, constant)) return "Assignment to constant variable.";

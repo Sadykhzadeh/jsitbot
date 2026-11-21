@@ -31,6 +31,8 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ["reduce of an empty array", `[].reduce((a, b) => a + b)`, "TypeError: Reduce of empty array with no initial value"],
     ["reduceRight of an empty array", `[].reduceRight((a, b) => a + b)`, "TypeError: Reduce of empty array with no initial value"],
     ["an array of a length that cannot be", `new Array(-1)`, "RangeError: Invalid array length"],
+    ["a for-of loop over an object", `const obj = { a: 1 }; for (const x of obj) {}`, "TypeError: obj is not iterable"],
+    ["a for-of loop over a method that is not called", `const m = new Map(); for (const e of m.entries) {}`, "TypeError: m.entries is not iterable"],
     ["a date that is not a date", `new Date("nope").toISOString()`, "RangeError: Invalid time value"],
     ["a bad escape in a URI", `decodeURIComponent("%")`, "URIError: URI malformed"],
     ["a bad byte in a URI", `decodeURI("%C0%80")`, "URIError: URI malformed"],
