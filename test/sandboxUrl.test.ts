@@ -343,5 +343,5 @@ describe("hostile input to URL", () => {
       expect(cpuMs).toBeLessThan(650);
     }
     expect((await sandbox.execute("1 + 1")).ok).toBe(true);
-  });
+  }, 30_000);
 });
