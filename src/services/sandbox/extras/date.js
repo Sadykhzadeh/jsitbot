@@ -160,8 +160,14 @@
       if (needDefaults && cycle === "h11") cycle = "h12";
     }
 
+    // The fraction is written in the place of the seconds, and it comes with them
+    // when there is a minute. With an hour the engines write it in a form that is not
+    // worth imitating, so that is left to the engine.
+    if (f.fractionalSecondDigits !== undefined && f.second === undefined) {
+      if (f.hour !== undefined) return null;
+      if (f.minute !== undefined) f.second = "numeric";
+    }
     // What the engine's formats have no sensible form for
-    if (f.fractionalSecondDigits !== undefined && f.second === undefined) return null;
     if (f.second !== undefined && f.hour !== undefined && f.minute === undefined) return null;
     if (f.day !== undefined && f.month === undefined && f.year !== undefined) return null;
     if (f.month === "narrow" && (f.weekday !== undefined || f.day !== undefined || f.year !== undefined)) return null;
@@ -249,8 +255,8 @@
       add(type, value);
     });
 
-    if (f.second !== undefined && f.fractionalSecondDigits !== undefined) {
-      add("literal", ".");
+    if (f.fractionalSecondDigits !== undefined && (f.second !== undefined || fields.length === 0)) {
+      if (fields.length > 0) add("literal", ".");
       add("fractionalSecond", String(c.milliseconds + 1000).slice(1, 1 + f.fractionalSecondDigits));
     }
     if (twelve && f.hour !== undefined) {
@@ -312,7 +318,7 @@
     if (c.year < 1 || c.year > 9999) return undefined;
 
     const dateParts = has(f, DATE_FIELDS) ? datePart(f, c) : [];
-    const timeParts = has(f, ["hour", "minute", "second"])
+    const timeParts = has(f, ["hour", "minute", "second", "fractionalSecondDigits"])
       ? timePart(f, c, cycle, zoneText)
       : f.timeZoneName !== undefined ? [{ type: "timeZoneName", value: zoneText }] : [];
     if (dateParts.length === 0 || timeParts.length === 0) return dateParts.concat(timeParts);

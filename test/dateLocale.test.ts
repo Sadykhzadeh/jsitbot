@@ -226,6 +226,9 @@ const CASES: Case[] = [
   [1704413229045, "toLocaleTimeString", {"hour":"numeric","hourCycle":"h11"}, "0 AM"],
   [1703516645006, "toLocaleString", {"hourCycle":"h11","timeZone":"America/New_York"}, "12/25/2023, 10:04:05 AM"],
   [1703516645006, "toLocaleTimeString", {"hour":"numeric","minute":"2-digit","hourCycle":"h11"}, "3:04 PM"],
+  [1703516645006, "toLocaleTimeString", {"fractionalSecondDigits":3}, "006"],
+  [1703516645006, "toLocaleTimeString", {"minute":"numeric","fractionalSecondDigits":2}, "04:05.00"],
+  [1703516645006, "toLocaleString", {"weekday":"long","fractionalSecondDigits":3}, "Monday, 006"],
 ];
 
 describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () => {
