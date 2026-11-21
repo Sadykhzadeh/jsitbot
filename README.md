@@ -167,7 +167,7 @@ It prints `Bot started as @your_bot_name` once it is polling. Bun loads `.env` o
 
 1. Open [@BotFather](https://t.me/BotFather) in Telegram and send `/newbot`.
 2. Pick a display name, then a username that ends in `bot`.
-3. BotFather replies with a token that looks like `<digits>:<letters and digits>`. Put it in `.env`. Anyone who has the token controls the bot, so do not commit it.
+3. BotFather replies with a token that looks like `<digits>:<letters, digits, _ and ->`. Put it in `.env`. Anyone who has the token controls the bot, so do not commit it.
 4. For inline mode, send `/setinline`, choose your bot and give it a placeholder such as `1 + 1`.
 
 ### Running the checks
@@ -197,7 +197,7 @@ The only setting read from the environment is the token:
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
-| `BOT_TOKEN` | yes | Telegram bot token from @BotFather, as `<digits>:<letters and digits>`. The bot stops at start with a one-line message when it is missing, malformed or refused by Telegram |
+| `BOT_TOKEN` | yes | Telegram bot token from @BotFather, as `<digits>:<letters, digits, _ and ->`. The bot stops at start with a one-line message when it is missing, malformed or refused by Telegram |
 
 Everything else is a constant in the source, so a change to a limit is a code change and goes through review and tests:
 

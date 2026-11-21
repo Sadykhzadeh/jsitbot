@@ -68,7 +68,7 @@ export function loadEnv(source: Record<string, string | undefined>) {
   if (!BOT_TOKEN_PATTERN.test(botToken)) {
     throw new ConfigError(
       "BOT_TOKEN does not look like a Telegram bot token. " +
-        "It is digits, a colon, then letters and digits, as BotFather sent it.",
+        "It is digits, a colon, then letters, digits, _ and -, as BotFather sent it.",
     );
   }
 
