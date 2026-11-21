@@ -123,8 +123,6 @@
 
     let cycle = hourCycle === undefined ? "h12" : hourCycle;
     if (options.hour12 !== undefined) cycle = options.hour12 ? "h12" : "h23";
-    // the engines write h11 and h24 inconsistently, so they are not imitated
-    if (cycle === "h11") return null;
 
     let glue;
     if (dateStyle !== undefined || timeStyle !== undefined) {
@@ -157,6 +155,9 @@
       if (needDefaults && defaults !== "date") {
         f.hour = f.minute = f.second = "numeric";
       }
+      // With the defaults, Node writes the hour of h11 as h12 does, and a time
+      // that names its hour counts it from 0 to 11.
+      if (needDefaults && cycle === "h11") cycle = "h12";
     }
 
     // What the engine's formats have no sensible form for
@@ -230,10 +231,11 @@
     };
 
     const fields = [];
-    const twelve = cycle === "h12";
+    const twelve = cycle === "h12" || cycle === "h11";
     if (f.hour !== undefined) {
       let hour = c.hours;
       if (cycle === "h12") hour = hour % 12 || 12;
+      else if (cycle === "h11") hour = hour % 12;
       fields[fields.length] = ["hour", !twelve || f.hour === "2-digit" ? pad(hour) : String(hour)];
     }
     if (f.minute !== undefined) {

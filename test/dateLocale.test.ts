@@ -222,6 +222,10 @@ const CASES: Case[] = [
   [1625400000000, "toLocaleString", {"hour12":true,"hour":"numeric","minute":"numeric","hourCycle":"h23"}, "12:00 PM"],
   [1625400000000, "toLocaleString", {"hour":"2-digit","hour12":true}, "12 PM"],
   [1625400000000, "toLocaleString", {"timeZoneName":"short"}, "7/4/2021, 12:00:00 PM UTC"],
+  [1704413229045, "toLocaleTimeString", {"hourCycle":"h11"}, "12:07:09 AM"],
+  [1704413229045, "toLocaleTimeString", {"hour":"numeric","hourCycle":"h11"}, "0 AM"],
+  [1703516645006, "toLocaleString", {"hourCycle":"h11","timeZone":"America/New_York"}, "12/25/2023, 10:04:05 AM"],
+  [1703516645006, "toLocaleTimeString", {"hour":"numeric","minute":"2-digit","hourCycle":"h11"}, "3:04 PM"],
 ];
 
 describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () => {
@@ -386,7 +390,6 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
     for (const call of [
       `new Date(0).toLocaleDateString("de-DE")`,
       `new Date(0).toLocaleDateString("en-US", { era: "short" })`,
-      `new Date(0).toLocaleTimeString("en-US", { hourCycle: "h11" })`,
     ]) {
       expect(await value(`return typeof ${call}`)).toBe("string");
     }
