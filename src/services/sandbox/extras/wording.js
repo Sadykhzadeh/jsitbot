@@ -1,8 +1,9 @@
-// The names Node gives to three errors the engine words without them: the callee
-// of a call that is not a function, the object of a for-of loop that is not
-// iterable, and the constant of an assignment to a const. Evaluated the first time
-// such an error is printed; see wordingOf in guest.js. The names are read from the
-// line of the code the error was thrown from, which the host gave the guest.
+// The names Node gives to some errors that the engine words without them: the callee
+// of a call that is not a function or a constructor, the value that is not iterable,
+// the constant of an assignment to a const, and the null or undefined given to
+// Object.keys and the like. Evaluated the first time such an error is printed; see
+// wordingOf in guest.js. The names are read from the line of the code the error was
+// thrown from, which the host gave the guest.
 (function (register, seed, host) {
   "use strict";
 
@@ -23,6 +24,9 @@
     new RegExp("\\]\\s*=\\s*" + NAME + "(?![\\w$.(\\[])", "g"),
   ];
   const NOT_ITERABLE_READ = "cannot read property 'Symbol.iterator' of ";
+  const NOT_CONVERTIBLE = "cannot convert to object";
+  const OBJECT_CALL = /\bObject\.\w+\s*\(/;
+  const DESTRUCTURING = /\{[^{}]*\}\s*=(?!=)|\(\s*\{/;
 
   function lineOf(text, number) {
     let start = 0;
@@ -36,14 +40,8 @@
   }
 
   // The code line an error was thrown from, and the column it was thrown at (0 when
-  // the stack does not give one). Undefined when the stack does not say, or when a
-  // built-in threw the error, since its frame comes first.
-  function thrownFrom(error) {
-    const stack = error.stack;
-    if (typeof stack !== "string") return undefined;
-    const end = stack.indexOf("\n");
-    if ((end === -1 ? stack : stack.slice(0, end)).indexOf("(native)") !== -1) return undefined;
-
+  // the stack does not give one). Undefined when the stack does not say.
+  function codeLine(error) {
     const where = host.where(error);
     const colon = where.indexOf(":");
     const line = +(colon === -1 ? where : where.slice(0, colon));
@@ -52,6 +50,16 @@
     const text = lineOf(host.source(), line);
     if (text === undefined) return undefined;
     return { text, column: colon === -1 ? 0 : +where.slice(colon + 1) };
+  }
+
+  // codeLine for an error that a program's own code threw: one a built-in threw has its
+  // frame first, and the place it was thrown from is not in the program.
+  function thrownFrom(error) {
+    const stack = error.stack;
+    if (typeof stack !== "string") return undefined;
+    const end = stack.indexOf("\n");
+    if ((end === -1 ? stack : stack.slice(0, end)).indexOf("(native)") !== -1) return undefined;
+    return codeLine(error);
   }
 
   // What a call tried to call, as Node names it: "obj.run is not a function", or
@@ -123,6 +131,12 @@
         const iterated = iteratedName(error);
         if (iterated !== undefined) return iterated + " is not iterable";
         return message === NOT_ITERABLE ? undefined : message.slice(NOT_ITERABLE_READ.length) + " is not iterable";
+      }
+      if (message === NOT_CONVERTIBLE) {
+        // Only a call of Object.keys and the like on the line, and no destructuring there:
+        // Node words a destructuring by the property it reads.
+        const line = codeLine(error);
+        return line !== undefined && OBJECT_CALL.test(line.text) && !DESTRUCTURING.test(line.text) ? "Cannot convert undefined or null to object" : undefined;
       }
       const constant = readOnlyName(message);
       return constant !== undefined && isConstAssignment(error, constant) ? "Assignment to constant variable." : undefined;
