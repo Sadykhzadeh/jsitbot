@@ -84,6 +84,7 @@ Deliberate differences, with the reason:
 - A promise still pending when the program ends is an error: the sandbox waits for the result of the run.
 - A listener that throws does not stop the run, because events have no event loop behind them.
 - `globalThis` and `console` have the names the sandbox provides, not Node's, and `Atomics` is not provided.
+- `fetch`, `Request`, `Response`, `Headers`, `FormData`, `navigator`, `MessageChannel`, `BroadcastChannel` and `WebAssembly` are not provided, so a program that names them gets a `ReferenceError`: the sandbox has no network and no host APIs.
 - A program that starts with `{ a: 1 }` shows the object, as a REPL does.
 - A lone surrogate in a string printed on its own is written as U+FFFD, so the text sent to Telegram is well-formed; Node escapes it as `\ud83d`. Inside an array or object the sandbox escapes it, as Node does.
 
@@ -99,6 +100,7 @@ Known gaps, not fixed yet:
 - A class instance whose prototype was removed prints as `[Object: null prototype]`; Node names the class it was made by, which the engine does not keep.
 - An async or generator function whose prototype is not the one of its kind is shown as a plain function, where Node names its kind.
 - A rejected promise that nothing handles does not stop the run, where Node stops with the error. The engine does not report such a rejection, so the sandbox only shows it when it is the value of the run; otherwise the run gives its own result, as if the rejection had been handled. An error thrown by a timer does stop the run, as in Node.
+- `Temporal` and `Intl.DurationFormat` are not provided yet. `Math.sumPrecise` is provided, which Node 26 does not have.
 
 ### Running the comparison
 
