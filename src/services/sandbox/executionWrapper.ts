@@ -31,8 +31,13 @@ function compact(source: string): string {
 
 const read = (path: string) => compact(readFileSync(new URL(path, import.meta.url), "utf8"));
 
+let runtimeSource: string | undefined;
+
 /** Source of the runtime that is installed in every context before user code. */
-export const guestRuntimeSource = read("./guest.js");
+export function guestRuntimeSource(): string {
+  runtimeSource ??= read("./guest.js");
+  return runtimeSource;
+}
 
 /**
  * Parts of the guest's environment that most programs never touch. They are not
@@ -40,14 +45,29 @@ export const guestRuntimeSource = read("./guest.js");
  * globals the runtime asks for the source and evaluates it then, so a program
  * that does not use them does not pay for parsing them.
  */
-export const guestExtras: Record<string, string> = Object.fromEntries(
-  ["clone", "encoding", "url", "crypto", "collate", "date", "datestring", "number", "intl", "events", "proxy", "digest", "width", "bytes", "weakref", "buffer", "disposable", "blob", "arrays", "casing"].map((name) => [name, read(`./extras/${name}.js`)]),
-);
+const EXTRA_NAMES = ["clone", "encoding", "url", "crypto", "collate", "date", "datestring", "number", "intl", "events", "proxy", "digest", "width", "bytes", "weakref", "buffer", "disposable", "blob", "arrays", "casing"];
+const extraSources = new Map<string, string>();
 
-// The guest's dates are in the time zone of this process, so that is the zone
-// Intl.DateTimeFormat reports. QuickJS cannot tell the name of it.
-const hostTimeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-guestExtras.intl = `(function (hostTimeZone) { return ${guestExtras.intl}; })(${JSON.stringify(hostTimeZone)})`;
+/** Source of the part called `name`, or undefined for a name that is not one. */
+export function guestExtra(name: string): string | undefined {
+  if (!EXTRA_NAMES.includes(name)) {
+    return undefined;
+  }
+
+  let source = extraSources.get(name);
+  if (source === undefined) {
+    source = read(`./extras/${name}.js`);
+    if (name === "intl") {
+      // The guest's dates are in the time zone of this process, so that is the zone
+      // Intl.DateTimeFormat reports. QuickJS cannot tell the name of it.
+      const hostTimeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      source = `(function (hostTimeZone) { return ${source}; })(${JSON.stringify(hostTimeZone)})`;
+    }
+    extraSources.set(name, source);
+  }
+
+  return source;
+}
 
 // The wrappers add nothing but text on the first line, so line numbers in the
 // user's code are the same inside the wrapper. The newline before the closing

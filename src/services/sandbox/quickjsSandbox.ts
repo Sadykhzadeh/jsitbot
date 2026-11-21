@@ -8,7 +8,7 @@ import type {
 import {
   GUEST_FILE,
   awaitsAtTopLevel,
-  guestExtras,
+  guestExtra,
   guestRuntimeSource,
   opensWithDeclarationAndMore,
   wrapAsExpression,
@@ -566,7 +566,7 @@ export class QuickJsSandboxService implements SandboxService {
   private installGuest(context: QuickJSContext, prepared: Prepared): Guest {
     const { maxLogs, maxLogLength, maxResultLength } = this.options;
 
-    const setup = context.unwrapResult(context.evalCode(guestRuntimeSource, "guest.js"));
+    const setup = context.unwrapResult(context.evalCode(guestRuntimeSource(), "guest.js"));
     const hostLog = context.newFunction("hostLog", (line) => {
       const text = readString(context, line);
       if (text !== undefined && prepared.logs.length < maxLogs) {
@@ -578,7 +578,7 @@ export class QuickJsSandboxService implements SandboxService {
     // Where the guest's random numbers start from. It goes in; nothing comes out.
     const seed = Array.from(crypto.getRandomValues(new Uint32Array(4)));
     const loadExtra = context.newFunction("loadExtra", (name) => {
-      const source = guestExtras[readString(context, name) ?? ""];
+      const source = guestExtra(readString(context, name) ?? "");
       return context.newString(source ?? "");
     });
     // Says whether a promise is settled and with what: [state, value]. The guest

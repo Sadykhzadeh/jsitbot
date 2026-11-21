@@ -217,7 +217,7 @@ console.log("\nwhere a run goes, inside the child (median of 100, a fresh instan
     runtimeAndContext.push(performance.now() - mark);
 
     mark = performance.now();
-    context.unwrapResult(context.evalCode(guestRuntimeSource, "guest.js")).dispose();
+    context.unwrapResult(context.evalCode(guestRuntimeSource(), "guest.js")).dispose();
     guest.push(performance.now() - mark);
 
     mark = performance.now();
