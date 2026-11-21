@@ -105,6 +105,9 @@ export async function downloadTelegramFile(
     if (signal.aborted) {
       throw new FileDownloadError("timeout", `file download timed out after ${timeoutMs} ms`);
     }
+    if (error instanceof GrammyError && /file is too big/i.test(error.description)) {
+      throw new FileDownloadError("too-large", "file is larger than the limit");
+    }
     if (error instanceof GrammyError) {
       throw new FileDownloadError("failed", `getFile failed with ${error.error_code}: ${error.description}`);
     }

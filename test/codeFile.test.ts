@@ -220,13 +220,21 @@ describe("downloadTelegramFile", () => {
     expect((failure as Error).message).not.toContain(TOKEN);
   });
 
-  test("says why Telegram refused to give the file's path", async () => {
+  test("reports a file that Telegram will not give a path for because it is too big as too large", async () => {
     const refused = api(async () => {
       throw new GrammyError("Call failed", { ok: false, error_code: 400, description: "Bad Request: file is too big" }, "getFile", {});
     });
 
+    await expect(downloadTelegramFile(refused, "f", 100)).rejects.toMatchObject({ reason: "too-large" });
+  });
+
+  test("says why Telegram refused to give the file's path", async () => {
+    const refused = api(async () => {
+      throw new GrammyError("Call failed", { ok: false, error_code: 400, description: "Bad Request: wrong file_id" }, "getFile", {});
+    });
+
     await expect(downloadTelegramFile(refused, "f", 100)).rejects.toThrow(
-      "getFile failed with 400: Bad Request: file is too big",
+      "getFile failed with 400: Bad Request: wrong file_id",
     );
   });
 });
