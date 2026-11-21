@@ -195,6 +195,13 @@ describe("characters that cannot cross the boundary as they are", () => {
     expect(await outcome(String.raw`"a\tb\r\nc"`)).toBe("a\tb\r\nc");
   });
 
+  test("C1 control characters are shown, not passed through to Telegram", async () => {
+    expect(await outcome(String.raw`"\x80\x85\x9b\x9f"`)).toBe(String.raw`\x80\x85\x9b\x9f`);
+
+    const logged = await sandbox.execute(String.raw`console.log("a\x9bb"); 1`);
+    expect(logged.logs).toEqual([String.raw`a\x9bb`]);
+  });
+
   test("a lone surrogate becomes one replacement character, a pair is kept", async () => {
     expect(await outcome(String.raw`"a\ud83d" + "b"`)).toBe("a\ufffdb");
     expect(await outcome(String.raw`"\ude00\ud83d\ude00"`)).toBe("\ufffd😀");

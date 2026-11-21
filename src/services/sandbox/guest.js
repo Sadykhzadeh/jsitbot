@@ -236,8 +236,8 @@
       if (c < 32) {
         if (c === 9 || c === 10 || c === 13) continue;
         replacement = "\\x" + hexByte(c);
-      } else if (c === 127) {
-        replacement = "\\x7f";
+      } else if (c >= 127 && c <= 0x9f) {
+        replacement = "\\x" + hexByte(c);
       } else if (c >= 0xd800 && c <= 0xdfff) {
         if (c <= 0xdbff && i + 1 < text.length) {
           const next = stringCharCodeAt(text, i + 1);
