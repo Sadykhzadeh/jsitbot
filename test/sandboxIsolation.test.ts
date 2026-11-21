@@ -90,6 +90,14 @@ describe("tampering with built-ins", () => {
     `)).toBe("Jan 01, 1970, 12:00:00.000 AM");
   });
 
+  test("structuredClone keeps its properties after Object.keys is replaced", async () => {
+    expect(await value(`
+      Object.keys = () => [];
+      Object.prototype.toString = () => "[object Array]";
+      return structuredClone({ a: 1, b: [2, 3] });
+    `)).toBe("{ a: 1, b: [ 2, 3 ] }");
+  });
+
   test("the console cannot be replaced or removed", async () => {
     const result = await sandbox.execute(`
       console.log = () => {};

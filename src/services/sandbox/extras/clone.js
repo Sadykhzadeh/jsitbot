@@ -1,6 +1,6 @@
 // structuredClone, for the guest. Evaluated the first time the code asks for it;
 // see lazyGlobals in guest.js. Returns the globals it defines.
-(function (register, seed, host) {
+(function (register, seed, host, builtins) {
   "use strict";
 
   function cloneError(what) {
@@ -52,16 +52,16 @@
       if (item === null || (typeof item !== "object" && typeof item !== "function")) {
         throw argumentError("transfer in Options[" + index + "] is not an object.", "ERR_INVALID_ARG_TYPE");
       }
-      if (Object.prototype.toString.call(item) !== "[object ArrayBuffer]") {
+      if (builtins.tag(item) !== "[object ArrayBuffer]") {
         throw dataCloneError("Found invalid value in transferList.");
       }
-      if (buffers.indexOf(item) !== -1) {
+      if (builtins.indexOfIn(buffers, item) !== -1) {
         throw dataCloneError("Transfer list contains duplicate ArrayBuffer");
       }
       if (item.detached) {
         throw dataCloneError("Cannot transfer object of unsupported type.");
       }
-      buffers.push(item);
+      builtins.push(buffers, item);
       index++;
     }
     return buffers;
@@ -81,14 +81,14 @@
 
     function copy(source) {
       if (source === null || (typeof source !== "object" && typeof source !== "function")) {
-        if (typeof source === "symbol") throw cloneError(String(source));
+        if (typeof source === "symbol") throw cloneError(builtins.string(source));
         return source;
       }
-      if (typeof source === "function") throw cloneError(String(source));
+      if (typeof source === "function") throw cloneError(builtins.string(source));
       if (seen.has(source)) return seen.get(source);
-      if (host.isProxy(source)) throw cloneError(Array.isArray(source) ? "[object Array]" : "#<Object>");
+      if (host.isProxy(source)) throw cloneError(builtins.isArray(source) ? "[object Array]" : "#<Object>");
 
-      let tag = Object.prototype.toString.call(source);
+      let tag = builtins.tag(source);
       let out;
 
       // A Blob or a File is copied only when it holds data. An object that only claims the tag,
@@ -185,11 +185,11 @@
         return out;
       }
 
-      throw cloneError("#<" + tag.slice(8, -1) + ">");
+      throw cloneError("#<" + builtins.slice(tag, 8, -1) + ">");
     }
 
     function copyProperties(source, out) {
-      const keys = Object.keys(source);
+      const keys = builtins.keys(source);
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
         if (key === "__proto__") {
