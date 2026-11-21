@@ -12,7 +12,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 ## What It Does
 
 - Executes JavaScript from private messages, group chats and inline queries, handling up to 8 updates at a time
-- In a private chat, re-runs a message when you edit it and updates the answer in place, `/run` commands included
+- In a private chat, re-runs a message when you edit it and updates the answer in place, `/run` commands included. The bot remembers recent answers in memory only, so after a restart an edit is answered as a new message
 - In a private chat, sends the whole output as a text file after the answer when it does not fit in one message
 - Returns the value of the last statement, like a REPL, and understands `return` and top-level `await`
 - Accepts TypeScript syntax (the types are stripped)
