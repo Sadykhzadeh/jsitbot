@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { stripCodeFence } from "../src/bot/codeInput";
+import { codeInMessage, stripCodeFence } from "../src/bot/codeInput";
 
 describe("stripCodeFence", () => {
   test("removes a fence with a language name", () => {
@@ -40,5 +40,18 @@ describe("stripCodeFence", () => {
     for (const code of ["1 + 1", "`a${1}`", "console.log(`x`)", "```js\n1 + 1", "x = ```", "// ```\n1"]) {
       expect(stripCodeFence(code)).toBe(code);
     }
+  });
+});
+
+describe("codeInMessage", () => {
+  test("runs the block Telegram marked, and leaves out the text around it", () => {
+    const text = "what is this?\n```js\n6 * 7\n```";
+
+    expect(codeInMessage(text, [{ type: "pre", offset: text.indexOf("6"), length: 5, language: "js" }])).toBe("6 * 7");
+  });
+
+  test("takes the fence off a message without entities, as stripCodeFence does", () => {
+    expect(codeInMessage("```js\n1 + 1\n```", undefined)).toBe("1 + 1");
+    expect(codeInMessage("```js\n1 + 1\n```", [{ type: "bold", offset: 0, length: 3 }])).toBe("1 + 1");
   });
 });

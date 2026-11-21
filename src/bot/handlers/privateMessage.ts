@@ -2,7 +2,7 @@ import { GrammyError, type Api, type Bot } from "grammy";
 import type { Document, ParseMode } from "grammy/types";
 
 import { rateKey, createRunner, type RunnerOptions } from "../runner";
-import { stripCodeFence } from "../codeInput";
+import { codeInMessage } from "../codeInput";
 import { isBotCommand } from "../commands";
 import { formatRejectionMessage } from "../formatters/telegramExecutionMessage";
 import { ReplyTracker, type TrackedReply } from "../replyTracker";
@@ -438,7 +438,7 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       chatId: ctx.chat.id,
       userId: ctx.from.id,
       messageId: ctx.message.message_id,
-      code: stripCodeFence(text),
+      code: codeInMessage(text, ctx.message.entities),
     });
   });
 
@@ -456,7 +456,7 @@ export function registerPrivateMessageHandler(bot: Bot, options: PrivateMessageH
       chatId: ctx.chat.id,
       userId: ctx.from.id,
       messageId: ctx.editedMessage.message_id,
-      code: stripCodeFence(text),
+      code: codeInMessage(text, ctx.editedMessage.entities),
     });
   });
 }

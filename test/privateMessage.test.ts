@@ -289,6 +289,36 @@ describe("code in a fence", () => {
     expect(reply.payload.text).not.toContain("not a function");
   });
 
+  test("runs the block Telegram marked in a message with text around it, and in an edit", async () => {
+    const harness = createHarness();
+    const block = "const n = 20;\nn + 22";
+    const text = `Why does this print 42?\n\`\`\`\n${block}\n\`\`\`\nThanks`;
+    const from = { id: USER_ID, is_bot: false, first_name: "Tester" };
+    const chat = { id: USER_ID, type: "private" as const, first_name: "Tester" };
+    const entities = [{ type: "pre" as const, offset: text.indexOf(block), length: block.length }];
+
+    await harness.bot.handleUpdate({ update_id: 601, message: { message_id: 4, date: 0, chat, from, text, entities } });
+    const edited = "const n = 20;\nn + 23";
+    const editedText = `Why does this print 43?\n\`\`\`\n${edited}\n\`\`\`\nThanks`;
+    await harness.bot.handleUpdate({
+      update_id: 602,
+      edited_message: {
+        message_id: 4,
+        date: 0,
+        edit_date: 1,
+        chat,
+        from,
+        text: editedText,
+        entities: [{ type: "pre", offset: editedText.indexOf(edited), length: edited.length }],
+      },
+    });
+
+    const [reply] = harness.callsTo("sendMessage");
+    expect(reply.payload.text).toContain("*Result*\n```\n42\n```");
+    const [edit] = harness.callsTo("editMessageText");
+    expect(edit.payload.text).toContain("*Result*\n```\n43\n```");
+  });
+
   test("is stripped in an edit as well", async () => {
     const harness = createHarness();
 

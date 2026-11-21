@@ -1,3 +1,5 @@
+import type { MessageEntity } from "grammy/types";
+
 // Code pasted from a chat, a README or an answer on a forum usually comes in a
 // fence, with a language name after the opening one. As JavaScript that is a
 // pair of empty template literals around the real program, and it fails with
@@ -19,4 +21,15 @@ export function stripCodeFence(text: string): string {
   const oneLiner = FENCED_ONE_LINER.exec(trimmed);
 
   return oneLiner ? oneLiner[1].replace(LANGUAGE_NAME, "") : text;
+}
+
+/**
+ * The code in a message. Telegram marks a fenced block as a `pre` entity, so a
+ * message with text around its block runs the block, as the text of a fence
+ * without entities is taken off in one piece.
+ */
+export function codeInMessage(text: string, entities: readonly MessageEntity[] | undefined): string {
+  const block = entities?.find((entity) => entity.type === "pre");
+
+  return block ? text.slice(block.offset, block.offset + block.length) : stripCodeFence(text);
 }

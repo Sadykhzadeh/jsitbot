@@ -2,7 +2,7 @@ import type { Bot } from "grammy";
 import type { Document, Message } from "grammy/types";
 
 import { createRunner, rateKey, type RunnerOptions } from "../runner";
-import { stripCodeFence } from "../codeInput";
+import { codeInMessage, stripCodeFence } from "../codeInput";
 import { ReplyTracker } from "../replyTracker";
 import {
   type CodeFileOptions,
@@ -34,10 +34,7 @@ function codeIn(message: Message): string {
     return "";
   }
 
-  const entities = message.text !== undefined ? message.entities : message.caption_entities;
-  const block = entities?.find((entity) => entity.type === "pre");
-
-  return block ? text.slice(block.offset, block.offset + block.length) : stripCodeFence(text);
+  return codeInMessage(text, message.text !== undefined ? message.entities : message.caption_entities);
 }
 
 /**
