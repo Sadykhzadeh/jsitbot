@@ -458,6 +458,71 @@
     return false;
   }
 
+  // The code the engine is running, given by the host before each reading of it, so
+  // that the columns of a stack can be read back to the text they point at.
+  let sourceText = "";
+  function setSource(code) {
+    sourceText = code;
+  }
+  const NOT_A_FUNCTION = "not a function";
+  const NOT_A_CONSTRUCTOR = " is not a constructor";
+  const CALLEE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
+  const KEYWORD = /^(?:await|yield|return|typeof|void|delete|new|throw|in|of|instanceof)$/;
+  const CALLEE_CHARACTER = /[\w$.]/;
+  const toCharacters = Array.from;
+
+  function lineOf(text, number) {
+    let start = 0;
+    for (let i = 1; i < number; i++) {
+      const next = stringIndexOf(text, "\n", start);
+      if (next === -1) return undefined;
+      start = next + 1;
+    }
+    const end = stringIndexOf(text, "\n", start);
+    return end === -1 ? stringSlice(text, start) : stringSlice(text, start, end);
+  }
+
+  // What a call tried to call, as Node names it: "obj.run is not a function", or
+  // "obj.Run is not a constructor" after new. The engine does not say, so the name is
+  // read from the code at the place the call was thrown from: a "(" after a plain
+  // name or a chain of them. A call made by a built-in is not named, since its frame
+  // comes first.
+  function calleeWording(error) {
+    try {
+      const stack = error.stack;
+      if (typeof stack !== "string") return undefined;
+      const end = stringIndexOf(stack, "\n");
+      if (stringIndexOf(end === -1 ? stack : stringSlice(stack, 0, end), "(native)") !== -1) return undefined;
+
+      const where = whereOf(error);
+      const colon = stringIndexOf(where, ":");
+      if (colon === -1) return undefined;
+      const line = +stringSlice(where, 0, colon);
+      const column = +stringSlice(where, colon + 1);
+      if (!(line >= 1) || !(column >= 1)) return undefined;
+
+      const text = lineOf(sourceText, line);
+      if (text === undefined) return undefined;
+      const characters = toCharacters(text);
+      const at = column - 1;
+      if (characters[at] !== "(") return undefined;
+
+      let start = at;
+      while (start > 0 && CALLEE_CHARACTER.test(characters[start - 1])) start--;
+      let callee = "";
+      for (let i = start; i < at; i++) callee += characters[i];
+      if (!CALLEE.test(callee) || KEYWORD.test(callee)) return undefined;
+
+      let before = start;
+      while (before > 0 && characters[before - 1] === " ") before--;
+      const constructs = before >= 3 && characters[before - 3] + characters[before - 2] + characters[before - 1] === "new" && (before === 3 || !CALLEE_CHARACTER.test(characters[before - 4]));
+
+      return callee + (constructs ? NOT_A_CONSTRUCTOR : " is not a function");
+    } catch (ignored) {
+      return undefined;
+    }
+  }
+
   function errorText(error, state) {
     let name = "Error";
     let message = "";
@@ -465,7 +530,12 @@
       const n = error.name;
       if (typeof n === "string" && n) name = stringSlice(n, 0, 100);
       const m = error.message;
-      if (typeof m === "string") message = cut(nodeWording(name, m), maxResultLength, state);
+      if (typeof m === "string") {
+        const named = name === "TypeError" && (m === NOT_A_FUNCTION || m === NOT_A_CONSTRUCTOR) ? calleeWording(error) : undefined;
+        if (named !== undefined) message = cut(named, maxResultLength, state);
+        else if (m === NOT_A_CONSTRUCTOR) message = cut("(intermediate value)" + m, maxResultLength, state);
+        else message = cut(nodeWording(name, m), maxResultLength, state);
+      }
       if (name === "RangeError" && message === STACK_OVERFLOW && getPrototypeOf(error) === InternalError.prototype) {
         message = "Maximum call stack size exceeded";
       } else if (endsWith(name, "Error") && inherits(error, errorPrototype)) {
@@ -2312,5 +2382,5 @@
 
   collectBuiltInNames();
 
-  return { finish, fail, tick, uncaught };
+  return { finish, fail, tick, uncaught, source: setSource };
 })

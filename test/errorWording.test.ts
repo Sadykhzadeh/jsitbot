@@ -32,6 +32,15 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ["reduceRight of an empty array", `[].reduceRight((a, b) => a + b)`, "TypeError: Reduce of empty array with no initial value"],
     ["an array of a length that cannot be", `new Array(-1)`, "RangeError: Invalid array length"],
     ["this used before super", `class A {} class B extends A { constructor() { this.x = 1 } } new B()`, "ReferenceError: Must call super constructor in derived class before accessing 'this' or returning from derived constructor"],
+    ["a method that is not there", `const o = {}; o.method()`, "TypeError: o.method is not a function"],
+    ["a name that is not a function", `let n = 5; n()`, "TypeError: n is not a function"],
+    ["a chain of names that is not a function", `const obj = { inner: {} }; obj.inner.run(1, 2)`, "TypeError: obj.inner.run is not a function"],
+    ["a new of a chain that is not a constructor", `const o = {}; new o.K()`, "TypeError: o.K is not a constructor"],
+    ["a new of an expression that is not a constructor", `new (() => 1)()`, "TypeError: (intermediate value) is not a constructor"],
+    ["a method of this", `class K { m() { this.zz() } } new K().m()`, "TypeError: this.zz is not a function"],
+    ["a method awaited at the top", `const q = {}; await q.later()`, "TypeError: q.later is not a function"],
+    ["a method on a later line", `const ok = 1;\nconst o = {};\n  o.run()`, "TypeError: o.run is not a function"],
+    ["a method in a type-annotated snippet", `const o: any = {}; o.method(1 as number)`, "TypeError: o.method is not a function"],
   ];
 
   for (const [name, code, expected] of cases) {
@@ -46,6 +55,20 @@ describe("errors the engine throws are worded the way Node words them", () => {
       "[ [TypeError: Cannot read properties of null (reading 'x')] ]",
     ]);
     expect(await logged(`queueMicrotask(() => nope); console.log("after")`)).toEqual(["after", "Uncaught ReferenceError: nope is not defined"]);
+  });
+
+  test("names a call that is not a function where the call is, and keeps the engine's message", async () => {
+    expect(await logged(`try { const o = {}; o.go() } catch (e) { console.log(e, "|", e.message) }`)).toEqual([
+      "TypeError: o.go is not a function | not a function",
+    ]);
+    expect(await logged(`queueMicrotask(() => { const q = {}; q.run() }); console.log("after")`)).toEqual([
+      "after",
+      "Uncaught TypeError: q.run is not a function",
+    ]);
+  });
+
+  test("does not name a call of a call result, which has no name to read", async () => {
+    expect(await failure(`const f = () => 1; f()()`)).toBe("TypeError: not a function");
   });
 
   test("leaves other errors alone", async () => {

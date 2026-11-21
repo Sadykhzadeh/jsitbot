@@ -123,6 +123,14 @@ interface Guest {
   tick: QuickJSHandle;
   fail: QuickJSHandle;
   uncaught: QuickJSHandle;
+  source: QuickJSHandle;
+}
+
+/** Gives the guest the text the engine is about to run, so that a call error can name what was called. */
+function giveSource(context: QuickJSContext, guest: Guest, source: string): void {
+  const text = context.newString(source);
+  context.callFunction(guest.source, context.undefined, text).dispose();
+  text.dispose();
 }
 
 /**
@@ -514,6 +522,7 @@ export class QuickJsSandboxService implements SandboxService {
     source: string,
     expired: () => boolean,
   ): Attempt {
+    giveSource(context, guest, source);
     const evaluated = context.evalCode(source, GUEST_FILE);
 
     if (evaluated.error) {
@@ -547,6 +556,7 @@ export class QuickJsSandboxService implements SandboxService {
     }
 
     // It parses, so whatever happens from here on is the code's own doing.
+    giveSource(context, guest, code);
     const evaluated = context.evalCode(code, GUEST_FILE);
     const packed = evaluated.error
       ? this.packFailure(context, guest.fail, evaluated.error)
@@ -623,6 +633,7 @@ export class QuickJsSandboxService implements SandboxService {
       tick: context.getProp(api, "tick"),
       fail: context.getProp(api, "fail"),
       uncaught: context.getProp(api, "uncaught"),
+      source: context.getProp(api, "source"),
     };
   }
 
