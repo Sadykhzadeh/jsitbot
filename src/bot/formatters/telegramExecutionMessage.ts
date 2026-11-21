@@ -265,7 +265,7 @@ export function formatHelpMessage(
     escapeMarkdownV2("• The value of the last statement is the result. Use return to stop early."),
     escapeMarkdownV2("• Top-level await works."),
     escapeMarkdownV2("• TypeScript annotations are fine, the types are stripped."),
-    escapeMarkdownV2("• Edit your message and the answer updates."),
+    escapeMarkdownV2("• In a private chat, edit your message and the answer updates."),
     escapeMarkdownV2("• A sleep does not use up the time limit: it returns at once."),
     escapeMarkdownV2(
       `• Limits: ${limits.timeoutMs} ms per run, ${Math.round(limits.memoryLimitBytes / (1024 * 1024))} MB of memory, ${limits.maxCodeLength} characters of code.`,

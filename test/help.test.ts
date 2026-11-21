@@ -62,4 +62,10 @@ describe("help message for groups", () => {
   test("shows how to run code in a group", () => {
     expect(examplesIn(formatHelpMessage("jsitbot", HELP_LIMITS).text)).toContain("/run 6 * 7");
   });
+
+  test("says that an edit updates the answer only in a private chat", () => {
+    const text = formatHelpMessage("jsitbot", HELP_LIMITS).text;
+
+    expect(text).toContain("In a private chat, edit your message and the answer updates\\.");
+  });
 });
