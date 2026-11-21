@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
+import { DEFAULT_SANDBOX_OPTIONS } from "../src/services/sandbox/types";
+import { measure } from "./helpers/measure";
 
-const sandbox = new QuickJsSandboxService();
+// These cases check what the globals give, not how quickly; a busy machine
+// gets the same answers from a longer clock.
+const sandbox = new QuickJsSandboxService({ timeoutMs: 10_000 });
 
 async function value(code: string): Promise<string> {
   const result = await sandbox.execute(code);
@@ -403,7 +407,7 @@ describe("crypto.subtle.digest", () => {
         expect(await guestHex(algorithm, length)).toBe(await hostHex(algorithm, bytesOf(length)));
       }
     }
-  });
+  }, 30_000);
 
   test("knows the usual examples", async () => {
     const hash = (algorithm: string, text: string) =>
@@ -461,12 +465,16 @@ describe("crypto.subtle.digest", () => {
   });
 
   test("hashes a quarter of a megabyte within the time limit", async () => {
-    const result = await sandbox.execute(`
-      const hash = await crypto.subtle.digest("SHA-256", new Uint8Array(1 << 18));
-      return new Uint8Array(hash)[0];
-    `);
+    // The limit is read off the CPU time, which a busy machine does not stretch the way it does the clock.
+    const { value: result, cpuMs } = await measure(() =>
+      sandbox.execute(`
+        const hash = await crypto.subtle.digest("SHA-256", new Uint8Array(1 << 18));
+        return new Uint8Array(hash)[0];
+      `),
+    );
 
     expect(result.ok).toBe(true);
+    expect(cpuMs).toBeLessThan(DEFAULT_SANDBOX_OPTIONS.timeoutMs);
   });
 });
 
