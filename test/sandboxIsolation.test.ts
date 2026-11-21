@@ -207,6 +207,33 @@ describe("tampering with built-ins", () => {
     `)).toBe("[ 'http://User:Pw@example.com/b?c=1#e', '/b', 'a=1&b=2&c=3' ]");
   });
 
+  test("the Buffer extra keeps working after String, Math and Uint8Array methods are replaced", async () => {
+    expect(await value(`
+      String.prototype.charCodeAt = () => 0;
+      String.prototype.toLowerCase = () => "x";
+      Math.floor = () => 0;
+      Math.min = () => -5;
+      Uint8Array.prototype.subarray = () => new Uint8Array(0);
+      Uint8Array.prototype.set = () => {};
+      return [
+        Buffer.from("aGk=", "base64").toString("hex"),
+        Buffer.compare(Buffer.from("a"), Buffer.from("b")),
+        (() => { const bytes = Buffer.alloc(4); bytes.writeUInt32BE(258, 0); return bytes.toString("hex"); })(),
+        Buffer.isEncoding("UTF-8"),
+        Buffer.from([104, 101, 108, 108, 111]).slice(1, 3).toString("hex"),
+        Buffer.concat([Buffer.from("a"), Buffer.from("b")]).toString(),
+      ];
+    `)).toBe("[ '6869', -1, '00000102', true, '656c', 'ab' ]");
+  });
+
+  test("Buffer keeps encoding and decoding UTF-8 after TextEncoder and TextDecoder are patched", async () => {
+    expect(await value(`
+      TextEncoder.prototype.encode = () => new Uint8Array(1);
+      TextDecoder.prototype.decode = () => "x";
+      return [Buffer.from("hello").length, Buffer.byteLength("hello"), Buffer.from([104, 105]).toString("utf8")];
+    `)).toBe("[ 5, 5, 'hi' ]");
+  });
+
   test("the console cannot be replaced or removed", async () => {
     const result = await sandbox.execute(`
       console.log = () => {};

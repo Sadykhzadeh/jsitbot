@@ -3,7 +3,7 @@
 // asks for Buffer; see lazyGlobals in guest.js. The encodings are the ones Node
 // names, read the way Node reads them: base64 and hex text is decoded leniently, and
 // the errors carry Node's messages and codes.
-(function (register, seed, host) {
+(function (register, seed, host, builtins) {
   "use strict";
 
   const MAX_SAFE = 9007199254740991;
@@ -40,7 +40,7 @@
       return "an instance of " + (name ? name : "Object");
     }
     if (typeof value === "string") {
-      const shown = value.length > 25 ? value.slice(0, 25) + "..." : value;
+      const shown = value.length > 25 ? builtins.slice(value, 0, 25) + "..." : value;
       return "type string ('" + shown + "')";
     }
     return "type " + typeof value + " (" + String(value) + ")";
@@ -55,14 +55,14 @@
   }
 
   function hasEncoding(name) {
-    return Object.prototype.hasOwnProperty.call(ENCODINGS, name);
+    return builtins.hasOwn(ENCODINGS, name);
   }
 
   // The encoding of from(), alloc() and the other writers: anything that is not a
   // name of one is UTF-8, except a name that is not known.
   function encodingOf(encoding) {
     if (typeof encoding !== "string" || encoding === "") return "utf8";
-    const name = encoding.toLowerCase();
+    const name = builtins.toLowerCase(encoding);
     if (!hasEncoding(name)) throw unknownEncoding(encoding);
     return ENCODINGS[name];
   }
@@ -72,7 +72,7 @@
   function strictEncodingOf(encoding) {
     if (encoding === undefined) return "utf8";
     if (typeof encoding !== "string") throw unknownEncoding(encoding);
-    const name = encoding.toLowerCase();
+    const name = builtins.toLowerCase(encoding);
     if (!hasEncoding(name)) throw unknownEncoding(encoding);
     return ENCODINGS[name];
   }
@@ -88,10 +88,10 @@
   function bytesOfHex(text) {
     const out = [];
     for (let i = 0; i + 1 < text.length; i += 2) {
-      const high = hexDigit(text.charCodeAt(i));
-      const low = hexDigit(text.charCodeAt(i + 1));
+      const high = hexDigit(builtins.charCodeAt(text, i));
+      const low = hexDigit(builtins.charCodeAt(text, i + 1));
       if (high < 0 || low < 0) break;
-      out.push((high << 4) | low);
+      builtins.push(out, (high << 4) | low);
     }
     return out;
   }
@@ -112,7 +112,7 @@
     let acc = 0;
     let bits = 0;
     for (let i = 0; i < text.length; i++) {
-      const code = text.charCodeAt(i);
+      const code = builtins.charCodeAt(text, i);
       if (code === 61) break;
       const value = base64Value(code);
       if (value < 0) continue;
@@ -120,7 +120,7 @@
       bits += 6;
       if (bits >= 8) {
         bits -= 8;
-        out.push((acc >> bits) & 255);
+        builtins.push(out, (acc >> bits) & 255);
       }
     }
     return out;
@@ -129,7 +129,7 @@
   function bytesOfUtf16(text) {
     const out = new Uint8Array(text.length * 2);
     for (let i = 0; i < text.length; i++) {
-      const code = text.charCodeAt(i);
+      const code = builtins.charCodeAt(text, i);
       out[2 * i] = code & 255;
       out[2 * i + 1] = code >> 8;
     }
@@ -140,16 +140,16 @@
   function bytesOfString(text, encoding) {
     switch (encoding) {
       case "utf8":
-        return new TextEncoder().encode(text);
+        return host.extra("encoding").encodeUtf8(text);
       case "hex":
-        return Uint8Array.from(bytesOfHex(text));
+        return builtins.typedArrayFrom(bytesOfHex(text));
       case "base64":
       case "base64url":
-        return Uint8Array.from(bytesOfBase64(text));
+        return builtins.typedArrayFrom(bytesOfBase64(text));
       case "latin1":
       case "ascii": {
         const out = new Uint8Array(text.length);
-        for (let i = 0; i < text.length; i++) out[i] = text.charCodeAt(i) & 255;
+        for (let i = 0; i < text.length; i++) out[i] = builtins.charCodeAt(text, i) & 255;
         return out;
       }
       default:
@@ -161,10 +161,10 @@
   function textOf(bytes, encoding) {
     switch (encoding) {
       case "utf8":
-        return new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
+        return host.extra("encoding").decodeUtf8(bytes);
       case "hex": {
         let out = "";
-        for (let i = 0; i < bytes.length; i++) out += (bytes[i] < 16 ? "0" : "") + bytes[i].toString(16);
+        for (let i = 0; i < bytes.length; i++) out += (bytes[i] < 16 ? "0" : "") + builtins.numberToString(bytes[i], 16);
         return out;
       }
       case "base64":
@@ -176,17 +176,17 @@
         const mask = encoding === "ascii" ? 127 : 255;
         let out = "";
         for (let i = 0; i < bytes.length; i += 8192) {
-          const chunk = Array.prototype.slice.call(bytes, i, i + 8192);
+          const chunk = builtins.sliceOf(bytes, i, i + 8192);
           for (let j = 0; j < chunk.length; j++) chunk[j] &= mask;
-          out += String.fromCharCode.apply(null, chunk);
+          out += builtins.apply(builtins.fromCharCode, null, chunk);
         }
         return out;
       }
       default: {
         const units = [];
-        for (let i = 0; i + 1 < bytes.length; i += 2) units.push(bytes[i] | (bytes[i + 1] << 8));
+        for (let i = 0; i + 1 < bytes.length; i += 2) builtins.push(units, bytes[i] | (bytes[i + 1] << 8));
         let out = "";
-        for (let i = 0; i < units.length; i += 8192) out += String.fromCharCode.apply(null, units.slice(i, i + 8192));
+        for (let i = 0; i < units.length; i += 8192) out += builtins.apply(builtins.fromCharCode, null, builtins.sliceOf(units, i, i + 8192));
         return out;
       }
     }
@@ -194,20 +194,20 @@
 
   // A Buffer over the bytes of a Uint8Array, which it takes over when it can.
   function asBuffer(bytes) {
-    Object.setPrototypeOf(bytes, Buffer.prototype);
+    builtins.setPrototypeOf(bytes, Buffer.prototype);
     return bytes;
   }
 
   function copyBytes(source) {
     const out = new Uint8Array(source.length);
-    out.set(source);
+    builtins.typedArraySet(out, source);
     return out;
   }
 
   function fromArrayBuffer(buffer, offsetArgument, lengthArgument) {
     const byteLength = buffer.byteLength;
     const offset = offsetArgument === undefined ? 0 : +offsetArgument;
-    if (offset < 0 || offset !== Math.floor(offset) || Number.isNaN(offset)) {
+    if (offset < 0 || offset !== builtins.floor(offset) || builtins.numberIsNaN(offset)) {
       throw new RangeError("Start offset " + String(offsetArgument) + " is outside the bounds of the buffer");
     }
     if (offset > byteLength) {
@@ -216,7 +216,7 @@
     const available = byteLength - offset;
     let length = available;
     if (lengthArgument !== undefined) {
-      length = Math.max(0, +lengthArgument);
+      length = builtins.max(0, +lengthArgument);
       if (length > available) {
         throw nodeError(RangeError, "ERR_BUFFER_OUT_OF_BOUNDS", '"length" is outside of buffer bounds');
       }
@@ -230,7 +230,7 @@
       return fromArrayBuffer(value, encodingOrOffset, length);
     }
     if (ArrayBuffer.isView(value)) {
-      if (Object.prototype.toString.call(value) === "[object DataView]") {
+      if (builtins.tag(value) === "[object DataView]") {
         return asBuffer(copyBytes(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)));
       }
       return asBuffer(new Uint8Array(value));
@@ -240,10 +240,10 @@
       if (primitive != null && primitive !== value && (typeof primitive === "string" || typeof primitive === "object")) {
         return from(primitive, encodingOrOffset, length);
       }
-      if (Array.isArray(value) || typeof value.length === "number") {
+      if (builtins.isArray(value) || typeof value.length === "number") {
         return asBuffer(new Uint8Array(value));
       }
-      if (value.type === "Buffer" && Array.isArray(value.data)) {
+      if (value.type === "Buffer" && builtins.isArray(value.data)) {
         return asBuffer(new Uint8Array(value.data));
       }
     }
@@ -273,7 +273,7 @@
   }
 
   function concat(list, totalLength) {
-    if (!Array.isArray(list)) throw argumentError("list", "must be an instance of Array", list);
+    if (!builtins.isArray(list)) throw argumentError("list", "must be an instance of Array", list);
     if (list.length === 0) return asBuffer(new Uint8Array(0));
     let total = 0;
     for (let i = 0; i < list.length; i++) {
@@ -290,8 +290,8 @@
     let at = 0;
     for (let i = 0; i < list.length && at < total; i++) {
       const item = list[i];
-      const count = Math.min(item.length, total - at);
-      out.set(item.subarray(0, count), at);
+      const count = builtins.min(item.length, total - at);
+      builtins.typedArraySet(out, builtins.typedArraySubarray(item, 0, count), at);
       at += count;
     }
     return asBuffer(out);
@@ -304,17 +304,17 @@
       }
       throw argumentError("string", "must be of type string or an instance of Buffer or ArrayBuffer", value);
     }
-    const name = typeof encoding === "string" && hasEncoding(encoding.toLowerCase()) ? ENCODINGS[encoding.toLowerCase()] : "utf8";
+    const name = typeof encoding === "string" && hasEncoding(builtins.toLowerCase(encoding)) ? ENCODINGS[builtins.toLowerCase(encoding)] : "utf8";
     switch (name) {
       case "utf8":
-        return new TextEncoder().encode(value).length;
+        return host.extra("encoding").encodeUtf8(value).length;
       case "hex":
         return value.length >>> 1;
       case "base64":
       case "base64url": {
         let bytes = value.length;
-        if (value.charCodeAt(bytes - 1) === 61) bytes--;
-        if (bytes > 1 && value.charCodeAt(bytes - 1) === 61) bytes--;
+        if (builtins.charCodeAt(value, bytes - 1) === 61) bytes--;
+        if (bytes > 1 && builtins.charCodeAt(value, bytes - 1) === 61) bytes--;
         return (bytes * 3) >>> 2;
       }
       case "utf16le":
@@ -328,7 +328,7 @@
   // that is not a finite number.
   function integerOf(value) {
     const number = +value;
-    return Number.isFinite(number) ? Math.floor(number) : 0;
+    return builtins.numberIsFinite(number) ? builtins.floor(number) : 0;
   }
 
   function outOfRange(name, range, value) {
@@ -342,7 +342,7 @@
   // A position that is given as a number: a whole number from min to max, or a range error.
   function checkPosition(value, name, min, max) {
     if (typeof value !== "number") throw argumentError(name, "must be of type number", value);
-    if (!Number.isInteger(value)) throw outOfRange(name, "an integer", value);
+    if (!builtins.numberIsInteger(value)) throw outOfRange(name, "an integer", value);
     if (value < min || value > max) throw outOfRange(name, ">= " + min + " && <= " + max, value);
     return value;
   }
@@ -366,7 +366,7 @@
   // number, and room for `bytes` bytes after it.
   function checkOffset(buffer, offset, bytes, name) {
     if (typeof offset !== "number") throw argumentError(name, "must be of type number", offset);
-    if (Math.floor(offset) !== offset) {
+    if (builtins.floor(offset) !== offset) {
       throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "' + name + '" is out of range. It must be an integer. Received ' + received(offset));
     }
     const length = buffer.length - bytes;
@@ -386,8 +386,8 @@
     const start = text[0] === "-" ? 1 : 0;
     let end = text.length;
     let groups = "";
-    for (; end >= start + 4; end -= 3) groups = "_" + text.slice(end - 3, end) + groups;
-    return text.slice(0, end) + groups;
+    for (; end >= start + 4; end -= 3) groups = "_" + builtins.slice(text, end - 3, end) + groups;
+    return builtins.slice(text, 0, end) + groups;
   }
 
   function received(value) {
@@ -395,8 +395,8 @@
       const text = String(value);
       return (value > 4294967296n || value < -4294967296n ? groupDigits(text) : text) + "n";
     }
-    if (Number.isInteger(value) && Math.abs(value) > 4294967296) return groupDigits(String(value));
-    return Object.is(value, -0) ? "-0" : String(value);
+    if (builtins.numberIsInteger(value) && builtins.abs(value) > 4294967296) return groupDigits(String(value));
+    return builtins.is(value, -0) ? "-0" : String(value);
   }
 
   // Node refuses only a value above max or below min, so NaN is written as 0.
@@ -419,7 +419,7 @@
   // The bytes indexOf and lastIndexOf look for: a byte, the bytes of a string in an
   // encoding, or the bytes of a view.
   function needleOf(value, encoding) {
-    if (typeof value === "number") return Uint8Array.of(value & 255);
+    if (typeof value === "number") return builtins.typedArrayOf(value & 255);
     if (typeof value === "string") return bytesOfString(value, encodingOf(encoding));
     if (value instanceof Uint8Array) return value;
     throw nodeError(
@@ -441,17 +441,17 @@
     if (encoding === "utf8") {
       let written = 0;
       for (const char of text) {
-        const piece = new TextEncoder().encode(char);
+        const piece = host.extra("encoding").encodeUtf8(char);
         if (written + piece.length > room) break;
-        buffer.set(piece, offset + written);
+        builtins.typedArraySet(buffer, piece, offset + written);
         written += piece.length;
       }
       return written;
     }
     let bytes = bytesOfString(text, encoding);
-    let count = Math.min(bytes.length, room);
+    let count = builtins.min(bytes.length, room);
     if (encoding === "utf16le") count -= count % 2;
-    buffer.set(bytes.subarray(0, count), offset);
+    builtins.typedArraySet(buffer, builtins.typedArraySubarray(bytes, 0, count), offset);
     return count;
   }
 
@@ -482,22 +482,22 @@
   // Node takes the low 32 bits from the truncated value and the bytes above them from the
   // floor, so a negative fraction in a five or six byte integer sets its high bytes.
   function writeInteger(buffer, start, bytes, littleEndian, value) {
-    let low = wrapInto(Math.trunc(value), 2 ** 32);
-    let high = bytes > 4 ? wrapInto(Math.floor(value / 2 ** 32), 2 ** (8 * (bytes - 4))) : 0;
+    let low = wrapInto(builtins.trunc(value), 2 ** 32);
+    let high = bytes > 4 ? wrapInto(builtins.floor(value / 2 ** 32), 2 ** (8 * (bytes - 4))) : 0;
     for (let i = 0; i < bytes; i++) {
       const index = littleEndian ? start + i : start + bytes - 1 - i;
       if (i < 4) {
         buffer[index] = low % 256;
-        low = Math.floor(low / 256);
+        low = builtins.floor(low / 256);
       } else {
         buffer[index] = high % 256;
-        high = Math.floor(high / 256);
+        high = builtins.floor(high / 256);
       }
     }
   }
 
   function wrapInto(number, span) {
-    return number < 0 ? number + span * Math.ceil(-number / span) : number % span;
+    return number < 0 ? number + span * builtins.ceil(-number / span) : number % span;
   }
 
   // Defines the reads and writes of one width and byte order. A signed one reads
@@ -543,7 +543,7 @@
 
   function checkByteLength(byteLength) {
     if (typeof byteLength !== "number") throw argumentError("byteLength", "must be of type number", byteLength);
-    if (!Number.isInteger(byteLength)) {
+    if (!builtins.numberIsInteger(byteLength)) {
       throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" is out of range. It must be an integer. Received ' + byteLength);
     }
     if (byteLength < 1 || byteLength > 6) {
@@ -581,7 +581,7 @@
         const start = offset === undefined ? 0 : offset;
         checkOffset(buffer, start, 8, "offset");
         const view = viewOf(buffer);
-        return signed ? view.getBigInt64(start, littleEndian) : view.getBigUint64(start, littleEndian);
+        return signed ? builtins.dataViewGetBigInt64(view, start, littleEndian) : builtins.dataViewGetBigUint64(view, start, littleEndian);
       },
       write(buffer, value, offset) {
         checkValue(value, min, max, range);
@@ -591,8 +591,8 @@
         const start = offset === undefined ? 0 : offset;
         checkOffset(buffer, start, 8, "offset");
         const view = viewOf(buffer);
-        if (signed) view.setBigInt64(start, value, littleEndian);
-        else view.setBigUint64(start, value, littleEndian);
+        if (signed) builtins.dataViewSetBigInt64(view, start, value, littleEndian);
+        else builtins.dataViewSetBigUint64(view, start, value, littleEndian);
         return start + 8;
       },
     };
@@ -625,7 +625,7 @@
 
   // -1, 0 or 1: how two byte sequences order, the shorter one first when one starts the other.
   function compareBytes(a, b) {
-    const count = Math.min(a.length, b.length);
+    const count = builtins.min(a.length, b.length);
     for (let i = 0; i < count; i++) {
       if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
     }
@@ -635,7 +635,7 @@
   class Buffer extends Uint8Array {
     constructor(value, encodingOrOffset, length) {
       const made = typeof value === "number" ? alloc(value) : from(value, encodingOrOffset, length);
-      Object.setPrototypeOf(made, new.target.prototype);
+      builtins.setPrototypeOf(made, new.target.prototype);
       return made;
     }
 
@@ -671,7 +671,7 @@
     }
 
     static isEncoding(encoding) {
-      return typeof encoding === "string" && encoding.length !== 0 && hasEncoding(encoding.toLowerCase());
+      return typeof encoding === "string" && encoding.length !== 0 && hasEncoding(builtins.toLowerCase(encoding));
     }
 
     toString(encoding, start, end) {
@@ -681,9 +681,9 @@
       let to = end;
       if (from <= 0) from = 0;
       else if (from >= length) return "";
-      else from = Math.trunc(from) || 0;
+      else from = builtins.trunc(from) || 0;
       if (to === undefined || to > length) to = length;
-      else to = Math.trunc(to) || 0;
+      else to = builtins.trunc(to) || 0;
       if (to <= from) return "";
       const name = strictEncodingOf(encoding);
       return textOf(new Uint8Array(this.buffer, this.byteOffset + from, to - from), name);
@@ -703,7 +703,7 @@
     }
 
     slice(start, end) {
-      return this.subarray(start, end);
+      return builtins.typedArraySubarray(this, start, end);
     }
 
     fill(value, offsetArgument, endArgument, encodingArgument) {
@@ -750,9 +750,9 @@
         byteOffset = 0;
       }
       const needle = needleOf(value, encoding);
-      let from = byteOffset === undefined ? 0 : Math.trunc(+byteOffset) || 0;
-      if (from < 0) from = Math.max(0, this.length + from);
-      if (needle.length === 0) return Math.min(from, this.length);
+      let from = byteOffset === undefined ? 0 : builtins.trunc(+byteOffset) || 0;
+      if (from < 0) from = builtins.max(0, this.length + from);
+      if (needle.length === 0) return builtins.min(from, this.length);
       for (let i = from; i + needle.length <= this.length; i++) {
         if (matchesAt(this, needle, i)) return i;
       }
@@ -769,8 +769,8 @@
       const needle = needleOf(value, encoding);
       // The start Node takes for a search backwards, as its C++ does: an offset
       // before the buffer is no match unless the needle is empty.
-      let from = Math.floor(byteOffset === undefined ? NaN : +byteOffset);
-      if (Number.isNaN(from)) from = this.length;
+      let from = builtins.floor(byteOffset === undefined ? NaN : +byteOffset);
+      if (builtins.numberIsNaN(from)) from = this.length;
       if (from < 0) {
         if (from + this.length >= 0) from += this.length;
         else if (needle.length === 0) from = 0;
@@ -779,7 +779,7 @@
         from = needle.length === 0 ? this.length : this.length - 1;
       }
       if (needle.length === 0) return from;
-      for (let i = Math.min(from, this.length - needle.length); i >= 0; i--) {
+      for (let i = builtins.min(from, this.length - needle.length); i >= 0; i--) {
         if (matchesAt(this, needle, i)) return i;
       }
       return -1;
@@ -795,7 +795,7 @@
       const tto = targetEnd === undefined ? target.length : checkPosition(targetEnd, "targetEnd", 0, target.length);
       const from = sourceStart === undefined ? 0 : checkPosition(sourceStart, "sourceStart", 0, MAX_SAFE);
       const to = sourceEnd === undefined ? this.length : checkPosition(sourceEnd, "sourceEnd", 0, this.length);
-      return compareBytes(this.subarray(from, to), target.subarray(tfrom, tto));
+      return compareBytes(builtins.typedArraySubarray(this, from, to), builtins.typedArraySubarray(target, tfrom, tto));
     }
 
     copy(target, targetStart, sourceStart, sourceEnd) {
@@ -808,8 +808,8 @@
       if (end < 0) throw outOfRange("sourceEnd", ">= 0", end);
       if (to >= target.length || from >= end) return 0;
 
-      const count = Math.min(end - from, target.length - to, this.length - from);
-      target.set(this.subarray(from, from + count), to);
+      const count = builtins.min(end - from, target.length - to, this.length - from);
+      builtins.typedArraySet(target, builtins.typedArraySubarray(this, from, from + count), to);
       return count;
     }
 
@@ -843,7 +843,7 @@
           encoding = lengthArgument;
         } else if (lengthArgument !== undefined) {
           checkWriteOffset(lengthArgument, this.length, "length");
-          length = Math.min(lengthArgument, remaining);
+          length = builtins.min(lengthArgument, remaining);
           encoding = encodingArgument === undefined ? "utf8" : encodingArgument;
         }
       }
@@ -851,7 +851,7 @@
     }
 
     toJSON() {
-      return { type: "Buffer", data: Array.from(this) };
+      return { type: "Buffer", data: builtins.arrayFrom(this) };
     }
 
     readUInt8(offset) {
@@ -1034,7 +1034,7 @@
   // The offset or length of write(), which must be a number in 0 to the length of the buffer.
   function checkWriteOffset(value, max, name) {
     if (typeof value !== "number") throw argumentError(name, "must be of type number", value);
-    if (Math.floor(value) !== value) {
+    if (builtins.floor(value) !== value) {
       throw nodeError(RangeError, "ERR_OUT_OF_RANGE", 'The value of "' + name + '" is out of range. It must be an integer. Received ' + received(value));
     }
     if (!(value >= 0 && value <= max)) {
@@ -1053,8 +1053,8 @@
   ];
   for (const name of LOWERCASE_NAMES) {
     for (const verb of ["read", "write"]) {
-      const original = verb + name.replace("Uint", "UInt");
-      Object.defineProperty(Buffer.prototype, verb + name, {
+      const original = verb + builtins.replace(name, "Uint", "UInt");
+      builtins.defineProperty(Buffer.prototype, verb + name, {
         value: Buffer.prototype[original],
         writable: true,
         configurable: true,
@@ -1067,9 +1067,9 @@
   register(
     Buffer,
     function (buffer) {
-      const shown = Math.min(buffer.length, INSPECT_MAX_BYTES);
+      const shown = builtins.min(buffer.length, INSPECT_MAX_BYTES);
       let text = "";
-      for (let i = 0; i < shown; i++) text += (i > 0 ? " " : "") + (buffer[i] < 16 ? "0" : "") + buffer[i].toString(16);
+      for (let i = 0; i < shown; i++) text += (i > 0 ? " " : "") + (buffer[i] < 16 ? "0" : "") + builtins.numberToString(buffer[i], 16);
       const remaining = buffer.length - shown;
       if (remaining > 0) text += " ... " + remaining + " more byte" + (remaining > 1 ? "s" : "");
       return { text: "<Buffer " + text + ">" };

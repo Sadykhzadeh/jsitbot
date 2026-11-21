@@ -1,5 +1,6 @@
 // TextEncoder, TextDecoder, atob and btoa, for the guest. Evaluated the first
-// time the code asks for one of them; see lazyGlobals in guest.js.
+// time the code asks for one of them; see lazyGlobals in guest.js. Returns the
+// globals it defines, and the UTF-8 functions the Buffer extra reads text with.
 (function (register, seed, host, builtins) {
   "use strict";
 
@@ -71,6 +72,15 @@
     return { read, written };
   }
 
+  // The UTF-8 bytes of a string, as a Uint8Array.
+  function encodeUtf8(input = "") {
+    const text = builtins.string(input);
+    const bytes = new Uint8Array(text.length * 3);
+    const { written } = encode(text, bytes, bytes.length);
+
+    return bytes.slice(0, written);
+  }
+
   class TextEncoder {
     get encoding() {
       return "utf-8";
@@ -81,11 +91,7 @@
     }
 
     encode(input = "") {
-      const text = builtins.string(input);
-      const bytes = new Uint8Array(text.length * 3);
-      const { written } = encode(text, bytes, bytes.length);
-
-      return bytes.slice(0, written);
+      return encodeUtf8(input);
     }
 
     encodeInto(source, destination) {
@@ -399,5 +405,10 @@
     return out;
   }
 
-  return { TextEncoder, TextDecoder, atob, btoa };
+  // The text of UTF-8 bytes, with a byte order mark kept as a character.
+  function decodeUtf8(input) {
+    return decode(bytesOf(input), false, false, false).text;
+  }
+
+  return { TextEncoder, TextDecoder, atob, btoa, encodeUtf8, decodeUtf8 };
 })
