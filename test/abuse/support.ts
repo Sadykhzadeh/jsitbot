@@ -1,7 +1,7 @@
 import { expect } from "bun:test";
 
 import { ProcessSandboxService } from "../../src/services/sandbox/processSandbox";
-import type { SandboxExecution } from "../../src/services/sandbox/types";
+import type { SandboxExecution, SandboxOptions } from "../../src/services/sandbox/types";
 
 export const TIME_LIMIT_MESSAGE = "Sandbox execution timed out.";
 export const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
@@ -45,8 +45,8 @@ export const eitherLimit: Outcome = { kind: "limit" };
 export const failsWith = (message: RegExp): Outcome => ({ kind: "error", message });
 
 /** One sandbox process shared by a file's cases, as the bot shares one. */
-export function createPool(): ProcessSandboxService {
-  return new ProcessSandboxService();
+export function createPool(options?: Partial<SandboxOptions>): ProcessSandboxService {
+  return new ProcessSandboxService(options);
 }
 
 /** The output limits every run keeps to, whatever the code did. */

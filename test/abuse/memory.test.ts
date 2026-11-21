@@ -70,7 +70,9 @@ const cases: AbuseCase[] = [
   },
 ];
 
-const pool = createPool();
+// A clock that a loaded machine does not run out of first, so a case that
+// fills the heap ends on the memory cap. The time limit has its own cases.
+const pool = createPool({ timeoutMs: 10_000 });
 
 afterAll(() => pool.dispose());
 
