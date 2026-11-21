@@ -62,9 +62,41 @@
     return codeLine(error);
   }
 
-  // What a call tried to call, as Node names it: "obj.run is not a function", or
-  // "obj.Run is not a constructor" after new. The name is read from the code at the
-  // place the call was thrown from: a "(" after a plain name or a chain of them.
+  // The text of the expression that ends at index end, as Node writes a callee: each
+  // call in it shows its arguments as (...). Undefined when the text is not one.
+  function calleeText(characters, end) {
+    let text = "";
+    let at = end;
+    while (at > 0) {
+      const character = characters[at - 1];
+      if (character === ")") {
+        let depth = 0;
+        let open = at - 1;
+        for (; open >= 0; open--) {
+          if (characters[open] === ")") depth++;
+          else if (characters[open] === "(" && --depth === 0) break;
+        }
+        if (open < 0) return undefined;
+        text = "(...)" + text;
+        at = open;
+      } else if (CALLEE_CHARACTER.test(character)) {
+        let start = at;
+        while (start > 0 && CALLEE_CHARACTER.test(characters[start - 1])) start--;
+        let name = "";
+        for (let i = start; i < at; i++) name += characters[i];
+        text = name + text;
+        at = start;
+      } else {
+        break;
+      }
+    }
+    return CALLEE.test(text.replace(/\(\.\.\.\)/g, "")) && !KEYWORD.test(text.split(/[.(]/)[0]) ? text : undefined;
+  }
+
+  // What a call tried to call, as Node names it: "obj.run is not a function", "f(...)
+  // is not a function" for a call of a result, or "obj.Run is not a constructor" after
+  // new. The name is read from the code at the place the call was thrown from: a "("
+  // after an expression that is a plain name, a chain of them, or calls of those.
   function calleeWording(error) {
     const from = thrownFrom(error);
     if (from === undefined || !(from.column >= 1)) return undefined;
@@ -72,15 +104,15 @@
     const at = from.column - 1;
     if (characters[at] !== "(") return undefined;
 
-    let start = at;
-    while (start > 0 && CALLEE_CHARACTER.test(characters[start - 1])) start--;
-    let callee = "";
-    for (let i = start; i < at; i++) callee += characters[i];
-    if (!CALLEE.test(callee) || KEYWORD.test(callee)) return undefined;
+    const callee = calleeText(characters, at);
+    if (callee === undefined) return undefined;
 
+    let start = at;
+    while (start > 0 && (CALLEE_CHARACTER.test(characters[start - 1]) || characters[start - 1] === ")")) start--;
     let before = start;
     while (before > 0 && characters[before - 1] === " ") before--;
     const constructs = before >= 3 && characters[before - 3] + characters[before - 2] + characters[before - 1] === "new" && (before === 3 || !CALLEE_CHARACTER.test(characters[before - 4]));
+    if (constructs && callee.indexOf("(...)") !== -1) return undefined;
 
     return callee + (constructs ? NOT_A_CONSTRUCTOR : " is not a function");
   }

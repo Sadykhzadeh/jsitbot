@@ -46,6 +46,8 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ["a name that is not a function", `let n = 5; n()`, "TypeError: n is not a function"],
     ["a chain of names that is not a function", `const obj = { inner: {} }; obj.inner.run(1, 2)`, "TypeError: obj.inner.run is not a function"],
     ["a new of a chain that is not a constructor", `const o = {}; new o.K()`, "TypeError: o.K is not a constructor"],
+    ["a call of the result of a call", `const f = () => 1; f()()`, "TypeError: f(...) is not a function"],
+    ["a method of the result of a call", `const f = () => ({}); f().go()`, "TypeError: f(...).go is not a function"],
     ["a new of an expression that is not a constructor", `new (() => 1)()`, "TypeError: (intermediate value) is not a constructor"],
     ["a method of this", `class K { m() { this.zz() } } new K().m()`, "TypeError: this.zz is not a function"],
     ["a method awaited at the top", `const q = {}; await q.later()`, "TypeError: q.later is not a function"],
@@ -80,9 +82,6 @@ describe("errors the engine throws are worded the way Node words them", () => {
     ]);
   });
 
-  test("does not name a call of a call result, which has no name to read", async () => {
-    expect(await failure(`const f = () => 1; f()()`)).toBe("TypeError: not a function");
-  });
 
   test("leaves other errors alone", async () => {
     expect(await failure(`throw new Error("x is not defined")`)).toBe("Error: x is not defined");
