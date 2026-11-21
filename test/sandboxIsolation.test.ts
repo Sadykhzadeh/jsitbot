@@ -65,15 +65,16 @@ describe("tampering with built-ins", () => {
     `)).toBe("still resolved");
   });
 
-  test("the case and collation extras keep working after their prototypes are replaced", async () => {
+  test("the case, collation and number extras keep working after their prototypes are replaced", async () => {
     expect(await value(`
       String.prototype.toLowerCase = () => "hijacked";
       String.prototype.replace = () => "hijacked";
       String.prototype.split = () => ["hijacked"];
       String.prototype.normalize = () => { throw new Error("normalize"); };
       String.prototype.codePointAt = () => 0;
-      return ["a".localeCompare("B"), "i".toLocaleUpperCase("tr"), "I".toLocaleLowerCase("tr")].join("|");
-    `)).toBe("-1|\u0130|\u0131");
+      String.prototype.repeat = () => "hijacked";
+      return ["a".localeCompare("B"), "i".toLocaleUpperCase("tr"), "I".toLocaleLowerCase("tr"), (1234.5).toLocaleString()].join("|");
+    `)).toBe("-1|\u0130|\u0131|1,234.5");
   });
 
   test("the console cannot be replaced or removed", async () => {

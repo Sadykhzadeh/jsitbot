@@ -18,7 +18,7 @@
 // Anything else, another language or an option that is not listed, is left to
 // the engine's own method, which is the `original` it is given, together with
 // the prototype it belongs to.
-(function (original, owner) {
+(function (original, owner, zoneInfo, builtins) {
   "use strict";
 
   const ENGLISH = /^en(-(US|GB|AU|CA|NZ|IE))?$/i;
@@ -28,12 +28,12 @@
   const LANGUAGE_TAG = /^(?:[a-z]{2,3}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*(?:-[\da-wy-z](?:-[a-z\d]{2,8})+)*(?:-x(?:-[a-z\d]{1,8})+)?$/i;
 
   function checkLocales(locales) {
-    const tags = Array.isArray(locales) ? locales : [locales];
+    const tags = builtins.isArray(locales) ? locales : [locales];
     for (let i = 0; i < tags.length; i++) {
       if (tags[i] === undefined) continue;
-      const tag = String(tags[i]);
-      const singletons = tag.toLowerCase().split("-x-")[0].split("-").filter((subtag) => subtag.length === 1);
-      if (!LANGUAGE_TAG.test(tag) || new Set(singletons).size !== singletons.length) {
+      const tag = builtins.string(tags[i]);
+      const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
+      if (!builtins.test(LANGUAGE_TAG, tag) || new Set(singletons).size !== singletons.length) {
         throw new RangeError("Invalid language tag: " + tag);
       }
     }
@@ -125,35 +125,35 @@
   function digitsOption(options, name, fallback, lowest, highest) {
     const given = options[name];
     if (given === undefined) return fallback;
-    const number = Number(given);
+    const number = builtins.number(given);
     if (!(number >= lowest && number <= highest)) throw new RangeError(name + " value is out of range.");
-    return Math.floor(number);
+    return builtins.floor(number);
   }
 
   // One more at the last digit of a string of digits.
   function increment(digits) {
     let i = digits.length - 1;
     while (i >= 0 && digits[i] === "9") i--;
-    if (i < 0) return "1" + "0".repeat(digits.length);
-    return digits.slice(0, i) + String.fromCharCode(digits.charCodeAt(i) + 1) + "0".repeat(digits.length - 1 - i);
+    if (i < 0) return "1" + builtins.repeat("0", digits.length);
+    return builtins.slice(digits, 0, i) + builtins.fromCharCode(builtins.charCodeAt(digits, i) + 1) + builtins.repeat("0", digits.length - 1 - i);
   }
 
   // The digits of a non-negative finite number as it is written, moved
   // `shift` places to the left.
   function split(value, shift) {
-    const parts = String(value).split("e");
-    const written = parts[0].split(".");
+    const parts = builtins.split(builtins.string(value), "e");
+    const written = builtins.split(parts[0], ".");
     const whole = written[0];
     let digits = whole + (written[1] || "");
-    let point = whole.length + (Number(parts[1]) || 0) + shift;
+    let point = whole.length + (builtins.number(parts[1]) || 0) + shift;
 
     if (point < 0) {
-      digits = "0".repeat(-point) + digits;
+      digits = builtins.repeat("0", -point) + digits;
       point = 0;
     } else if (point > digits.length) {
-      digits += "0".repeat(point - digits.length);
+      digits += builtins.repeat("0", point - digits.length);
     }
-    return { whole: digits.slice(0, point), fraction: digits.slice(point) };
+    return { whole: builtins.slice(digits, 0, point), fraction: builtins.slice(digits, point) };
   }
 
   // Whether the digits kept by a rounding step take one more, given the digits it
@@ -161,11 +161,11 @@
   function roundingRule(mode, negative) {
     return function (kept, dropped) {
       const first = dropped[0];
-      const beyondHalf = /[1-9]/.test(dropped.slice(1));
+      const beyondHalf = builtins.test(/[1-9]/, builtins.slice(dropped, 1));
       const above = first > "5" || (first === "5" && beyondHalf);
       const half = first === "5" && !beyondHalf;
-      const any = /[1-9]/.test(dropped);
-      const odd = Number(kept.slice(-1)) % 2 === 1;
+      const any = builtins.test(/[1-9]/, dropped);
+      const odd = builtins.number(builtins.slice(kept, -1)) % 2 === 1;
       switch (mode) {
         case "ceil":
           return any && !negative;
@@ -196,32 +196,32 @@
 
     const all = parts.whole + parts.fraction;
     const cut = parts.whole.length + places;
-    let kept = cut > 0 ? all.slice(0, cut) : "";
-    const dropped = cut >= 0 ? all.slice(cut) : "0".repeat(-cut) + all;
+    let kept = cut > 0 ? builtins.slice(all, 0, cut) : "";
+    const dropped = cut >= 0 ? builtins.slice(all, cut) : builtins.repeat("0", -cut) + all;
     if (rule(kept, dropped)) kept = increment(kept);
     if (kept === "") kept = "0";
 
     if (places >= 0) {
-      kept = "0".repeat(Math.max(0, places + 1 - kept.length)) + kept;
-      return { whole: kept.slice(0, kept.length - places), fraction: kept.slice(kept.length - places) };
+      kept = builtins.repeat("0", builtins.max(0, places + 1 - kept.length)) + kept;
+      return { whole: builtins.slice(kept, 0, kept.length - places), fraction: builtins.slice(kept, kept.length - places) };
     }
-    return { whole: kept === "0" ? "0" : kept + "0".repeat(-places), fraction: "" };
+    return { whole: kept === "0" ? "0" : kept + builtins.repeat("0", -places), fraction: "" };
   }
 
   // How many digits a number is written with, not counting the zeros in front.
   function significant(parts) {
-    const whole = parts.whole.replace(/^0+/, "");
-    return whole === "" ? parts.fraction.replace(/^0+/, "").length : whole.length + parts.fraction.length;
+    const whole = builtins.replace(parts.whole, /^0+/, "");
+    return whole === "" ? builtins.replace(parts.fraction, /^0+/, "").length : whole.length + parts.fraction.length;
   }
 
   // Rounds to at most `maximum` significant digits and writes at least `minimum`.
   function roundSignificant(parts, minimum, maximum, rule) {
-    const whole = parts.whole.replace(/^0+/, "");
+    const whole = builtins.replace(parts.whole, /^0+/, "");
     let places;
     if (whole !== "") {
       places = maximum - whole.length;
     } else {
-      const zeros = parts.fraction.length - parts.fraction.replace(/^0+/, "").length;
+      const zeros = parts.fraction.length - builtins.replace(parts.fraction, /^0+/, "").length;
       places = zeros === parts.fraction.length ? 0 : zeros + maximum;
     }
 
@@ -230,13 +230,13 @@
     let count = significant(rounded);
     if (count === 0) {
       count = 1;
-      if (minimum > 1) fraction = "0".repeat(minimum - 1);
+      if (minimum > 1) fraction = builtins.repeat("0", minimum - 1);
     } else {
       while (count > minimum && fraction[fraction.length - 1] === "0") {
-        fraction = fraction.slice(0, -1);
+        fraction = builtins.slice(fraction, 0, -1);
         count--;
       }
-      if (count < minimum) fraction += "0".repeat(minimum - count);
+      if (count < minimum) fraction += builtins.repeat("0", minimum - count);
     }
     return { whole: rounded.whole, fraction };
   }
@@ -253,11 +253,11 @@
   // The power of ten a number is written with in scientific notation, or the
   // nearest multiple of three below it in engineering notation.
   function exponentOf(parts, engineering) {
-    const whole = parts.whole.replace(/^0+/, "");
+    const whole = builtins.replace(parts.whole, /^0+/, "");
     let exponent = 0;
     if (whole !== "") exponent = whole.length - 1;
-    else if (/[1-9]/.test(parts.fraction)) exponent = -(parts.fraction.length - parts.fraction.replace(/^0+/, "").length + 1);
-    return engineering ? Math.floor(exponent / 3) * 3 : exponent;
+    else if (builtins.test(/[1-9]/, parts.fraction)) exponent = -(parts.fraction.length - builtins.replace(parts.fraction, /^0+/, "").length + 1);
+    return engineering ? builtins.floor(exponent / 3) * 3 : exponent;
   }
 
   // The digits of a number, rounded and grouped as the options say. A compact
@@ -271,8 +271,8 @@
       throw new RangeError("maximumFractionDigits value is out of range.");
     }
     const fractionGiven = minimum !== undefined || maximum !== undefined;
-    if (minimum === undefined) minimum = maximum === undefined ? defaultMin : Math.min(defaultMin, maximum);
-    if (maximum === undefined) maximum = Math.max(defaultMax, minimum);
+    if (minimum === undefined) minimum = maximum === undefined ? defaultMin : builtins.min(defaultMin, maximum);
+    if (maximum === undefined) maximum = builtins.max(defaultMax, minimum);
     const integers = digitsOption(options, "minimumIntegerDigits", 1, 1, 21);
 
     let leastSignificant = digitsOption(options, "minimumSignificantDigits", undefined, 1, 21);
@@ -287,7 +287,7 @@
     const round = function (parts) {
       if (bySignificant) return roundSignificant(parts, leastSignificant, mostSignificant, rule);
       if (compact && !fractionGiven) {
-        return parts.whole.replace(/^0+/, "").length >= 2 ? roundAt(parts, 0, rule) : roundSignificant(parts, 1, 2, rule);
+        return builtins.replace(parts.whole, /^0+/, "").length >= 2 ? roundAt(parts, 0, rule) : roundSignificant(parts, 1, 2, rule);
       }
       return roundAt(parts, maximum, rule);
     };
@@ -299,29 +299,29 @@
       exponent = exponentOf(parts, engineering);
       for (;;) {
         parts = round(split(magnitude, shift - exponent));
-        const mantissa = parts.whole.replace(/^0+/, "").length;
+        const mantissa = builtins.replace(parts.whole, /^0+/, "").length;
         if (mantissa <= (engineering ? 3 : 1)) break;
         exponent = engineering ? exponent + 3 : exponent + 1;
       }
     } else if (compact) {
-      const length = parts.whole.replace(/^0+/, "").length;
-      exponent = length > 3 ? Math.min(Math.floor((length - 1) / 3), 4) : 0;
+      const length = builtins.replace(parts.whole, /^0+/, "").length;
+      exponent = length > 3 ? builtins.min(builtins.floor((length - 1) / 3), 4) : 0;
       for (;;) {
         parts = round(exponent === 0 ? split(magnitude, shift) : split(magnitude, shift - exponent * 3));
-        if (parts.whole.replace(/^0+/, "").length <= 3 || exponent === 4) break;
+        if (builtins.replace(parts.whole, /^0+/, "").length <= 3 || exponent === 4) break;
         exponent++;
       }
     } else {
       parts = round(parts);
     }
 
-    let whole = parts.whole.replace(/^0+/, "");
+    let whole = builtins.replace(parts.whole, /^0+/, "");
     let fraction = parts.fraction;
     if (!bySignificant && !(compact && !fractionGiven)) {
-      while (fraction.length > minimum && fraction[fraction.length - 1] === "0") fraction = fraction.slice(0, -1);
-      if (fraction.length < minimum) fraction += "0".repeat(minimum - fraction.length);
+      while (fraction.length > minimum && fraction[fraction.length - 1] === "0") fraction = builtins.slice(fraction, 0, -1);
+      if (fraction.length < minimum) fraction += builtins.repeat("0", minimum - fraction.length);
     }
-    if (whole.length < integers) whole = "0".repeat(integers - whole.length) + whole;
+    if (whole.length < integers) whole = builtins.repeat("0", integers - whole.length) + whole;
 
     const grouping = groupingOf(options.useGrouping);
     // A compact number is only grouped when there are five digits to group, unless it is asked to always be.
@@ -336,8 +336,8 @@
   // The sign in front of a number, as signDisplay asks for it. A number that is
   // written as zero counts as zero, whatever it was before it was rounded.
   function signOf(negative, text, options) {
-    const mode = options.signDisplay === undefined ? "auto" : String(options.signDisplay);
-    const zero = !/[1-9∞N]/.test(text);
+    const mode = options.signDisplay === undefined ? "auto" : builtins.string(options.signDisplay);
+    const zero = !builtins.test(/[1-9∞N]/, text);
     switch (mode) {
       case "auto":
         return negative ? "-" : "";
@@ -354,18 +354,18 @@
   }
 
   function format(negative, magnitude, options) {
-    const style = options.style === undefined ? "decimal" : String(options.style);
+    const style = options.style === undefined ? "decimal" : builtins.string(options.style);
     let currency;
     if (style === "currency") {
       if (options.currency === undefined) throw new TypeError("Currency code is required with currency style.");
-      currency = String(options.currency).toUpperCase();
+      currency = builtins.toUpperCase(builtins.string(options.currency));
     }
 
     let defaultMin = 0;
     let defaultMax = 3;
     if (style === "percent") defaultMax = 0;
     if (style === "currency") {
-      defaultMin = defaultMax = WHOLE_CURRENCIES.indexOf(currency) >= 0 ? 0 : 2;
+      defaultMin = defaultMax = builtins.indexOfIn(WHOLE_CURRENCIES, currency) >= 0 ? 0 : 2;
     }
 
     const notation = options.notation;
@@ -387,7 +387,7 @@
         text += " " + CURRENCY_NAMES[currency][text === "1" ? 0 : 1];
       } else {
         const symbol = display === "code" ? undefined : display === "narrowSymbol" ? NARROW_SYMBOLS[currency] : SYMBOLS[currency];
-        text = (symbol === undefined ? currency + (/^\d/.test(text) ? " " : "") : symbol) + text;
+        text = (symbol === undefined ? currency + (builtins.test(/^\d/, text) ? " " : "") : symbol) + text;
       }
     }
     // A compact number keeps its minus sign, as ICU writes it. A currency name is not put in brackets.
@@ -398,8 +398,8 @@
   }
 
   function handled(locales, options) {
-    const tag = Array.isArray(locales) ? locales[0] : locales;
-    if (tag !== undefined && !ENGLISH.test(String(tag))) return false;
+    const tag = builtins.isArray(locales) ? locales[0] : locales;
+    if (tag !== undefined && !builtins.test(ENGLISH, builtins.string(tag))) return false;
     if (options === undefined || options === null) return true;
     for (let i = 0; i < UNSUPPORTED.length; i++) {
       if (options[UNSUPPORTED[i]] !== undefined) return false;
@@ -407,39 +407,39 @@
     const notation = options.notation;
     if (notation !== undefined && notation !== "standard" && notation !== "compact" && notation !== "scientific" && notation !== "engineering") return false;
     if (options.compactDisplay !== undefined && options.compactDisplay !== "short" && options.compactDisplay !== "long") return false;
-    if (options.currencyDisplay === "name" && options.style === "currency" && CURRENCY_NAMES[String(options.currency).toUpperCase()] === undefined) return false;
+    if (options.currencyDisplay === "name" && options.style === "currency" && CURRENCY_NAMES[builtins.toUpperCase(builtins.string(options.currency))] === undefined) return false;
     if (options.currencySign !== undefined && options.currencySign !== "standard" && options.currencySign !== "accounting") return false;
     if (options.style === "unit") return unitKnown(options);
     return options.style === undefined || options.style === "decimal" || options.style === "percent" || options.style === "currency";
   }
 
   function unitDisplayOf(options) {
-    return options.unitDisplay === undefined ? "short" : String(options.unitDisplay);
+    return options.unitDisplay === undefined ? "short" : builtins.string(options.unitDisplay);
   }
 
   function unitKnown(options) {
-    return Object.prototype.hasOwnProperty.call(UNITS, String(options.unit)) && UNIT_DISPLAYS.indexOf(unitDisplayOf(options)) !== -1;
+    return builtins.hasOwn(UNITS, builtins.string(options.unit)) && builtins.indexOfIn(UNIT_DISPLAYS, unitDisplayOf(options)) !== -1;
   }
 
   // A unit is well formed when it is a simple unit, or two simple units joined by
   // "per"; any other unit is refused, as Node refuses it.
   function isSimpleUnit(unit) {
-    return Object.prototype.hasOwnProperty.call(UNITS, unit) && unit.indexOf("-per-") === -1;
+    return builtins.hasOwn(UNITS, unit) && builtins.indexOf(unit, "-per-") === -1;
   }
 
   function unitWellFormed(unit) {
     if (isSimpleUnit(unit)) return true;
-    const at = unit.indexOf("-per-");
-    return at !== -1 && isSimpleUnit(unit.slice(0, at)) && isSimpleUnit(unit.slice(at + 5));
+    const at = builtins.indexOf(unit, "-per-");
+    return at !== -1 && isSimpleUnit(builtins.slice(unit, 0, at)) && isSimpleUnit(builtins.slice(unit, at + 5));
   }
 
   // The unit after the number, with its space when the form has one. A number of
   // exactly one takes the singular, with no fraction digits shown: 001 and 1E0
   // are one, as 1.0 is not.
   function unitSuffix(options, text) {
-    const forms = UNITS[String(options.unit)];
+    const forms = UNITS[builtins.string(options.unit)];
     const display = unitDisplayOf(options);
-    const one = /^0*1(E0)?$/.test(text.replace(/,/g, ""));
+    const one = builtins.test(/^0*1(E0)?$/, builtins.replace(text, /,/g, ""));
     if (display === "narrow") return forms[2];
     if (display === "long") return forms[one ? 3 : 4];
     return forms[one ? 0 : 1];
@@ -452,30 +452,30 @@
     if (value === undefined) return "auto";
     if (value === true) return "always";
     if (!value) return false;
-    const text = String(value);
+    const text = builtins.string(value);
     if (text === "true" || text === "false") return "auto";
     return text === "always" || text === "auto" || text === "min2" ? text : undefined;
   }
 
   function checkOptions(options, owner) {
     if (options === undefined || options === null) return;
-    for (const name of Object.keys(OPTION_VALUES)) {
+    for (const name of builtins.keys(OPTION_VALUES)) {
       const value = options[name];
-      if (value !== undefined && OPTION_VALUES[name].indexOf(String(value)) === -1) {
-        throw new RangeError("Value " + String(value) + " out of range for " + owner + " options property " + name);
+      if (value !== undefined && builtins.indexOfIn(OPTION_VALUES[name], builtins.string(value)) === -1) {
+        throw new RangeError("Value " + builtins.string(value) + " out of range for " + owner + " options property " + name);
       }
     }
     if (options.useGrouping !== undefined && groupingOf(options.useGrouping) === undefined) {
-      throw new RangeError("Value " + String(options.useGrouping) + " out of range for " + owner + " options property useGrouping");
+      throw new RangeError("Value " + builtins.string(options.useGrouping) + " out of range for " + owner + " options property useGrouping");
     }
-    if (options.currency !== undefined && !/^[A-Za-z]{3}$/.test(String(options.currency))) {
-      throw new RangeError("Invalid currency code : " + String(options.currency));
+    if (options.currency !== undefined && !builtins.test(/^[A-Za-z]{3}$/, builtins.string(options.currency))) {
+      throw new RangeError("Invalid currency code : " + builtins.string(options.currency));
     }
     if (options.style === "unit" && options.unit === undefined) {
       throw new TypeError("Invalid unit argument for " + owner + "() ''");
     }
-    if (options.unit !== undefined && !unitWellFormed(String(options.unit))) {
-      throw new RangeError("Invalid unit argument for " + owner + "() '" + String(options.unit) + "'");
+    if (options.unit !== undefined && !unitWellFormed(builtins.string(options.unit))) {
+      throw new RangeError("Invalid unit argument for " + owner + "() '" + builtins.string(options.unit) + "'");
     }
   }
 
@@ -485,7 +485,7 @@
     checkOptions(options, "Number.prototype.toLocaleString");
     if (!handled(locales, options)) return original.call(value, locales, options);
 
-    return format(value < 0 || Object.is(value, -0), Math.abs(value), options || {});
+    return format(value < 0 || builtins.is(value, -0), builtins.abs(value), options || {});
   }
 
   function bigintToLocaleString(locales, options) {
