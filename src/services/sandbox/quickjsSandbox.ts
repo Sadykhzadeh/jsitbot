@@ -23,7 +23,7 @@ import {
 } from "./types";
 import { truncateText } from "../../utils/markdownV2";
 import { zoneInfo } from "./timeZone";
-import { sourceLine, stripTypes } from "./typescript";
+import { blankEmptyExports, sourceLine, stripTypes } from "./typescript";
 import { createCappedModule, isHeapExhausted, isHeapGrown, isHeapNearlyFull } from "./wasmHeap";
 
 const MEMORY_LIMIT_MESSAGE = "Sandbox exceeded its memory limit.";
@@ -405,7 +405,7 @@ export class QuickJsSandboxService implements SandboxService {
     if (stripped && "code" in stripped) {
       const typed = this.readCode(context, runtime, guest, stripped.code, expired);
       if (typed.settled) {
-        return typed.packed && atSourceLine(typed.packed, code);
+        return typed.packed && atSourceLine(typed.packed, blankEmptyExports(code));
       }
     }
 

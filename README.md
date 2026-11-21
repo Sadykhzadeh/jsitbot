@@ -43,6 +43,8 @@ Telegram bot for running JavaScript in an isolated sandbox.
 
 A snippet that does not run as JavaScript is read as TypeScript, and its types are removed before it runs. Code that runs as JavaScript is never changed. Types are not checked: `const n: number = "a"` runs and gives `a`.
 
+An empty `export {};`, which TypeScript uses to make a file a module, is left out of a snippet, so the snippet runs. An export with a name is still refused. A snippet that has an empty export and a top-level `return` runs as a script, like any snippet without exports, so it is not in strict mode the way a module is.
+
 Errors point at what you wrote: a runtime error gives the line of your code, and a syntax error shows that line with a caret under its column, also when types come before it. A runtime error inside a statement that spans lines gives the line of the part that failed, found from the place the engine reports. The exception is code that awaits or returns at its top level, and an error whose name is on more than one line: there it gives the line the statement starts on.
 
 Supported, with the same meaning as in `tsc`:

@@ -117,3 +117,37 @@ describe("stripTypes", () => {
     expect(stripTypes("let a = 1;\n")).toBeUndefined();
   });
 });
+
+describe("an empty export list", () => {
+  test("is left out of a snippet, so the snippet runs", async () => {
+    expect(await show("export {};")).toBe("undefined");
+    expect(await show("export {}\nlet q = 4\nq")).toBe("4");
+    expect(await show("export {};\nconst a: number = 2;\na")).toBe("2");
+  });
+
+  test("is left out of a snippet that returns at its top level", async () => {
+    expect(await show("export {};\nreturn 7;")).toBe("7");
+    expect(await show("export {};\nconst n: number = await Promise.resolve(2);\nreturn n * 2;")).toBe("4");
+    expect(await show("export {};\nfunction f(): number { return 3 }\nf()")).toBe("3");
+  });
+
+  test("keeps the lines of the code after it, for an error", async () => {
+    const execution = await sandbox.execute("const a: number = 1;\n  export {};\nthrow new Error(`x${a}`);");
+
+    expect(execution.ok).toBe(false);
+    expect(execution.ok ? "" : execution.error).toBe("Error: x1");
+    expect(execution.ok ? undefined : execution.line).toBe(3);
+  });
+
+  test("is not touched inside a template literal, a string or a comment", async () => {
+    expect(await show("const s: string = `\nexport {};\n`;\ns")).toBe("\nexport {};\n");
+    expect(await show("const s: string = 'export {};';\ns")).toBe("export {};");
+    expect(await show("// export {};\nconst n: number = 3;\nn")).toBe("3");
+  });
+
+  test("is left alone when it is not a statement of the code", () => {
+    expect(stripTypes("const a: number = 1;\nconst s = `export {};`;\na")).toEqual({
+      code: "const a = 1;\nconst s = `export {};`;\na;\n",
+    });
+  });
+});

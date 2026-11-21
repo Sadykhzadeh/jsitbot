@@ -16,7 +16,7 @@ export type Stripped =
 
 let transpiler: Bun.Transpiler | undefined;
 
-function transform(source: string): string {
+function getTranspiler(): Bun.Transpiler {
   // Macros are off: an `import ... with { type: "macro" }` is run by the
   // transpiler itself, in the process that holds the host's modules and files,
   // and its return value is pasted into the output. Guest code must never get
@@ -27,7 +27,11 @@ function transform(source: string): string {
     macro: false,
   } as unknown as Bun.TranspilerOptions);
 
-  return transpiler.transformSync(source);
+  return transpiler;
+}
+
+function transform(source: string): string {
+  return getTranspiler().transformSync(source);
 }
 
 // The head of the function a snippet that returns is wrapped in.
@@ -44,6 +48,14 @@ const HELPERS_REFUSAL = "SyntaxError: decorators, accessor and using are not sup
 // module statements they are.
 const TYPE_ONLY_MODULE = /^[ \t]*(?:(import)[ \t]+(?:type\b|[\w$]+[ \t]*=)|(export)(?:[ \t]+type\b|[ \t]*=))/m;
 
+// The empty export list that makes a file a module. The engine reads a snippet as
+// a script and refuses the keyword, so the statement is taken out.
+const EMPTY_EXPORT = /export[ \t\r\n]*\{[ \t\r\n]*\}[ \t\r\n]*;?/g;
+const EXPORT_PROBE = "__jsitbot_empty_export__";
+// A snippet may return at its top level, which a module may not. The probe is
+// scanned with the keyword blanked, which keeps every statement where it was.
+const RETURN_KEYWORD = /(?<![\w$.])return(?![\w$])/g;
+
 // JSX: a closing tag, a fragment, a self-closing element or an attribute. A
 // type assertion such as `<number>x` has none of these, so it is not JSX.
 const JSX_LIKE = /<\/[A-Za-z]|<>|<[A-Za-z][\w.-]*(?:\s+[\w:-]+=|\s*\/>)/;
@@ -58,7 +70,8 @@ const JSX_REFUSAL = "SyntaxError: JSX is not supported";
  * expression such as the `v` in `const v: string = "a"; v`, which is the value
  * the user wants back.
  */
-export function stripTypes(code: string): Stripped | undefined {
+export function stripTypes(source: string): Stripped | undefined {
+  const code = blankEmptyExports(source);
   const moduleStatement = TYPE_ONLY_MODULE.exec(code);
   if (moduleStatement) {
     const keywordAt = moduleStatement.index + moduleStatement[0].length - moduleStatement[0].trimStart().length;
@@ -93,7 +106,42 @@ export function stripTypes(code: string): Stripped | undefined {
     return { refusal: { message: HELPERS_REFUSAL } };
   }
 
-  return output.trim() === code.trim() ? undefined : { code: output };
+  return output.trim() === code.trim() && code === source ? undefined : { code: output };
+}
+
+/**
+ * Replaces each `export {};` that the transpiler reads as a statement of the
+ * code with spaces, so the lines and columns stay where they were. Each
+ * candidate is tested alone: the transpiler is asked whether it exports a name
+ * put in its place, which only a top-level statement does, so the same text in a
+ * string, a template or a comment is left as it is.
+ */
+export function blankEmptyExports(code: string): string {
+  if (!code.includes("export") || code.includes(EXPORT_PROBE)) {
+    return code;
+  }
+
+  let result = code;
+  let scanned = code.replace(RETURN_KEYWORD, (word) => " ".repeat(word.length));
+  for (const match of code.matchAll(EMPTY_EXPORT)) {
+    const at = match.index ?? 0;
+    const probe = scanned.slice(0, at) + `export const ${EXPORT_PROBE} = 0;` + scanned.slice(at + match[0].length);
+    if (exportsProbe(probe)) {
+      const blank = match[0].replace(/[^\n]/g, " ");
+      result = result.slice(0, at) + blank + result.slice(at + match[0].length);
+      scanned = scanned.slice(0, at) + blank + scanned.slice(at + match[0].length);
+    }
+  }
+
+  return result;
+}
+
+function exportsProbe(source: string): boolean {
+  try {
+    return getTranspiler().scan(source).exports.includes(EXPORT_PROBE);
+  } catch {
+    return false;
+  }
 }
 
 /**
