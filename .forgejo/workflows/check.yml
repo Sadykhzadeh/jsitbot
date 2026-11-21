@@ -18,7 +18,14 @@ jobs:
   check:
     # The only label this forge's runner answers to.
     runs-on: docker
-    # The job takes about half a minute; a hang should not hold the runner longer.
+    # The oldest Bun the README supports and the newest, so a change that needs
+    # a newer Bun is caught instead of silently dropping the oldest.
+    strategy:
+      matrix:
+        bun-version: ["1.3.10", "1.4.4"]
+
+    # The oldest Bun takes a couple of minutes; a hang should not hold the
+    # runner longer.
     timeout-minutes: 5
 
     steps:
@@ -26,7 +33,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.4
+          bun-version: ${{ matrix.bun-version }}
 
       - name: Install
         run: bun install --frozen-lockfile
