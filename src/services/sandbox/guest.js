@@ -2222,6 +2222,8 @@
   });
 
   lazyMethod("collate", String.prototype, "localeCompare");
+  lazyMethod("casing", String.prototype, "toLocaleUpperCase");
+  lazyMethod("casing", String.prototype, "toLocaleLowerCase");
   // The date extra writes the three locale methods of Date.prototype, and the parts
   // Intl.DateTimeFormat uses, so it is evaluated once, by the first call of any of them.
   const engineDate = {
