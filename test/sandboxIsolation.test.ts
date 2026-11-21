@@ -186,6 +186,27 @@ describe("tampering with built-ins", () => {
     `)).toBe("1");
   });
 
+  test("the URL extra keeps working after String, Array, RegExp, Function and Math methods are replaced", async () => {
+    expect(await value(`
+      String.prototype.slice = () => "";
+      String.prototype.split = () => [];
+      String.prototype.replace = () => "";
+      String.prototype.toLowerCase = () => "x";
+      Array.prototype.push = () => 0;
+      Array.prototype.join = () => "J";
+      Array.prototype.map = () => [];
+      RegExp.prototype.test = () => false;
+      Function.prototype.call = () => "hijacked";
+      Object.assign = () => ({});
+      Math.floor = () => -1;
+      const url = new URL("HTTP://User:Pw@EXAMPLE.com:80/a/../b?c=1#d");
+      url.hash = "e";
+      const params = new URLSearchParams("a=1&b=2");
+      params.append("c", "3");
+      return [url.href, url.pathname, params.toString()];
+    `)).toBe("[ 'http://User:Pw@example.com/b?c=1#e', '/b', 'a=1&b=2&c=3' ]");
+  });
+
   test("the console cannot be replaced or removed", async () => {
     const result = await sandbox.execute(`
       console.log = () => {};

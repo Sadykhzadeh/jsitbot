@@ -5,25 +5,25 @@
 // in ASCII with non-ASCII labels written as punycode. The mapping of
 // internationalised names is limited to compatibility normalisation, lower case
 // and the ideographic full stops.
-(function (register) {
+(function (register, seed, host, builtins) {
   "use strict";
 
   const SPECIAL_PORTS = { http: "80", https: "443", ws: "80", wss: "443", ftp: "21", file: "" };
 
   function isSpecial(scheme) {
-    return Object.prototype.hasOwnProperty.call(SPECIAL_PORTS, scheme);
+    return builtins.hasOwn(SPECIAL_PORTS, scheme);
   }
 
   function invalidUrl(input, base) {
     const error = new TypeError("Invalid URL");
     error.code = "ERR_INVALID_URL";
-    error.input = String(input).toWellFormed();
-    if (base !== undefined) error.base = String(base).toWellFormed();
+    error.input = builtins.toWellFormed(builtins.string(input));
+    if (base !== undefined) error.base = builtins.toWellFormed(builtins.string(base));
     return error;
   }
 
   function hex(code) {
-    return "%" + (code < 16 ? "0" : "") + code.toString(16).toUpperCase();
+    return "%" + (code < 16 ? "0" : "") + builtins.toUpperCase(builtins.numberToString(code, 16));
   }
 
   // Percent-encodes the characters that are outside printable ASCII, plus the
@@ -31,21 +31,21 @@
   const SAFE_PATTERNS = new Map();
 
   function pct(text, set) {
-    let pattern = SAFE_PATTERNS.get(set);
+    let pattern = builtins.mapGet(SAFE_PATTERNS, set);
     if (pattern === undefined) {
-      pattern = new RegExp("[\\u0000-\\u0020\\u007f-\\uffff" + set.replace(/[\\\]\[^-]/g, "\\$&") + "]");
-      SAFE_PATTERNS.set(set, pattern);
+      pattern = new RegExp("[\\u0000-\\u0020\\u007f-\\uffff" + builtins.replace(set, /[\\\]\[^-]/g, "\\$&") + "]");
+      builtins.mapSet(SAFE_PATTERNS, set, pattern);
     }
-    if (!pattern.test(text)) return text;
+    if (!builtins.test(pattern, text)) return text;
     let out = "";
     for (const char of text) {
-      const code = char.codePointAt(0);
-      if (code >= 0x20 && code < 0x7f && set.indexOf(char) === -1) {
+      const code = builtins.codePointAt(char, 0);
+      if (code >= 0x20 && code < 0x7f && builtins.indexOf(set, char) === -1) {
         out += char;
       } else if (code < 0x80) {
         out += hex(code);
       } else {
-        out += encodeURIComponent(char);
+        out += builtins.encodeURIComponent(char);
       }
     }
     return out;
@@ -57,15 +57,15 @@
   const PATH_SET = ' "#<>?`{}^';
   const USERINFO_SET = ' "#<>?`{}/:;=@[\\]^|';
 
-  const isAlpha = (c) => c !== undefined && /^[a-zA-Z]$/.test(c);
-  const isDigit = (c) => c !== undefined && /^[0-9]$/.test(c);
-  const isHex = (c) => c !== undefined && /^[0-9a-fA-F]$/.test(c);
+  const isAlpha = (c) => c !== undefined && builtins.test(/^[a-zA-Z]$/, c);
+  const isDigit = (c) => c !== undefined && builtins.test(/^[0-9]$/, c);
+  const isHex = (c) => c !== undefined && builtins.test(/^[0-9a-fA-F]$/, c);
   const isWindowsDriveLetter = (text) => text.length === 2 && isAlpha(text[0]) && (text[1] === ":" || text[1] === "|");
   const isNormalizedDriveLetter = (text) => text.length === 2 && isAlpha(text[0]) && text[1] === ":";
 
   // The path segments of a parsed URL, which keeps its path as one string.
   function segmentsOf(record) {
-    return record.path === "" ? [] : record.path.slice(1).split("/");
+    return record.path === "" ? [] : builtins.split(builtins.slice(record.path, 1), "/");
   }
 
   function startsWithDriveLetter(text, from) {
@@ -76,27 +76,27 @@
   }
 
   function isSingleDot(text) {
-    return text === "." || (text[0] === "%" && text.toLowerCase() === "%2e");
+    return text === "." || (text[0] === "%" && builtins.toLowerCase(text) === "%2e");
   }
 
   function isDoubleDot(text) {
     if (text[0] !== "." && text[0] !== "%") return false;
-    const lower = text.toLowerCase();
+    const lower = builtins.toLowerCase(text);
     return lower === ".." || lower === ".%2e" || lower === "%2e." || lower === "%2e%2e";
   }
 
   function shortenPath(url) {
     if (url.scheme === "file" && url.path.length === 1 && isNormalizedDriveLetter(url.path[0])) return;
-    url.path.pop();
+    builtins.pop(url.path);
   }
 
   // Decodes a run of %XX escapes as UTF-8. A byte that does not start or continue a
   // character becomes U+FFFD, and a valid character is kept whole.
   function decodeRun(run) {
     try {
-      return decodeURIComponent(run);
+      return builtins.decodeURIComponent(run);
     } catch (error) {
-      const bytes = run.match(/%[0-9a-fA-F]{2}/g).map((escape) => parseInt(escape.slice(1), 16));
+      const bytes = builtins.map(builtins.match(run, /%[0-9a-fA-F]{2}/g), (escape) => builtins.parseInteger(builtins.slice(escape, 1), 16));
       let out = "";
       for (let i = 0; i < bytes.length; ) {
         const first = bytes[i];
@@ -104,16 +104,16 @@
         let whole = length > 0 && i + length <= bytes.length;
         for (let k = 1; whole && k < length; k++) if ((bytes[i + k] & 0xc0) !== 0x80) whole = false;
         if (whole && length > 1) {
-          const piece = bytes.slice(i, i + length).map((byte) => "%" + byte.toString(16).padStart(2, "0")).join("");
+          const piece = builtins.join(builtins.map(builtins.sliceOf(bytes, i, i + length), (byte) => "%" + builtins.padStart(builtins.numberToString(byte, 16), 2, "0")), "");
           try {
-            out += decodeURIComponent(piece);
+            out += builtins.decodeURIComponent(piece);
             i += length;
             continue;
           } catch (inner) {
             // Not a character after all: the first byte is replaced below.
           }
         }
-        out += length === 1 ? String.fromCharCode(first) : "�";
+        out += length === 1 ? builtins.fromCharCode(first) : "�";
         i++;
       }
       return out;
@@ -122,7 +122,7 @@
 
   // Decodes the %XX escapes of a host name.
   function percentDecode(text) {
-    return text.replace(/(?:%[0-9a-fA-F]{2})+/g, decodeRun);
+    return builtins.replace(text, /(?:%[0-9a-fA-F]{2})+/g, decodeRun);
   }
 
   // RFC 3492, for a label that is not ASCII.
@@ -132,26 +132,26 @@
     const tMax = 26;
     const skew = 38;
     const damp = 700;
-    const codes = Array.from(input, (char) => char.codePointAt(0));
+    const codes = builtins.from(input, (char) => builtins.codePointAt(char, 0));
     let n = 128;
     let delta = 0;
     let bias = 72;
-    let output = codes.filter((code) => code < 0x80).map((code) => String.fromCharCode(code)).join("");
+    let output = builtins.join(builtins.map(builtins.filter(codes, (code) => code < 0x80), (code) => builtins.fromCharCode(code)), "");
     const basicCount = output.length;
     let handled = basicCount;
     if (basicCount > 0) output += "-";
 
-    const digit = (value) => String.fromCharCode(value + 22 + 75 * (value < 26));
+    const digit = (value) => builtins.fromCharCode(value + 22 + 75 * (value < 26));
     const threshold = (k, current) => (k <= current ? tMin : k >= current + tMax ? tMax : k - current);
     const adapt = (change, count, first) => {
-      let d = first ? Math.floor(change / damp) : Math.floor(change / 2);
-      d += Math.floor(d / count);
+      let d = first ? builtins.floor(change / damp) : builtins.floor(change / 2);
+      d += builtins.floor(d / count);
       let k = 0;
-      while (d > Math.floor(((base - tMin) * tMax) / 2)) {
-        d = Math.floor(d / (base - tMin));
+      while (d > builtins.floor(((base - tMin) * tMax) / 2)) {
+        d = builtins.floor(d / (base - tMin));
         k += base;
       }
-      return k + Math.floor(((base - tMin + 1) * d) / (d + skew));
+      return k + builtins.floor(((base - tMin + 1) * d) / (d + skew));
     };
 
     while (handled < codes.length) {
@@ -167,7 +167,7 @@
             const t = threshold(k, bias);
             if (q < t) break;
             output += digit(t + ((q - t) % (base - t)));
-            q = Math.floor((q - t) / (base - t));
+            q = builtins.floor((q - t) / (base - t));
           }
           output += digit(q);
           bias = adapt(delta, handled + 1, handled === basicCount);
@@ -184,51 +184,51 @@
   // Compatibility normalisation and lower case, the ideographic full stops as dots,
   // and punycode for labels that are not ASCII.
   function domainToAscii(domain) {
-    return domain
-      .replace(/[。．｡]/g, ".")
-      .normalize("NFKC")
-      .toLowerCase()
-      .split(".")
-      .map((label) => (/[^\x00-\x7f]/.test(label) ? "xn--" + punycode(label) : label))
-      .join(".");
+    return builtins.join(
+      builtins.map(
+        builtins.split(builtins.toLowerCase(builtins.normalize(builtins.replace(domain, /[。．｡]/g, "."), "NFKC")), "."),
+        (label) => (builtins.test(/[^\x00-\x7f]/, label) ? "xn--" + punycode(label) : label),
+      ),
+      ".",
+    );
   }
 
   function parseIPv4Number(text) {
     if (text === "") return null;
     let radix = 10;
     let digits = text;
-    if (digits.length >= 2 && (digits.startsWith("0x") || digits.startsWith("0X"))) {
-      digits = digits.slice(2);
+    if (digits.length >= 2 && (builtins.startsWith(digits, "0x") || builtins.startsWith(digits, "0X"))) {
+      digits = builtins.slice(digits, 2);
       radix = 16;
-    } else if (digits.length >= 2 && digits.startsWith("0")) {
-      digits = digits.slice(1);
+    } else if (digits.length >= 2 && builtins.startsWith(digits, "0")) {
+      digits = builtins.slice(digits, 1);
       radix = 8;
     }
     if (digits === "") return 0;
     const valid = radix === 10 ? /^[0-9]+$/ : radix === 16 ? /^[0-9a-fA-F]+$/ : /^[0-7]+$/;
-    return valid.test(digits) ? parseInt(digits, radix) : null;
+    return builtins.test(valid, digits) ? builtins.parseInteger(digits, radix) : null;
   }
 
   function endsInNumber(host) {
-    const parts = host.split(".");
+    const parts = builtins.split(host, ".");
     if (parts[parts.length - 1] === "") {
       if (parts.length === 1) return false;
-      parts.pop();
+      builtins.pop(parts);
     }
     const last = parts[parts.length - 1];
-    if (/^[0-9]+$/.test(last)) return true;
+    if (builtins.test(/^[0-9]+$/, last)) return true;
     return parseIPv4Number(last) !== null;
   }
 
   function parseIPv4(host) {
-    const parts = host.split(".");
-    if (parts[parts.length - 1] === "" && parts.length > 1) parts.pop();
+    const parts = builtins.split(host, ".");
+    if (parts[parts.length - 1] === "" && parts.length > 1) builtins.pop(parts);
     if (parts.length > 4) return null;
     const numbers = [];
     for (const part of parts) {
       const value = parseIPv4Number(part);
       if (value === null) return null;
-      numbers.push(value);
+      builtins.push(numbers, value);
     }
     for (let i = 0; i < numbers.length - 1; i++) if (numbers[i] > 255) return null;
     if (numbers[numbers.length - 1] >= 256 ** (5 - numbers.length)) return null;
@@ -236,10 +236,10 @@
     for (let i = 0; i < numbers.length - 1; i++) address += numbers[i] * 256 ** (3 - i);
     const octets = [];
     for (let i = 0; i < 4; i++) {
-      octets.unshift(address % 256);
-      address = Math.floor(address / 256);
+      builtins.unshift(octets, address % 256);
+      address = builtins.floor(address / 256);
     }
-    return octets.join(".");
+    return builtins.join(octets, ".");
   }
 
   function parseIPv6(input) {
@@ -266,7 +266,7 @@
       let value = 0;
       let length = 0;
       while (length < 4 && isHex(input[p])) {
-        value = value * 16 + parseInt(input[p], 16);
+        value = value * 16 + builtins.parseInteger(input[p], 16);
         p++;
         length++;
       }
@@ -283,7 +283,7 @@
           }
           if (!isDigit(input[p])) return null;
           while (isDigit(input[p])) {
-            const digit = parseInt(input[p], 10);
+            const digit = builtins.parseInteger(input[p], 10);
             if (piece === null) piece = digit;
             else if (piece === 0) return null;
             else piece = piece * 10 + digit;
@@ -345,7 +345,7 @@
         skipping = true;
         continue;
       }
-      out += address[i].toString(16);
+      out += builtins.numberToString(address[i], 16);
       if (i !== 7) out += ":";
     }
     return out;
@@ -356,40 +356,40 @@
 
   // The host of a URL as it is written in the serialised form, or null when the text is not a host.
   function parseHost(input, opaque) {
-    if (input.startsWith("[")) {
-      if (!input.endsWith("]")) return null;
-      const address = parseIPv6(input.slice(1, -1));
+    if (builtins.startsWith(input, "[")) {
+      if (!builtins.endsWith(input, "]")) return null;
+      const address = parseIPv6(builtins.slice(input, 1, -1));
       return address === null ? null : "[" + address + "]";
     }
-    if (opaque) return FORBIDDEN_HOST.test(input) ? null : pct(input, "");
+    if (opaque) return builtins.test(FORBIDDEN_HOST, input) ? null : pct(input, "");
 
     const domain = percentDecode(input);
-    if (domain.indexOf("�") !== -1) return null;
-    const ascii = /^[a-zA-Z0-9.-]+$/.test(domain) ? domain.toLowerCase() : domainToAscii(domain);
-    if (FORBIDDEN_DOMAIN.test(ascii)) return null;
+    if (builtins.indexOf(domain, "�") !== -1) return null;
+    const ascii = builtins.test(/^[a-zA-Z0-9.-]+$/, domain) ? builtins.toLowerCase(domain) : domainToAscii(domain);
+    if (builtins.test(FORBIDDEN_DOMAIN, ascii)) return null;
     if (endsInNumber(ascii)) return parseIPv4(ascii);
     return ascii;
   }
 
   // The path a pathname setter gives a URL, serialised as the parser keeps it.
   function pathOf(text, special) {
-    const body = text.replace(/[\t\n\r]/g, "");
+    const body = builtins.replace(text, /[\t\n\r]/g, "");
     if (!special && body === "") return "";
-    const parts = (special ? body.replace(/\\/g, "/") : body).split("/");
-    if (parts[0] === "" && parts.length > 1) parts.shift();
+    const parts = builtins.split(special ? builtins.replace(body, /\\/g, "/") : body, "/");
+    if (parts[0] === "" && parts.length > 1) builtins.shift(parts);
     const segments = [];
-    parts.forEach((part, index) => {
+    builtins.forEach(parts, (part, index) => {
       const last = index === parts.length - 1;
       if (isDoubleDot(part)) {
-        segments.pop();
-        if (last) segments.push("");
+        builtins.pop(segments);
+        if (last) builtins.push(segments, "");
       } else if (isSingleDot(part)) {
-        if (last) segments.push("");
+        if (last) builtins.push(segments, "");
       } else {
-        segments.push(pct(part, PATH_SET));
+        builtins.push(segments, pct(part, PATH_SET));
       }
     });
-    return segments.map((segment) => "/" + segment).join("");
+    return builtins.join(builtins.map(segments, (segment) => "/" + segment), "");
   }
 
   // Runs of characters that no state treats one by one, so that a long host or path
@@ -407,8 +407,8 @@
   // The end of the run that `run` matches at `from`, and at least one character on.
   function runEnd(run, text, from) {
     run.lastIndex = from;
-    run.exec(text);
-    return Math.max(run.lastIndex, from + 1);
+    builtins.exec(run, text);
+    return builtins.max(run.lastIndex, from + 1);
   }
 
   // The states of the basic URL parser, as numbers: a switch on strings is slow in the engine.
@@ -435,12 +435,12 @@
 
   // The basic URL parser. Returns the record of the URL, or null when the input is not a URL.
   function parse(input, base) {
-    const raw = String(input).toWellFormed();
+    const raw = builtins.toWellFormed(builtins.string(input));
     let start = 0;
     let end = raw.length;
-    while (start < end && raw.charCodeAt(start) <= 0x20) start++;
-    while (end > start && raw.charCodeAt(end - 1) <= 0x20) end--;
-    const text = raw.slice(start, end).replace(/[\t\n\r]/g, "");
+    while (start < end && builtins.charCodeAt(raw, start) <= 0x20) start++;
+    while (end > start && builtins.charCodeAt(raw, end - 1) <= 0x20) end--;
+    const text = builtins.replace(builtins.slice(raw, start, end), /[\t\n\r]/g, "");
     const url = {
       scheme: "", username: "", password: "", host: null, port: "", path: [], opaque: false, query: null, fragment: null,
     };
@@ -458,7 +458,7 @@
       switch (state) {
         case ST_SCHEME_START:
           if (isAlpha(c)) {
-            buffer += c.toLowerCase();
+            buffer += builtins.toLowerCase(c);
             state = ST_SCHEME;
           } else {
             state = ST_NO_SCHEME;
@@ -467,8 +467,8 @@
           break;
 
         case ST_SCHEME:
-          if (c !== undefined && /^[a-zA-Z0-9+\-.]$/.test(c)) {
-            buffer += c.toLowerCase();
+          if (c !== undefined && builtins.test(/^[a-zA-Z0-9+\-.]$/, c)) {
+            buffer += builtins.toLowerCase(c);
           } else if (c === ":") {
             url.scheme = buffer;
             special = isSpecial(url.scheme);
@@ -591,10 +591,10 @@
           if (c === "@") {
             if (atSignSeen) buffer = "%40" + buffer;
             atSignSeen = true;
-            const colon = passwordSeen ? -1 : buffer.indexOf(":");
+            const colon = passwordSeen ? -1 : builtins.indexOf(buffer, ":");
             if (colon !== -1) {
-              url.username += pct(buffer.slice(0, colon), USERINFO_SET);
-              url.password += pct(buffer.slice(colon + 1), USERINFO_SET);
+              url.username += pct(builtins.slice(buffer, 0, colon), USERINFO_SET);
+              url.password += pct(builtins.slice(buffer, colon + 1), USERINFO_SET);
               passwordSeen = true;
             } else if (passwordSeen) {
               url.password += pct(buffer, USERINFO_SET);
@@ -609,7 +609,7 @@
             state = ST_HOST;
           } else {
             const next = runEnd(special ? RUN_AUTHORITY_SPECIAL : RUN_AUTHORITY, text, p);
-            buffer += text.slice(p, next);
+            buffer += builtins.slice(text, p, next);
             p = next - 1;
           }
           break;
@@ -635,7 +635,7 @@
             buffer += c;
           } else {
             const next = runEnd(RUN_HOST, text, p);
-            buffer += text.slice(p, next);
+            buffer += builtins.slice(text, p, next);
             p = next - 1;
           }
           break;
@@ -643,13 +643,13 @@
         case ST_PORT:
           if (isDigit(c)) {
             const next = runEnd(RUN_PORT, text, p);
-            buffer += text.slice(p, next);
+            buffer += builtins.slice(text, p, next);
             p = next - 1;
           } else if (ends) {
             if (buffer !== "") {
-              const port = parseInt(buffer, 10);
+              const port = builtins.parseInteger(buffer, 10);
               if (port > 65535) return null;
-              url.port = String(port) === SPECIAL_PORTS[url.scheme] ? "" : String(port);
+              url.port = builtins.string(port) === SPECIAL_PORTS[url.scheme] ? "" : builtins.string(port);
               buffer = "";
             }
             state = ST_PATH_START;
@@ -696,7 +696,7 @@
               url.host = base.host;
               const first = segmentsOf(base)[0];
               if (!startsWithDriveLetter(text, p) && first !== undefined && isNormalizedDriveLetter(first)) {
-                url.path.push(first);
+                builtins.push(url.path, first);
               }
             }
             state = ST_PATH;
@@ -722,7 +722,7 @@
             }
           } else {
             const next = runEnd(RUN_FILE_HOST, text, p);
-            buffer += text.slice(p, next);
+            buffer += builtins.slice(text, p, next);
             p = next - 1;
           }
           break;
@@ -748,15 +748,15 @@
             const slashLike = c === "/" || (special && c === "\\");
             if (isDoubleDot(buffer)) {
               shortenPath(url);
-              if (!slashLike) url.path.push("");
+              if (!slashLike) builtins.push(url.path, "");
             } else if (isSingleDot(buffer)) {
-              if (!slashLike) url.path.push("");
+              if (!slashLike) builtins.push(url.path, "");
             } else {
               const segment = pct(buffer, PATH_SET);
               if (url.scheme === "file" && url.path.length === 0 && isWindowsDriveLetter(segment)) {
-                url.path.push(segment[0] + ":");
+                builtins.push(url.path, segment[0] + ":");
               } else {
-                url.path.push(segment);
+                builtins.push(url.path, segment);
               }
             }
             buffer = "";
@@ -770,7 +770,7 @@
             }
           } else {
             const next = runEnd(special ? RUN_PATH_SPECIAL : RUN_PATH, text, p);
-            buffer += text.slice(p, next);
+            buffer += builtins.slice(text, p, next);
             p = next - 1;
           }
           break;
@@ -785,7 +785,7 @@
             state = ST_FRAGMENT;
           } else if (c !== undefined) {
             const next = runEnd(RUN_OPAQUE, text, p);
-            url.path += pct(text.slice(p, next), "");
+            url.path += pct(builtins.slice(text, p, next), "");
             p = next - 1;
           }
           break;
@@ -800,14 +800,14 @@
             }
           } else {
             const next = runEnd(RUN_QUERY, text, p);
-            buffer += text.slice(p, next);
+            buffer += builtins.slice(text, p, next);
             p = next - 1;
           }
           break;
 
         case ST_FRAGMENT:
           if (c !== undefined) {
-            url.fragment += pct(text.slice(p), FRAGMENT_SET);
+            url.fragment += pct(builtins.slice(text, p), FRAGMENT_SET);
             p = text.length;
           }
           break;
@@ -824,7 +824,7 @@
       host: url.host,
       port: url.port,
       opaque: url.opaque,
-      path: url.opaque ? url.path : url.path.map((segment) => "/" + segment).join(""),
+      path: url.opaque ? url.path : builtins.join(builtins.map(url.path, (segment) => "/" + segment), ""),
       query: url.query,
       fragment: url.fragment,
     };
@@ -849,7 +849,7 @@
         out += record.username + (record.password !== "" ? ":" + record.password : "") + "@";
       }
       out += record.host + (record.port !== "" ? ":" + record.port : "");
-    } else if (!record.opaque && record.path.startsWith("//")) {
+    } else if (!record.opaque && builtins.startsWith(record.path, "//")) {
       out += "/.";
     }
     out += record.path;
@@ -864,31 +864,38 @@
   const links = new WeakMap();
 
   function formEncode(text) {
-    return encodeURIComponent(String(text).toWellFormed())
-      .replace(/[!'()~]/g, (char) => hex(char.charCodeAt(0)))
-      .replace(/%20/g, "+");
+    return builtins.replace(
+      builtins.replace(
+        builtins.encodeURIComponent(builtins.toWellFormed(builtins.string(text))),
+        /[!'()~]/g,
+        (char) => hex(builtins.charCodeAt(char, 0)),
+      ),
+      /%20/g,
+      "+",
+    );
   }
 
   function formDecode(text) {
-    return text.replace(/\+/g, " ").replace(/(?:%[0-9a-fA-F]{2})+/g, decodeRun);
+    return builtins.replace(builtins.replace(text, /\+/g, " "), /(?:%[0-9a-fA-F]{2})+/g, decodeRun);
   }
 
   function parseQuery(text) {
     const list = [];
-    for (const piece of text.split("&")) {
+    for (const piece of builtins.split(text, "&")) {
       if (piece === "") continue;
-      const equals = piece.indexOf("=");
-      list.push(
+      const equals = builtins.indexOf(piece, "=");
+      builtins.push(
+        list,
         equals === -1
           ? [formDecode(piece), ""]
-          : [formDecode(piece.slice(0, equals)), formDecode(piece.slice(equals + 1))],
+          : [formDecode(builtins.slice(piece, 0, equals)), formDecode(builtins.slice(piece, equals + 1))],
       );
     }
     return list;
   }
 
   function changed(params) {
-    const link = links.get(params);
+    const link = builtins.weakMapGet(links, params);
     if (link) link(params.toString());
   }
 
@@ -900,107 +907,107 @@
         list = [];
       } else if (typeof init === "object" || typeof init === "function") {
         if (init instanceof URLSearchParams) {
-          list = lists.get(init).map((pair) => [pair[0], pair[1]]);
+          list = builtins.map(builtins.weakMapGet(lists, init), (pair) => [pair[0], pair[1]]);
         } else if (typeof init[Symbol.iterator] === "function") {
           for (const pair of init) {
-            const items = Array.from(pair);
+            const items = builtins.from(pair);
             if (items.length !== 2) {
               throw new TypeError("Each query pair must be an iterable [name, value] tuple");
             }
-            list.push([String(items[0]).toWellFormed(), String(items[1]).toWellFormed()]);
+            builtins.push(list, [builtins.toWellFormed(builtins.string(items[0])), builtins.toWellFormed(builtins.string(items[1]))]);
           }
         } else {
-          for (const key of Object.keys(init)) {
-            list.push([key.toWellFormed(), String(init[key]).toWellFormed()]);
+          for (const key of builtins.keys(init)) {
+            builtins.push(list, [builtins.toWellFormed(key), builtins.toWellFormed(builtins.string(init[key]))]);
           }
         }
       } else {
-        const text = String(init);
-        list = parseQuery(text.startsWith("?") ? text.slice(1) : text);
+        const text = builtins.string(init);
+        list = parseQuery(builtins.startsWith(text, "?") ? builtins.slice(text, 1) : text);
       }
 
-      lists.set(this, list);
+      builtins.weakMapSet(lists, this, list);
     }
 
     get size() {
-      return lists.get(this).length;
+      return builtins.weakMapGet(lists, this).length;
     }
 
     append(name, value) {
       if (arguments.length < 2) throw new TypeError("The name and value arguments are required");
-      lists.get(this).push([String(name).toWellFormed(), String(value).toWellFormed()]);
+      builtins.push(builtins.weakMapGet(lists, this), [builtins.toWellFormed(builtins.string(name)), builtins.toWellFormed(builtins.string(value))]);
       changed(this);
     }
 
     delete(name, value) {
       if (arguments.length < 1) throw new TypeError("The name argument is required");
-      const key = String(name).toWellFormed();
-      const wanted = value === undefined ? undefined : String(value).toWellFormed();
-      lists.set(this, lists.get(this).filter((pair) => !(pair[0] === key && (wanted === undefined || pair[1] === wanted))));
+      const key = builtins.toWellFormed(builtins.string(name));
+      const wanted = value === undefined ? undefined : builtins.toWellFormed(builtins.string(value));
+      builtins.weakMapSet(lists, this, builtins.filter(builtins.weakMapGet(lists, this), (pair) => !(pair[0] === key && (wanted === undefined || pair[1] === wanted))));
       changed(this);
     }
 
     get(name) {
       if (arguments.length < 1) throw new TypeError("The name argument is required");
-      const key = String(name).toWellFormed();
-      const found = lists.get(this).find((pair) => pair[0] === key);
+      const key = builtins.toWellFormed(builtins.string(name));
+      const found = builtins.find(builtins.weakMapGet(lists, this), (pair) => pair[0] === key);
       return found === undefined ? null : found[1];
     }
 
     getAll(name) {
       if (arguments.length < 1) throw new TypeError("The name argument is required");
-      const key = String(name).toWellFormed();
-      return lists.get(this).filter((pair) => pair[0] === key).map((pair) => pair[1]);
+      const key = builtins.toWellFormed(builtins.string(name));
+      return builtins.map(builtins.filter(builtins.weakMapGet(lists, this), (pair) => pair[0] === key), (pair) => pair[1]);
     }
 
     has(name, value) {
       if (arguments.length < 1) throw new TypeError("The name argument is required");
-      const key = String(name).toWellFormed();
-      const wanted = value === undefined ? undefined : String(value).toWellFormed();
-      return lists.get(this).some((pair) => pair[0] === key && (wanted === undefined || pair[1] === wanted));
+      const key = builtins.toWellFormed(builtins.string(name));
+      const wanted = value === undefined ? undefined : builtins.toWellFormed(builtins.string(value));
+      return builtins.some(builtins.weakMapGet(lists, this), (pair) => pair[0] === key && (wanted === undefined || pair[1] === wanted));
     }
 
     set(name, value) {
       if (arguments.length < 2) throw new TypeError("The name and value arguments are required");
-      const key = String(name).toWellFormed();
-      const text = String(value).toWellFormed();
-      const list = lists.get(this);
-      const first = list.findIndex((pair) => pair[0] === key);
+      const key = builtins.toWellFormed(builtins.string(name));
+      const text = builtins.toWellFormed(builtins.string(value));
+      const list = builtins.weakMapGet(lists, this);
+      const first = builtins.findIndex(list, (pair) => pair[0] === key);
 
       if (first === -1) {
-        list.push([key, text]);
+        builtins.push(list, [key, text]);
       } else {
         list[first][1] = text;
-        lists.set(this, list.filter((pair, index) => index <= first || pair[0] !== key));
+        builtins.weakMapSet(lists, this, builtins.filter(list, (pair, index) => index <= first || pair[0] !== key));
       }
       changed(this);
     }
 
     sort() {
-      const list = lists.get(this);
-      const order = list.map((pair, index) => [pair, index]);
-      order.sort((a, b) => (a[0][0] < b[0][0] ? -1 : a[0][0] > b[0][0] ? 1 : a[1] - b[1]));
-      lists.set(this, order.map((entry) => entry[0]));
+      const list = builtins.weakMapGet(lists, this);
+      const order = builtins.map(list, (pair, index) => [pair, index]);
+      builtins.sort(order, (a, b) => (a[0][0] < b[0][0] ? -1 : a[0][0] > b[0][0] ? 1 : a[1] - b[1]));
+      builtins.weakMapSet(lists, this, builtins.map(order, (entry) => entry[0]));
       changed(this);
     }
 
     forEach(callback, thisArg) {
       if (typeof callback !== "function") throw new TypeError("The callback must be a function");
-      for (const pair of lists.get(this).slice()) {
-        callback.call(thisArg, pair[1], pair[0], this);
+      for (const pair of builtins.sliceOf(builtins.weakMapGet(lists, this))) {
+        builtins.apply(callback, thisArg, [pair[1], pair[0], this]);
       }
     }
 
     keys() {
-      return lists.get(this).map((pair) => pair[0])[Symbol.iterator]();
+      return builtins.map(builtins.weakMapGet(lists, this), (pair) => pair[0])[Symbol.iterator]();
     }
 
     values() {
-      return lists.get(this).map((pair) => pair[1])[Symbol.iterator]();
+      return builtins.map(builtins.weakMapGet(lists, this), (pair) => pair[1])[Symbol.iterator]();
     }
 
     entries() {
-      return lists.get(this).map((pair) => [pair[0], pair[1]])[Symbol.iterator]();
+      return builtins.map(builtins.weakMapGet(lists, this), (pair) => [pair[0], pair[1]])[Symbol.iterator]();
     }
 
     [Symbol.iterator]() {
@@ -1008,11 +1015,11 @@
     }
 
     toString() {
-      return lists.get(this).map((pair) => formEncode(pair[0]) + "=" + formEncode(pair[1])).join("&");
+      return builtins.join(builtins.map(builtins.weakMapGet(lists, this), (pair) => formEncode(pair[0]) + "=" + formEncode(pair[1])), "&");
     }
   }
 
-  Object.defineProperty(URLSearchParams.prototype, Symbol.toStringTag, { value: "URLSearchParams", configurable: true });
+  builtins.defineProperty(URLSearchParams.prototype, Symbol.toStringTag, { value: "URLSearchParams", configurable: true });
 
   // URL ----------------------------------------------------------------------
 
@@ -1050,13 +1057,13 @@
     }
 
     #update(changes) {
-      this.#record = Object.assign({}, this.#record, changes);
+      this.#record = builtins.assign({}, this.#record, changes);
     }
 
     #resetParams() {
       if (this.#params === null) return;
       const query = this.#record.query;
-      lists.set(this.#params, parseQuery(query === null ? "" : query));
+      builtins.weakMapSet(lists, this.#params, parseQuery(query === null ? "" : query));
     }
 
     get href() {
@@ -1079,9 +1086,9 @@
     }
 
     set protocol(value) {
-      const match = /^([a-zA-Z][a-zA-Z0-9+.\-]*):?/.exec(String(value));
+      const match = builtins.exec(/^([a-zA-Z][a-zA-Z0-9+.\-]*):?/, builtins.string(value));
       if (!match) return;
-      const scheme = match[1].toLowerCase();
+      const scheme = builtins.toLowerCase(match[1]);
       if (isSpecial(scheme) !== isSpecial(this.#record.scheme) || this.#record.opaque) return;
       if (this.#record.scheme === "file" && this.#record.host === "") return;
       if (scheme === "file" && (this.#record.username !== "" || this.#record.password !== "" || this.#record.port !== "")) return;
@@ -1097,7 +1104,7 @@
 
     set username(value) {
       if (this.#record.host === null || this.#record.host === "" || this.#record.scheme === "file") return;
-      this.#update({ username: pct(String(value), USERINFO_SET) });
+      this.#update({ username: pct(builtins.string(value), USERINFO_SET) });
     }
 
     get password() {
@@ -1106,7 +1113,7 @@
 
     set password(value) {
       if (this.#record.host === null || this.#record.host === "" || this.#record.scheme === "file") return;
-      this.#update({ password: pct(String(value), USERINFO_SET) });
+      this.#update({ password: pct(builtins.string(value), USERINFO_SET) });
     }
 
     get host() {
@@ -1118,21 +1125,21 @@
       const record = this.#record;
       if (record.opaque) return;
       const special = isSpecial(record.scheme);
-      const text = String(value).replace(/[\t\n\r]/g, "");
-      const end = text.search(special ? /[\/\\?#]/ : /[\/?#]/);
-      const authority = end === -1 ? text : text.slice(0, end);
-      const colon = authority.lastIndexOf(":");
-      const hasPort = colon > authority.lastIndexOf("]");
-      const hostText = hasPort ? authority.slice(0, colon) : authority;
+      const text = builtins.replace(builtins.string(value), /[\t\n\r]/g, "");
+      const end = builtins.search(text, special ? /[\/\\?#]/ : /[\/?#]/);
+      const authority = end === -1 ? text : builtins.slice(text, 0, end);
+      const colon = builtins.lastIndexOf(authority, ":");
+      const hasPort = colon > builtins.lastIndexOf(authority, "]");
+      const hostText = hasPort ? builtins.slice(authority, 0, colon) : authority;
       if (hostText === "" && special) return;
       const host = hostText === "" ? "" : parseHost(hostText, !special);
       if (host === null) return;
       this.#update({ host: record.scheme === "file" && host === "localhost" ? "" : host });
-      const digits = hasPort ? /^[0-9]+/.exec(authority.slice(colon + 1)) : null;
+      const digits = hasPort ? builtins.exec(/^[0-9]+/, builtins.slice(authority, colon + 1)) : null;
       if (digits === null) return;
-      const number = parseInt(digits[0], 10);
+      const number = builtins.parseInteger(digits[0], 10);
       if (number > 65535) return;
-      this.#update({ port: String(number) === SPECIAL_PORTS[record.scheme] ? "" : String(number) });
+      this.#update({ port: builtins.string(number) === SPECIAL_PORTS[record.scheme] ? "" : builtins.string(number) });
     }
 
     get hostname() {
@@ -1143,10 +1150,10 @@
       const record = this.#record;
       if (record.opaque) return;
       const special = isSpecial(record.scheme);
-      const text = String(value).replace(/[\t\n\r]/g, "");
-      const end = text.search(special ? /[\/\\?#:]/ : /[\/?#:]/);
+      const text = builtins.replace(builtins.string(value), /[\t\n\r]/g, "");
+      const end = builtins.search(text, special ? /[\/\\?#:]/ : /[\/?#:]/);
       if (end !== -1 && text[end] === ":") return;
-      const hostText = end === -1 ? text : text.slice(0, end);
+      const hostText = end === -1 ? text : builtins.slice(text, 0, end);
       if (hostText === "" && special) return;
       const host = hostText === "" ? "" : parseHost(hostText, !special);
       if (host !== null) this.#update({ host: record.scheme === "file" && host === "localhost" ? "" : host });
@@ -1159,14 +1166,14 @@
     set port(value) {
       const record = this.#record;
       if (record.host === null || record.host === "" || record.scheme === "file") return;
-      const text = String(value);
+      const text = builtins.string(value);
       if (text === "") {
         this.#update({ port: "" });
         return;
       }
-      const digits = /^[0-9]+/.exec(text);
-      if (!digits || Number(digits[0]) > 65535) return;
-      const port = String(Number(digits[0]));
+      const digits = builtins.exec(/^[0-9]+/, text);
+      if (!digits || builtins.number(digits[0]) > 65535) return;
+      const port = builtins.string(builtins.number(digits[0]));
       this.#update({ port: port === SPECIAL_PORTS[record.scheme] ? "" : port });
     }
 
@@ -1176,7 +1183,7 @@
 
     set pathname(value) {
       if (this.#record.opaque) return;
-      this.#update({ path: pathOf(String(value), isSpecial(this.#record.scheme)) });
+      this.#update({ path: pathOf(builtins.string(value), isSpecial(this.#record.scheme)) });
     }
 
     get search() {
@@ -1185,8 +1192,8 @@
     }
 
     set search(value) {
-      const text = String(value);
-      const query = text === "" ? null : pct(text.startsWith("?") ? text.slice(1) : text, isSpecial(this.#record.scheme) ? SPECIAL_QUERY_SET : QUERY_SET);
+      const text = builtins.string(value);
+      const query = text === "" ? null : pct(builtins.startsWith(text, "?") ? builtins.slice(text, 1) : text, isSpecial(this.#record.scheme) ? SPECIAL_QUERY_SET : QUERY_SET);
       this.#update({ query });
       this.#resetParams();
     }
@@ -1194,8 +1201,8 @@
     get searchParams() {
       if (this.#params === null) {
         const params = new URLSearchParams(this.#record.query === null ? "" : this.#record.query);
-        links.set(params, (query) => {
-          this.#record = Object.assign({}, this.#record, { query: query === "" ? null : query });
+        builtins.weakMapSet(links, params, (query) => {
+          this.#record = builtins.assign({}, this.#record, { query: query === "" ? null : query });
         });
         this.#params = params;
       }
@@ -1208,8 +1215,8 @@
     }
 
     set hash(value) {
-      const text = String(value);
-      this.#update({ fragment: text === "" ? null : pct(text.startsWith("#") ? text.slice(1) : text, FRAGMENT_SET) });
+      const text = builtins.string(value);
+      this.#update({ fragment: text === "" ? null : pct(builtins.startsWith(text, "#") ? builtins.slice(text, 1) : text, FRAGMENT_SET) });
     }
 
     toString() {
@@ -1221,16 +1228,16 @@
     }
   }
 
-  Object.defineProperty(URL.prototype, Symbol.toStringTag, { value: "URL", configurable: true });
+  builtins.defineProperty(URL.prototype, Symbol.toStringTag, { value: "URL", configurable: true });
 
   register(URLSearchParams, function (params) {
-    return { entries: lists.get(params), map: true };
+    return { entries: builtins.weakMapGet(lists, params), map: true };
   });
-  const readHref = Object.getOwnPropertyDescriptor(URL.prototype, "href").get;
+  const readHref = builtins.getOwnPropertyDescriptor(URL.prototype, "href").get;
 
   register(URL, function (url) {
     // Throws for anything that is not a real URL, such as a proxy that says it is.
-    readHref.call(url);
+    builtins.apply(readHref, url, []);
     return {
       entries: [
         ["href", url.href],
