@@ -228,6 +228,7 @@ src/security/          rate limiter and input guards
 src/runtime/           calls to Telegram (spacing, retries), shutdown, logs
 src/services/sandbox/  the QuickJS sandbox, its child process and the guest runtime
 src/config/            limits and environment
+src/utils/             MarkdownV2 escaping and text helpers
 test/                  tests, run with bun test
 scripts/               benchmark, soak test, fake Telegram API, Node comparison (scripts/node-diff)
 ```
