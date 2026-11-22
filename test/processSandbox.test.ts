@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test as bunTest } from "bun:test";
+import { afterAll, describe, expect, spyOn, test as bunTest } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -259,6 +259,22 @@ describe("the child process", () => {
     const result = await service.execute("1 + 1");
     expect(result.ok && result.result).toBe("2");
     await service.dispose();
+  });
+
+  test("a child that cannot be spawned leaves no start timer to fail later", async () => {
+    const spawn = spyOn(Bun, "spawn").mockImplementation(() => {
+      throw new Error("spawn EAGAIN");
+    });
+
+    try {
+      const service = new ProcessSandboxService(options);
+      await expect(service.warmUp()).rejects.toThrow("spawn EAGAIN");
+    } finally {
+      spawn.mockRestore();
+    }
+
+    // The start timer is 10 s long; a timer left behind by the failed spawn fires in this window.
+    await new Promise((resolve) => setTimeout(resolve, 10_500));
   });
 
   test("gets none of the bot's configuration", () => {

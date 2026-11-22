@@ -152,12 +152,6 @@ export class ProcessSandboxService implements SandboxService {
       const spawnedAt = performance.now();
       let ready = false;
 
-      const timer = setTimeout(() => {
-        child.killed = true;
-        child.process.kill("SIGKILL");
-        reject(new Error("Sandbox process did not start in time"));
-      }, START_TIMEOUT_MS);
-
       const subprocess = Bun.spawn(childCommand(), {
         stdin: "ignore",
         stdout: "inherit",
@@ -199,6 +193,13 @@ export class ProcessSandboxService implements SandboxService {
         },
       });
       const child: Child = { process: subprocess, pending, killed: false };
+
+      // Started once the process exists, so a spawn that throws leaves no timer behind.
+      const timer = setTimeout(() => {
+        child.killed = true;
+        child.process.kill("SIGKILL");
+        reject(new Error("Sandbox process did not start in time"));
+      }, START_TIMEOUT_MS);
 
       const init: ChildRequest = { type: "init", options: this.options };
       subprocess.send(init);
