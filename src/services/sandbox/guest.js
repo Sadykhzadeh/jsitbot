@@ -1366,7 +1366,7 @@
       case "d":
       case "i":
       case "f":
-        if (typeof argument === "bigint") return bigintToString(argument) + "n";
+        if (typeof argument === "bigint" && code !== "f") return bigintToString(argument) + "n";
         if (typeof argument === "symbol") return "NaN";
         return formatNumber(code === "d" ? toNumber(argument) : code === "i" ? parseInteger(argument) : parseDecimal(argument));
       case "j":

@@ -513,6 +513,10 @@ describe("console.log format specifiers", () => {
     expect(result.logs).toEqual(["before", "TypeError Do not know how to serialize a BigInt"]);
   });
 
+  test("%f writes a bigint as a number and %d and %i keep its suffix, as Node does", async () => {
+    expect(await logs(`console.log("%f|%d|%i|%f", 10n, 10n, -5n, -(2n ** 70n))`)).toEqual(["10|10n|-5n|-1.1805916207174113e+21"]);
+  });
+
   test("%d, %i and %f turn an object into a number when it can be one, as Node does", async () => {
     expect(await logs(`console.log("%d|%i|%f", new Date(0), [1, 2], [7]); console.log("%i %d %f", {}, "x", "3.5z")`)).toEqual([
       "0|1|7",
