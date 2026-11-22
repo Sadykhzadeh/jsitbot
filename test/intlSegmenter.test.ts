@@ -56,6 +56,48 @@ describe("Intl.Segmenter", () => {
     ]);
   });
 
+  test("keeps the marks of a word, a joined word and an emoji or flag in one segment", async () => {
+    expect(await segments("word", "a\u0301b c\u0308d \u{1F1EB}\u{1F1F7}\u{1F1E9}\u{1F1EA} flag \u{1F468}\u200d\u{1F469}\u200d\u{1F467} hi\u200dthere")).toEqual([
+      ["a\u0301b", 0, true],
+      [" ", 3, false],
+      ["c\u0308d", 4, true],
+      [" ", 7, false],
+      ["\u{1F1EB}\u{1F1F7}", 8, false],
+      ["\u{1F1E9}\u{1F1EA}", 12, false],
+      [" ", 16, false],
+      ["flag", 17, true],
+      [" ", 21, false],
+      ["\u{1F468}\u200d\u{1F469}\u200d\u{1F467}", 22, false],
+      [" ", 30, false],
+      ["hi\u200dthere", 31, true],
+    ]);
+  });
+
+  test("keeps the digits of a number with commas in one word, and a comma between words apart", async () => {
+    expect(await segments("word", "1,000.50 and 2,5 a,1 x,\u0301y 3.000,50 ok 12,")).toEqual([
+      ["1,000.50", 0, true],
+      [" ", 8, false],
+      ["and", 9, true],
+      [" ", 12, false],
+      ["2,5", 13, true],
+      [" ", 16, false],
+      ["a", 17, true],
+      [",", 18, false],
+      ["1", 19, true],
+      [" ", 20, false],
+      ["x", 21, true],
+      [",\u0301", 22, false],
+      ["y", 24, true],
+      [" ", 25, false],
+      ["3.000,50", 26, true],
+      [" ", 34, false],
+      ["ok", 35, true],
+      [" ", 37, false],
+      ["12", 38, true],
+      [",", 40, false],
+    ]);
+  });
+
   test("cuts sentences after their end marks and the space that follows", async () => {
     expect(await segments("sentence", "Hi there. How are you? Fine!")).toEqual([
       ["Hi there. ", 0, null],

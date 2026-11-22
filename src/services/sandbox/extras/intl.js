@@ -572,11 +572,12 @@
 
   // Where a text is cut. These are approximations of the Unicode rules, the same
   // for every language: a grapheme is a character with its marks and joined
-  // emoji, a word is a run of letters, digits and the apostrophe or the point
-  // between them, a sentence ends after . ! or ? and the space that follows.
+  // emoji, a word is a run of letters, digits and marks, with the apostrophe, the point
+  // or a comma between digits inside it, and a flag or an emoji is a word of its own; a
+  // sentence ends after . ! or ? and the space that follows.
   const SEGMENT_PATTERNS = {
     grapheme: /\r\n|\p{Regional_Indicator}{2}|[^\p{M}\u200d][\p{M}\ufe0f\p{Emoji_Modifier}]*(?:\u200d\p{Extended_Pictographic}[\p{M}\ufe0f\p{Emoji_Modifier}]*)*|[\s\S]/gu,
-    word: /[\p{L}\p{N}_]+(?:['’.][\p{L}\p{N}_]+)*|\s+|[\s\S]/gu,
+    word: /[\p{L}\p{N}\p{M}_\u200d]+(?:(?:['’.]|(?<=\p{N}),(?=\p{N}))[\p{L}\p{N}\p{M}_\u200d]+)*|\p{Regional_Indicator}{2}|\p{Extended_Pictographic}[\p{M}\ufe0f\p{Emoji_Modifier}]*(?:\u200d\p{Extended_Pictographic}[\p{M}\ufe0f\p{Emoji_Modifier}]*)*|\s+|[\s\S]\p{M}*/gu,
     sentence: /[\s\S]*?(?:[.!?]+['")\]]*(?:\s+|$)|$)/gu,
   };
 
