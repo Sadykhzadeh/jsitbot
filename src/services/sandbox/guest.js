@@ -2385,6 +2385,7 @@
   lazyMethod("number", BigInt.prototype, "toLocaleString");
   lazyMethod("arrays", Array.prototype, "join");
   lazyMethod("arrays", Array.prototype, "toLocaleString");
+  lazyMethod("arrays", Object.getPrototypeOf(Uint8Array.prototype), "toLocaleString");
   // The formatters the extras install are read once they are in place, so these
   // reach the extras and not the engine's own methods.
   captured.localeCompare = uncurry(String.prototype.localeCompare);

@@ -148,6 +148,19 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await value(`return [1234.5, 1e6].toLocaleString()`)).toBe("1,234.5,1,000,000");
   });
 
+  test("gives the locales and the options to every number of a typed array", async () => {
+    expect(await value(`return new Uint8Array([200, 255]).toLocaleString("en-US", { style: "percent" })`)).toBe("20,000%,25,500%");
+    expect(await value(`return new Int16Array([1234]).toLocaleString("en-US", { notation: "compact" })`)).toBe("1.2K");
+  });
+
+  test("gives the locales and the options to every number of an array", async () => {
+    expect(await value(`return [1234.5, -2, 0.125].toLocaleString("en-US", { style: "currency", currency: "USD" })`)).toBe(
+      "$1,234.50,-$2.00,$0.13",
+    );
+    expect(await value(`return [1234.5678, [2.5]].toLocaleString("en-US", { maximumFractionDigits: 0 })`)).toBe("1,235,3");
+    expect(await value(`return [1234.5678, 2.5].toLocaleString("en-US", { notation: "compact" })`)).toBe("1.2K,2.5");
+  });
+
   test("writes a unit after the number, in its short, narrow and long forms", async () => {
     expect(
       await value(`
