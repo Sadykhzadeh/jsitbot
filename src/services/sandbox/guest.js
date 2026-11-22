@@ -1313,6 +1313,19 @@
     }
   }
 
+  // The failure of %j that is not a circular reference, which console.log lets through as Node does.
+  let jsonFailure;
+
+  // Whether JSON.stringify gave up on a value for referring to itself, which is the only
+  // failure %j writes as text; the engine's wording of it is the one matched.
+  function isCircularError(error) {
+    try {
+      return typeof error === "object" && error !== null && error.message === "circular reference" && inherits(error, TypeError.prototype);
+    } catch (ignored) {
+      return false;
+    }
+  }
+
   // What a % specifier of console.log stands for. Objects are shown, and only
   // those with a toString of the program's own are converted by it.
   function substitute(code, argument, state) {
@@ -1360,8 +1373,10 @@
         try {
           const json = toJson(argument);
           return json === undefined ? "undefined" : json;
-        } catch (ignored) {
-          return "[Circular]";
+        } catch (thrown) {
+          if (isCircularError(thrown)) return "[Circular]";
+          jsonFailure = { error: thrown };
+          throw thrown;
         }
       case "c":
         return "";
@@ -1411,7 +1426,11 @@
         const filled = fill(arguments, state);
         line = filled.text;
         first = filled.used;
-      } catch (ignored) {
+      } catch (thrown) {
+        if (jsonFailure !== undefined && jsonFailure.error === thrown) {
+          jsonFailure = undefined;
+          throw thrown;
+        }
         line = "";
       }
     }

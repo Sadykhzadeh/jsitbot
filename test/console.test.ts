@@ -502,6 +502,17 @@ describe("console.log format specifiers", () => {
     ).toEqual(["{ a: 1 } Symbol(s) -0", "NaN NaN NaN NaN", "[Circular]"]);
   });
 
+  test("%j throws for a value JSON cannot hold, as Node does, and writes a circular one as text", async () => {
+    const result = await sandbox.execute(`
+      console.log("before");
+      try { console.log("%j", { a: 1n }); } catch (e) { console.log(e.name, e.message); }
+      console.log("%j", { toJSON() { throw new RangeError("from toJSON"); } });
+      console.log("after");
+    `);
+    expect(result.ok).toBe(false);
+    expect(result.logs).toEqual(["before", "TypeError Do not know how to serialize a BigInt"]);
+  });
+
   test("%d, %i and %f turn an object into a number when it can be one, as Node does", async () => {
     expect(await logs(`console.log("%d|%i|%f", new Date(0), [1, 2], [7]); console.log("%i %d %f", {}, "x", "3.5z")`)).toEqual([
       "0|1|7",
