@@ -18,7 +18,7 @@
 
   // Options that were given, in the order resolvedOptions lists them.
   function given(options, names) {
-    const out = {};
+    const out = { __proto__: null };
     if (options === undefined || options === null) return out;
     for (const name of names) {
       if (options[name] !== undefined) out[name] = options[name];
@@ -119,7 +119,7 @@
 
   class NumberFormat {
     constructor(locales, options) {
-      const asked = options === undefined || options === null ? {} : Object(options);
+      const asked = options === undefined || options === null ? { __proto__: null } : Object(options);
       for (const name of builtins.keys(NUMBER_OPTION_VALUES)) choose(asked, name, NUMBER_OPTION_VALUES[name], undefined, "NumberFormat");
       if (asked.currency !== undefined && !builtins.test(/^[A-Za-z]{3}$/, builtins.string(asked.currency))) {
         throw new RangeError("Invalid currency code : " + builtins.string(asked.currency));
@@ -212,7 +212,7 @@
     constructor(locales, options) {
       checkLocales(locales);
       if (options === null) throw new TypeError("Intl.Collator called on null or undefined");
-      const asked = options === undefined ? {} : Object(options);
+      const asked = options === undefined ? { __proto__: null } : Object(options);
       choose(asked, "usage", ["sort", "search"], undefined, "Collator");
       choose(asked, "sensitivity", ["base", "accent", "case", "variant"], undefined, "Collator");
       choose(asked, "caseFirst", ["upper", "lower", "false"], undefined, "Collator");
@@ -250,10 +250,10 @@
   class DateTimeFormat {
     constructor(locales, options) {
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
-      let given = options === undefined ? {} : Object(options);
+      let given = options === undefined ? { __proto__: null } : Object(options);
       // with nothing asked for, a date is written; toLocaleString would add the time
       if (!builtins.some(FORMAT_FIELDS, (name) => given[name] !== undefined)) {
-        given = builtins.assign({}, given, { year: "numeric", month: "numeric", day: "numeric" });
+        given = builtins.assign({ __proto__: null }, given, { year: "numeric", month: "numeric", day: "numeric" });
       }
       // A language the engine answers itself gets the engine's method for the parts asked
       // for, so a date alone is not followed by a time.
@@ -353,9 +353,9 @@
     constructor(locales, options) {
       this.#locale = checkLocale(locales, /^en(-[A-Za-z0-9]+)*$/i);
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
-      const given = options === undefined ? {} : Object(options);
+      const given = options === undefined ? { __proto__: null } : Object(options);
       this.#type = choose(given, "type", ["cardinal", "ordinal"], "cardinal", "PluralRules");
-      this.#digits = { useGrouping: false };
+      this.#digits = { __proto__: null, useGrouping: false };
       if (given.minimumFractionDigits !== undefined) this.#digits.minimumFractionDigits = given.minimumFractionDigits;
       if (given.maximumFractionDigits !== undefined) this.#digits.maximumFractionDigits = given.maximumFractionDigits;
       // the digits are checked now, as a constructor does
@@ -421,7 +421,7 @@
     constructor(locales, options) {
       this.#locale = checkLocale(locales, /^en(-US)?$/i);
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
-      const given = options === undefined ? {} : Object(options);
+      const given = options === undefined ? { __proto__: null } : Object(options);
       this.#type = choose(given, "type", ["conjunction", "disjunction", "unit"], "conjunction", "ListFormat");
       this.#style = choose(given, "style", ["long", "short", "narrow"], "long", "ListFormat");
     }
@@ -496,7 +496,7 @@
     constructor(locales, options) {
       checkLocale(locales, /^en(-[A-Za-z0-9]+)*$/i);
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
-      const given = options === undefined ? {} : Object(options);
+      const given = options === undefined ? { __proto__: null } : Object(options);
       this.#style = choose(given, "style", ["long", "short", "narrow"], "long", "RelativeTimeFormat");
       this.#numeric = choose(given, "numeric", ["always", "auto"], "always", "RelativeTimeFormat");
     }
@@ -595,7 +595,7 @@
     constructor(locales, options) {
       checkLocales(locales);
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
-      const asked = options === undefined ? {} : Object(options);
+      const asked = options === undefined ? { __proto__: null } : Object(options);
       this.#granularity = choose(asked, "granularity", ["grapheme", "word", "sentence"], "grapheme", "Segmenter");
     }
 
@@ -925,7 +925,7 @@
 
     constructor(locales, options) {
       this.#locale = checkLocale(locales, /^en(-[A-Za-z0-9]+)*$/i);
-      const given = options === undefined ? {} : Object(options);
+      const given = options === undefined ? { __proto__: null } : Object(options);
       this.#type = choose(given, "type", ["language", "region", "currency"], undefined, "DisplayNames");
       if (this.#type === undefined) throw new TypeError("invalid_argument");
       this.#style = choose(given, "style", ["long", "short", "narrow"], "long", "DisplayNames");
@@ -1030,7 +1030,7 @@
         throw new RangeError("Incorrect locale information provided");
       }
       if (options === null) throw new TypeError("Intl.Locale called on null or undefined");
-      const given = options === undefined ? {} : Object(options);
+      const given = options === undefined ? { __proto__: null } : Object(options);
 
       const parts = builtins.split(builtins.toLowerCase(text), "-");
       let at = 1;

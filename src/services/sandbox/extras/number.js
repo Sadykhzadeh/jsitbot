@@ -531,7 +531,7 @@
     checkOptions(options, "Number.prototype.toLocaleString");
     if (!handled(locales, options)) return builtins.apply(original, value, [locales, options]);
 
-    return format(value < 0 || builtins.is(value, -0), builtins.abs(value), options || {});
+    return format(value < 0 || builtins.is(value, -0), builtins.abs(value), options || { __proto__: null });
   }
 
   function bigintToLocaleString(locales, options) {
@@ -540,7 +540,7 @@
     checkOptions(options, "BigInt.prototype.toLocaleString");
     if (!handled(locales, options)) return builtins.apply(original, value, [locales, options]);
 
-    return format(value < 0n, value < 0n ? -value : value, options || {});
+    return format(value < 0n, value < 0n ? -value : value, options || { __proto__: null });
   }
 
   return { toLocaleString: owner === BigInt.prototype ? bigintToLocaleString : numberToLocaleString };

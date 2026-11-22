@@ -62,7 +62,7 @@
     if (options !== undefined && options !== null && typeof options !== "object" && typeof options !== "function") {
       throw nodeError(TypeError, "ERR_INVALID_ARG_TYPE", 'The "options" argument must be a dictionary. Received ' + describe(options));
     }
-    const settings = options || {};
+    const settings = options || { __proto__: null };
     let endings = "transparent";
     if (settings.endings !== undefined) {
       endings = String(settings.endings);
@@ -121,7 +121,7 @@
       throw nodeError(TypeError, "ERR_INVALID_ARG_TYPE", 'The "options" argument must be a dictionary. Received ' + describe(options));
     }
     const file = create(new.target, parts, options);
-    const settings = options || {};
+    const settings = options || { __proto__: null };
     names.set(file, String(name));
     lastModified.set(file, settings.lastModified === undefined ? Date.now() : Number(settings.lastModified));
     return file;

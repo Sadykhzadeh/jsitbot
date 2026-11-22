@@ -75,7 +75,7 @@
   // engine.
   function resolve(options, required, defaults, owner) {
     if (options === null) throw new TypeError("Cannot convert undefined or null to object");
-    options = options === undefined ? {} : Object(options);
+    options = options === undefined ? { __proto__: null } : Object(options);
 
     const f = {
       weekday: choice(options, "weekday", ["narrow", "short", "long"], owner),

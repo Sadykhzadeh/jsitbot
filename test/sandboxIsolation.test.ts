@@ -65,6 +65,41 @@ describe("tampering with built-ins", () => {
     `)).toBe("still resolved");
   });
 
+  test("formatters read no option from Object.prototype when none is given", async () => {
+    expect(await value(`
+      Object.prototype.style = "unit";
+      Object.prototype.unit = "acre";
+      Object.prototype.currency = "EUR";
+      Object.prototype.maximumFractionDigits = 0;
+      Object.prototype.type = "ordinal";
+      Object.prototype.numeric = "auto";
+      Object.prototype.granularity = "word";
+      Object.prototype.lastModified = 5;
+      Object.prototype.endings = "native";
+      return [
+        (1.5).toLocaleString("en-US"),
+        new Intl.NumberFormat("en-US").format(1.5),
+        new Intl.PluralRules("en").select(2),
+        new Intl.RelativeTimeFormat("en").format(-1, "day"),
+        new Intl.ListFormat("en").format(["a", "b", "c"]),
+        [...new Intl.Segmenter("en").segment("a b")].length,
+        new Blob(["a"]).type === "",
+        new File(["a"], "x").lastModified > 5,
+        new Intl.NumberFormat("en").resolvedOptions().style,
+        new Intl.Collator("en").resolvedOptions().numeric,
+      ].join("|");
+    `)).toBe("1.5|1.5|other|1 day ago|a, b, and c|3|true|true|decimal|false");
+  });
+
+  test("PluralRules reads no digit option from Object.prototype", async () => {
+    expect(await value(`
+      Object.prototype.minimumFractionDigits = 1;
+      Object.prototype.maximumFractionDigits = 0;
+      const plural = new Intl.PluralRules("en");
+      return [plural.select(1), plural.resolvedOptions().minimumFractionDigits, plural.resolvedOptions().maximumFractionDigits].join("|");
+    `)).toBe("one|0|3");
+  });
+
   test("the case, collation and number extras keep working after their prototypes are replaced", async () => {
     expect(await value(`
       String.prototype.toLowerCase = () => "hijacked";
