@@ -136,7 +136,7 @@ export function opensWithDeclarationAndMore(code: string): boolean {
 }
 
 // How far back from the end to look for where the last statement begins.
-const MAX_STATEMENT_STARTS = 200;
+const MAX_STATEMENT_STARTS = 1000;
 
 /**
  * Like wrapAsStatements, but the last statement is returned when it is an

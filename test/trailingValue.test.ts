@@ -35,6 +35,14 @@ describe("the value of the last statement of code that awaits", () => {
     expect(await show(`await null;\nawait Promise.all([\n  1,\n  2,\n])`)).toBe("[ 1, 2 ]");
   });
 
+  test("a last statement of a hundred lines is still the result", async () => {
+    const rows = Array.from({ length: 100 }, (_, i) => `  { n: ${i} },`).join("\n");
+    const execution = await run(`await null;\n[\n${rows}\n].length`);
+
+    expect(execution.ok && execution.result).toBe("100");
+    expect(await show(`await null;\n[\n${rows}\n]`)).toContain("{ n: 99 }");
+  });
+
   test("a last statement that is a call with a body", async () => {
     expect(await show(`await null;\n[1, 2, 3].map((n) => {\n  const m = n * 2;\n  return m;\n})`)).toBe("[ 2, 4, 6 ]");
   });
