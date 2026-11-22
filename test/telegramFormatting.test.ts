@@ -6,6 +6,7 @@ import {
   formatExecutionMessage,
   formatInlineExecutionPreview,
 } from "../src/bot/formatters/telegramExecutionMessage";
+import { truncateText } from "../src/utils/markdownV2";
 import { QuickJsSandboxService } from "../src/services/sandbox/quickjsSandbox";
 
 describe("telegramExecutionMessage", () => {
@@ -250,6 +251,10 @@ describe("syntax error carets", () => {
 });
 
 describe("cutting text that holds characters outside the BMP", () => {
+  test("a cut that would split a pair drops the whole pair", () => {
+    expect(truncateText("ab\u{1F600}cdef", 6)).toEqual({ value: "ab...", truncated: true });
+  });
+
   const loneSurrogate = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
 
   test("never leaves half of a pair in the message or the inline preview", () => {
