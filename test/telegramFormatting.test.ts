@@ -579,3 +579,26 @@ describe("code fences that are never closed", () => {
     }
   });
 });
+
+describe("inline preview and share cut-offs", () => {
+  const run = (result: string, logs: string[] = []) => ({
+    ok: true as const,
+    logs,
+    result,
+    durationMs: 1,
+    timedOut: false as const,
+    truncated: false as const,
+  });
+
+  test("a title is cut to 64 characters, the ellipsis included", () => {
+    const preview = formatInlineExecutionPreview(run("a".repeat(100)));
+
+    expect(preview.title).toBe(`Result: ${"a".repeat(53)}...`);
+  });
+
+  test("a description is cut to 128 characters, the ellipsis included", () => {
+    const preview = formatInlineExecutionPreview(run("1", ["b".repeat(200)]));
+
+    expect(preview.description).toBe(`console: ${"b".repeat(116)}...`);
+  });
+});
