@@ -46,6 +46,12 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await value(`return (1000).toLocaleString("en-US", { notation: "compact", minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" })`)).toBe("1K");
   });
 
+  test("writes a compact currency with no fraction digits unless it is asked for them", async () => {
+    expect(await value(`return (1000).toLocaleString("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 })`)).toBe("$1K");
+    expect(await value(`return (4.7).toLocaleString("en-US", { style: "currency", currency: "CAD", notation: "compact", maximumFractionDigits: 4 })`)).toBe("CA$4.7");
+    expect(await value(`return (1000).toLocaleString("en-US", { style: "currency", currency: "USD", notation: "compact", minimumFractionDigits: 1 })`)).toBe("$1.0K");
+  });
+
   test("formats percentages and currencies", async () => {
     expect(await value(`return (0.256).toLocaleString("en-US", { style: "percent" })`)).toBe("26%");
     expect(await value(`return (0.07).toLocaleString("en-US", { style: "percent", minimumFractionDigits: 1 })`)).toBe("7.0%");

@@ -379,6 +379,10 @@
       defaultMin = 0;
       defaultMax = style === "percent" ? 0 : 3;
     }
+    if (notation === "compact" && style === "currency") {
+      defaultMin = 0;
+      defaultMax = 3;
+    }
 
     let text;
     if (magnitude !== magnitude) text = "NaN";
