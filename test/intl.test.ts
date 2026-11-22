@@ -90,12 +90,12 @@ describe("resolvedOptions", () => {
 
   test("of a number format fills in the defaults of its style", async () => {
     expect(await value(`return JSON.stringify(new Intl.NumberFormat("en-US").resolvedOptions())`)).toBe(
-      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumFractionDigits":0,"maximumFractionDigits":3,"useGrouping":"auto","notation":"standard","signDisplay":"auto"}`,
+      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumFractionDigits":0,"maximumFractionDigits":3,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"auto","trailingZeroDisplay":"auto"}`,
     );
     expect(
       await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).resolvedOptions())`),
     ).toBe(
-      `{"locale":"en-US","numberingSystem":"latn","style":"currency","currency":"USD","currencyDisplay":"symbol","currencySign":"standard","minimumIntegerDigits":1,"minimumFractionDigits":2,"maximumFractionDigits":2,"useGrouping":"auto","notation":"standard","signDisplay":"auto"}`,
+      `{"locale":"en-US","numberingSystem":"latn","style":"currency","currency":"USD","currencyDisplay":"symbol","currencySign":"standard","minimumIntegerDigits":1,"minimumFractionDigits":2,"maximumFractionDigits":2,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"auto","trailingZeroDisplay":"auto"}`,
     );
     expect(
       await value(`const o = new Intl.NumberFormat("en-US", { style: "percent" }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
@@ -109,6 +109,9 @@ describe("resolvedOptions", () => {
     expect(
       await value(`const o = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
     ).toBe("2,3");
+    expect(
+      await value(`return [{ roundingMode: "floor", roundingPriority: "lessPrecision", maximumFractionDigits: 1 }, { trailingZeroDisplay: "stripIfInteger", roundingPriority: "morePrecision", maximumFractionDigits: 1 }, { notation: "compact" }].map((options) => { const o = new Intl.NumberFormat("en-US", options).resolvedOptions(); return [o.roundingIncrement, o.roundingMode, o.roundingPriority, o.trailingZeroDisplay].join() }).join(" ")`),
+    ).toBe("1,floor,lessPrecision,auto 1,halfExpand,auto,stripIfInteger 1,halfExpand,morePrecision,auto");
     expect(await value(`return new Intl.NumberFormat("en-US", { useGrouping: false }).resolvedOptions().useGrouping`)).toBe("false");
     expect(await value(`return new Intl.NumberFormat("en-US", { useGrouping: "min2" }).resolvedOptions().useGrouping`)).toBe("min2");
     expect(await value(`return new Intl.NumberFormat("en-US", { notation: "compact" }).resolvedOptions().useGrouping`)).toBe("min2");

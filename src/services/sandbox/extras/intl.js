@@ -160,7 +160,7 @@
         const asked = given(options, [
           "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",
           "minimumFractionDigits", "maximumFractionDigits", "minimumSignificantDigits", "maximumSignificantDigits",
-          "useGrouping", "notation", "compactDisplay", "signDisplay",
+          "useGrouping", "notation", "compactDisplay", "signDisplay", "roundingMode", "roundingPriority", "trailingZeroDisplay",
         ]);
         const style = asked.style === undefined ? "decimal" : builtins.string(asked.style);
         const out = { locale: "en-US", numberingSystem: "latn", style };
@@ -193,6 +193,16 @@
         out.notation = asked.notation === undefined ? "standard" : asked.notation;
         if (out.notation === "compact") out.compactDisplay = asked.compactDisplay === undefined ? "short" : asked.compactDisplay;
         out.signDisplay = asked.signDisplay === undefined ? "auto" : asked.signDisplay;
+        // A compact number with no digits asked for is rounded on the more precise of its digits, and
+        // stripIfInteger reports the priority as auto, as Node does.
+        const compactDigits = out.notation === "compact" && asked.minimumFractionDigits === undefined && asked.maximumFractionDigits === undefined && asked.minimumSignificantDigits === undefined && asked.maximumSignificantDigits === undefined;
+        const trailingZeros = asked.trailingZeroDisplay === undefined ? "auto" : builtins.string(asked.trailingZeroDisplay);
+        out.roundingIncrement = 1;
+        out.roundingMode = asked.roundingMode === undefined ? "halfExpand" : builtins.string(asked.roundingMode);
+        if (trailingZeros === "stripIfInteger") out.roundingPriority = "auto";
+        else if (asked.roundingPriority !== undefined) out.roundingPriority = builtins.string(asked.roundingPriority);
+        else out.roundingPriority = compactDigits ? "morePrecision" : "auto";
+        out.trailingZeroDisplay = trailingZeros;
         return out;
       });
     }
