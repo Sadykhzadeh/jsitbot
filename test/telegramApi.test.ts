@@ -313,6 +313,8 @@ describe("pending calls", () => {
 });
 
 describe("polling during an outage", () => {
+  const noUpdates = { ok: true, result: [] };
+
   function polling(answers: unknown[]) {
     const lines: string[] = [];
     const guard = createApiGuard(POLICY, new FakeClock(), (line) => lines.push(line));
@@ -331,7 +333,7 @@ describe("polling during an outage", () => {
 
   test("is reported once, and once more when Telegram answers again", async () => {
     const outage = () => new HttpError("Network request for 'getUpdates' failed!", new Error("fetch failed"));
-    const { lines, poll } = polling([outage(), outage(), [], []]);
+    const { lines, poll } = polling([outage(), outage(), noUpdates, noUpdates]);
 
     await expect(poll()).rejects.toThrow();
     await expect(poll()).rejects.toThrow();
@@ -342,6 +344,28 @@ describe("polling during an outage", () => {
       "Could not get updates from Telegram, retrying: no answer from Telegram for the call (fetch failed)",
       "Telegram answers again",
     ]);
+  });
+
+  test("is reported when Telegram answers the poll with an error, which is not thrown", async () => {
+    const serverError = { ok: false as const, error_code: 500, description: "Internal Server Error" };
+    const { lines, poll } = polling([serverError, serverError, noUpdates]);
+
+    expect(await poll()).toEqual(serverError);
+    expect(await poll()).toEqual(serverError);
+    await poll();
+
+    expect(lines).toEqual([
+      "Could not get updates from Telegram, retrying: getUpdates failed with 500: Internal Server Error",
+      "Telegram answers again",
+    ]);
+  });
+
+  test("is not reported for an error that ends polling, which the crash line names", async () => {
+    const { lines, poll } = polling([{ ok: false, error_code: 409, description: "Conflict: terminated by other getUpdates request" }]);
+
+    await poll();
+
+    expect(lines).toEqual([]);
   });
 
   test("is not reported when the poll is stopped", async () => {

@@ -1,4 +1,4 @@
-import type { Transformer } from "grammy";
+import { GrammyError, type Transformer } from "grammy";
 
 import { describeAnyError } from "./logError";
 
@@ -133,22 +133,36 @@ export function createApiGuard(
       const timer = setTimeout(() => deadline.abort(), waitMs);
       // grammY types its signal with the abort-controller package; the runtime one is the same thing.
       const combined = signal ? AbortSignal.any([signal as unknown as AbortSignal, deadline.signal]) : deadline.signal;
+      // Reports the start of an outage once, and the end of it when a poll works again.
+      const reportFailure = (line: string) => {
+        if (!pollFailing && !signal?.aborted) {
+          pollFailing = true;
+          log(line);
+        }
+      };
       try {
         const updates = await previous(method, payload, combined as never);
-        if (pollFailing) {
-          pollFailing = false;
-          log("Telegram answers again");
+        if (updates.ok) {
+          if (pollFailing) {
+            pollFailing = false;
+            log("Telegram answers again");
+          }
+          return updates;
+        }
+        // An error that Telegram answered with comes back as a value, not as a throw. grammY ends
+        // polling on 401 and 409 and the crash line says why, so only the errors it retries are reported here.
+        if (updates.error_code !== 401 && updates.error_code !== 409) {
+          reportFailure(
+            `Could not get updates from Telegram, retrying: ${describeAnyError(new GrammyError(`Call to '${method}' failed!`, updates, method, payload as Record<string, unknown>))}`,
+          );
         }
         return updates;
       } catch (error) {
-        if (!pollFailing && !signal?.aborted) {
-          pollFailing = true;
-          log(
-            deadline.signal.aborted
-              ? "Telegram did not answer the poll in time, retrying"
-              : `Could not get updates from Telegram, retrying: ${describeAnyError(error)}`,
-          );
-        }
+        reportFailure(
+          deadline.signal.aborted
+            ? "Telegram did not answer the poll in time, retrying"
+            : `Could not get updates from Telegram, retrying: ${describeAnyError(error)}`,
+        );
         throw error;
       } finally {
         clearTimeout(timer);
