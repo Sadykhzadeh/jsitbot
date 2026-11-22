@@ -147,6 +147,16 @@ describe("SandboxTimeBudget", () => {
     expect(budget.check("a", policy, 11_001).allowed).toBe(true);
   });
 
+  test("waits for the run that brings the total under the budget, not for one that leaves it at the budget", () => {
+    const budget = new SandboxTimeBudget();
+    budget.record("a", 500, policy, 0);
+    budget.record("a", 500, policy, 1_000);
+    budget.record("a", 500, policy, 2_000);
+
+    // Once the first run leaves the total is 1 000, still the budget; the second leaving gets it under.
+    expect(budget.check("a", policy, 2_000)).toEqual({ allowed: false, retryAfterMs: 9_000 });
+  });
+
   test("a run stops counting the moment its window is over", () => {
     const budget = new SandboxTimeBudget();
     budget.record("a", 1_000, policy, 0);
