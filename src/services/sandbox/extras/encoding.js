@@ -357,6 +357,28 @@
     }
   }
 
+  builtins.defineProperty(TextDecoder.prototype.decode, "length", { value: 0, configurable: true });
+
+  const readEncoding = builtins.getOwnPropertyDescriptor(TextDecoder.prototype, "encoding").get;
+  const readFatal = builtins.getOwnPropertyDescriptor(TextDecoder.prototype, "fatal").get;
+  const readIgnoreBOM = builtins.getOwnPropertyDescriptor(TextDecoder.prototype, "ignoreBOM").get;
+
+  // Node prints a decoder with its three settings, and an encoder as a plain object
+  // that holds its encoding.
+  register(TextDecoder, function (decoder) {
+    return {
+      entries: [
+        ["encoding", builtins.apply(readEncoding, decoder, [])],
+        ["fatal", builtins.apply(readFatal, decoder, [])],
+        ["ignoreBOM", builtins.apply(readIgnoreBOM, decoder, [])],
+      ],
+      map: false,
+    };
+  }, true);
+  register(TextEncoder, function () {
+    return { text: "{ encoding: 'utf-8' }" };
+  }, true);
+
   const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
   function btoa(input) {

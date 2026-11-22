@@ -51,3 +51,18 @@ describe("TextDecoder with UTF-16 and the single-byte Western encoding", () => {
     expect(await value(`return new TextDecoder("utf-32")`)).toBe('error: RangeError: The "utf-32" encoding is not supported');
   });
 });
+
+describe("printing TextDecoder and TextEncoder", () => {
+  test("shows a decoder with its settings and an encoder as an object, as Node does", async () => {
+    const result = await sandbox.execute(`
+      class Latin extends TextDecoder {}
+      console.log(new TextDecoder("utf-16le", { fatal: true }), [new TextEncoder()], new Latin("latin1"));
+      console.log(new TextDecoder().decode.length);
+    `);
+
+    expect(result.logs).toEqual([
+      "TextDecoder { encoding: 'utf-16le', fatal: true, ignoreBOM: false } [ { encoding: 'utf-8' } ] Latin { encoding: 'windows-1252', fatal: false, ignoreBOM: false }",
+      "0",
+    ]);
+  });
+});
