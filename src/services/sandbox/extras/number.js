@@ -52,7 +52,9 @@
     CAD: ["Canadian dollar", "Canadian dollars"],
     AUD: ["Australian dollar", "Australian dollars"],
   };
-  const WHOLE_CURRENCIES = ["JPY", "KRW"];
+  // The currencies whose amounts have no minor unit, and the three-digit ones, as Node's ICU data has them.
+  const WHOLE_CURRENCIES = ["AFN", "ALL", "BIF", "CLP", "COP", "DJF", "GNF", "HUF", "IDR", "IQD", "IRR", "ISK", "JPY", "KMF", "KPW", "KRW", "LAK", "LBP", "MGA", "MMK", "PKR", "PYG", "RWF", "SLL", "SOS", "SYP", "UGX", "VND", "VUV", "XAF", "XOF", "XPF", "YER"];
+  const THREE_DIGIT_CURRENCIES = ["BHD", "JOD", "KWD", "LYD", "OMR", "TND"];
   // What follows the number in each unit: the short form for one and for more,
   // the narrow form, and the long form for one and for more.
   const UNITS = {
@@ -365,7 +367,7 @@
     let defaultMax = 3;
     if (style === "percent") defaultMax = 0;
     if (style === "currency") {
-      defaultMin = defaultMax = builtins.indexOfIn(WHOLE_CURRENCIES, currency) >= 0 ? 0 : 2;
+      defaultMin = defaultMax = builtins.indexOfIn(WHOLE_CURRENCIES, currency) >= 0 ? 0 : builtins.indexOfIn(THREE_DIGIT_CURRENCIES, currency) >= 0 ? 3 : 2;
     }
 
     const notation = options.notation;

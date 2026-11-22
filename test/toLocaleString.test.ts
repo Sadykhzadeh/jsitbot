@@ -47,6 +47,12 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await value(`return (5).toLocaleString("en-US", { style: "currency" })`)).toContain("Currency code is required");
   });
 
+  test("shows the minor units of a currency as Node does", async () => {
+    expect(await value(`return (1234.5).toLocaleString("en-US", { style: "currency", currency: "CLP" })`)).toBe("CLP\u00a01,235");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { style: "currency", currency: "KWD" })`)).toBe("KWD\u00a01,234.500");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { style: "currency", currency: "bhd", maximumFractionDigits: 1 })`)).toBe("BHD\u00a01,234.5");
+  });
+
   test("writes the code of a currency when currencyDisplay asks for it", async () => {
     const coded = (n: string, options: string) =>
       value(`return (${n}).toLocaleString("en-US", { style: "currency", ${options} })`);
