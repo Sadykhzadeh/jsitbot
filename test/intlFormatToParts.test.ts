@@ -24,6 +24,8 @@ const OPTIONS = [
   `{ style: "currency", currency: "CHF" }`,
   `{ style: "currency", currency: "USD", currencyDisplay: "code" }`,
   `{ style: "currency", currency: "USD", currencySign: "accounting" }`,
+  `{ style: "currency", currency: "USD", currencyDisplay: "name" }`,
+  `{ style: "currency", currency: "GBP", currencyDisplay: "name", notation: "compact" }`,
   `{ notation: "compact" }`,
   `{ notation: "compact", compactDisplay: "long" }`,
   `{ notation: "compact", style: "currency", currency: "USD" }`,

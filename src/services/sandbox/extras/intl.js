@@ -133,11 +133,20 @@
           : builtins.numberToLocaleString(builtins.number(value), locales, withOptions);
       const format = (value) => formatWith(value, options);
       define(this, "format", format);
-      const layout = given(options, ["style", "notation"]);
+      const layout = given(options, ["style", "notation", "currencyDisplay"]);
       const bareOptions = builtins.assign({}, options, { style: undefined, unit: undefined, unitDisplay: undefined });
       define(this, "formatToParts", (value) => {
         const text = format(value);
-        return layout.style === "unit" ? unitStyleParts(text, formatWith(value, bareOptions)) : numberParts(text);
+        if (layout.style === "unit") return unitStyleParts(text, formatWith(value, bareOptions));
+        if (layout.style === "currency" && layout.currencyDisplay === "name") {
+          // The number has no space in it, so the name is everything after the first one, as one part.
+          const space = builtins.indexOf(text, " ");
+          const parts = numberParts(builtins.slice(text, 0, space));
+          builtins.push(parts, { type: "literal", value: " " });
+          builtins.push(parts, { type: "currency", value: builtins.slice(text, space + 1) });
+          return parts;
+        }
+        return numberParts(text);
       });
       define(this, "resolvedOptions", () => {
         const asked = given(options, [
