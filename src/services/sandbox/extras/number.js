@@ -150,6 +150,14 @@
     roundingPriority: ["auto", "morePrecision", "lessPrecision"],
   };
   const UNSUPPORTED = ["roundingIncrement"];
+  // Every option the formats read. A call copies them once, so a getter on the
+  // options is called once, as Node calls it, and every read sees the same value.
+  const OPTION_NAMES = [
+    "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",
+    "minimumFractionDigits", "maximumFractionDigits", "minimumSignificantDigits", "maximumSignificantDigits",
+    "useGrouping", "notation", "compactDisplay", "signDisplay", "roundingMode", "roundingPriority",
+    "trailingZeroDisplay", "roundingIncrement",
+  ];
   const SHORT_UNITS = ["", "K", "M", "B", "T"];
   const LONG_UNITS = ["", " thousand", " million", " billion", " trillion"];
 
@@ -525,22 +533,34 @@
     }
   }
 
+  function readOnce(options) {
+    const copy = { __proto__: null };
+    if (options === undefined || options === null) return copy;
+    for (let i = 0; i < OPTION_NAMES.length; i++) {
+      const value = options[OPTION_NAMES[i]];
+      if (value !== undefined) copy[OPTION_NAMES[i]] = value;
+    }
+    return copy;
+  }
+
   function numberToLocaleString(locales, options) {
     const value = builtins.numberValueOf(this);
     checkLocales(locales);
-    checkOptions(options, "Number.prototype.toLocaleString");
-    if (!handled(locales, options)) return builtins.apply(original, value, [locales, options]);
+    const read = readOnce(options);
+    checkOptions(read, "Number.prototype.toLocaleString");
+    if (!handled(locales, read)) return builtins.apply(original, value, [locales, options]);
 
-    return format(value < 0 || builtins.is(value, -0), builtins.abs(value), options || { __proto__: null });
+    return format(value < 0 || builtins.is(value, -0), builtins.abs(value), read);
   }
 
   function bigintToLocaleString(locales, options) {
     const value = builtins.bigintValueOf(this);
     checkLocales(locales);
-    checkOptions(options, "BigInt.prototype.toLocaleString");
-    if (!handled(locales, options)) return builtins.apply(original, value, [locales, options]);
+    const read = readOnce(options);
+    checkOptions(read, "BigInt.prototype.toLocaleString");
+    if (!handled(locales, read)) return builtins.apply(original, value, [locales, options]);
 
-    return format(value < 0n, value < 0n ? -value : value, options || { __proto__: null });
+    return format(value < 0n, value < 0n ? -value : value, read);
   }
 
   return { toLocaleString: owner === BigInt.prototype ? bigintToLocaleString : numberToLocaleString };

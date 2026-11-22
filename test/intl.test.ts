@@ -35,9 +35,35 @@ describe("Intl.NumberFormat", () => {
     expect(await value(`return Intl.NumberFormat() instanceof Intl.NumberFormat`)).toBe("true");
     expect(await value(`return Intl.NumberFormat.name`)).toBe("NumberFormat");
   });
+
+  test("reads each option once, when it is made, as a getter is not called again by each format", async () => {
+    expect(
+      await value(`
+        let reads = 0;
+        const format = new Intl.NumberFormat("en", { get maximumFractionDigits() { reads++; return 2; } });
+        return [format.format(1.234), format.format(1.234), reads].join("|");
+      `),
+    ).toBe("1.23|1.23|1");
+    expect(
+      await value(`
+        let reads = 0;
+        return (5).toLocaleString("en", { get style() { return reads++ ? "unit" : "decimal"; }, unit: "acre" });
+      `),
+    ).toBe("5");
+  });
 });
 
 describe("Intl.Collator", () => {
+  test("reads each option once, when it is made", async () => {
+    expect(
+      await value(`
+        let reads = 0;
+        const collator = new Intl.Collator("en", { get numeric() { reads++; return true; } });
+        return [collator.compare("a10", "a9"), collator.compare("a10", "a9"), reads].join("|");
+      `),
+    ).toBe("1|1|1");
+  });
+
   test("compares as localeCompare does, and sorts when its compare is handed to sort", async () => {
     expect(await value(`return ["b", "a", "C"].sort(new Intl.Collator().compare).join("")`)).toBe("abC");
     expect(
@@ -224,6 +250,16 @@ describe("Intl.Collator options, checked against Node 26.13", () => {
 });
 
 describe("Intl.DateTimeFormat and toLocale* options, checked against Node 26.13", () => {
+  test("reads each option once, when it is made, so a format does not call the getters again", async () => {
+    expect(
+      await value(`
+        let reads = 0;
+        const format = new Intl.DateTimeFormat("en", { timeZone: "UTC", get hour() { reads++; return "numeric"; } });
+        return [format.format(0), format.format(0), reads].join("|");
+      `),
+    ).toBe("12 AM|12 AM|1");
+  });
+
   test("refuses an era, day period or matcher value Node refuses, and names the method", async () => {
     const cases: Array<[string, string]> = [
       [`new Intl.DateTimeFormat("en", { era: "bogus" })`, "RangeError: Value bogus out of range for Intl.DateTimeFormat options property era"],

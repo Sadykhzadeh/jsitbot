@@ -17,11 +17,12 @@
   }
 
   // Options that were given, in the order resolvedOptions lists them.
-  function given(options, names) {
+  function snapshot(options, names) {
     const out = { __proto__: null };
     if (options === undefined || options === null) return out;
     for (const name of names) {
-      if (options[name] !== undefined) out[name] = options[name];
+      const value = options[name];
+      if (value !== undefined) out[name] = value;
     }
     return out;
   }
@@ -117,9 +118,18 @@
     roundingMode: ["ceil", "floor", "expand", "trunc", "halfCeil", "halfFloor", "halfExpand", "halfTrunc", "halfEven"],
   };
 
+  // The options a number format reads, read once by its constructor so that a getter is not called again by each format.
+  const NUMBER_OPTION_NAMES = [
+    "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",
+    "minimumFractionDigits", "maximumFractionDigits", "minimumSignificantDigits", "maximumSignificantDigits",
+    "useGrouping", "notation", "compactDisplay", "signDisplay", "roundingMode", "roundingPriority",
+    "trailingZeroDisplay", "roundingIncrement",
+  ];
+
   class NumberFormat {
     constructor(locales, options) {
-      const asked = options === undefined || options === null ? { __proto__: null } : Object(options);
+      options = snapshot(options, NUMBER_OPTION_NAMES);
+      const asked = options;
       for (const name of builtins.keys(NUMBER_OPTION_VALUES)) choose(asked, name, NUMBER_OPTION_VALUES[name], undefined, "NumberFormat");
       if (asked.currency !== undefined && !builtins.test(/^[A-Za-z]{3}$/, builtins.string(asked.currency))) {
         throw new RangeError("Invalid currency code : " + builtins.string(asked.currency));
@@ -141,8 +151,8 @@
           : builtins.numberToLocaleString(builtins.number(value), locales, withOptions);
       const format = (value) => formatWith(value, options);
       define(this, "format", format);
-      const layout = given(options, ["style", "notation", "currencyDisplay"]);
-      const bareOptions = builtins.assign({}, options, { style: undefined, unit: undefined, unitDisplay: undefined });
+      const layout = snapshot(options, ["style", "notation", "currencyDisplay"]);
+      const bareOptions = builtins.assign({ __proto__: null }, options, { style: undefined, unit: undefined, unitDisplay: undefined });
       define(this, "formatToParts", (value) => {
         const text = format(value);
         if (layout.style === "unit") return unitStyleParts(text, formatWith(value, bareOptions));
@@ -157,7 +167,7 @@
         return numberParts(text);
       });
       define(this, "resolvedOptions", () => {
-        const asked = given(options, [
+        const asked = snapshot(options, [
           "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",
           "minimumFractionDigits", "maximumFractionDigits", "minimumSignificantDigits", "maximumSignificantDigits",
           "useGrouping", "notation", "compactDisplay", "signDisplay", "roundingMode", "roundingPriority", "trailingZeroDisplay",
@@ -208,18 +218,21 @@
     }
   }
 
+  const COLLATOR_OPTION_NAMES = ["usage", "sensitivity", "ignorePunctuation", "numeric", "caseFirst"];
+
   class Collator {
     constructor(locales, options) {
       checkLocales(locales);
       if (options === null) throw new TypeError("Intl.Collator called on null or undefined");
-      const asked = options === undefined ? { __proto__: null } : Object(options);
+      options = snapshot(options, COLLATOR_OPTION_NAMES);
+      const asked = options;
       choose(asked, "usage", ["sort", "search"], undefined, "Collator");
       choose(asked, "sensitivity", ["base", "accent", "case", "variant"], undefined, "Collator");
       choose(asked, "caseFirst", ["upper", "lower", "false"], undefined, "Collator");
       const compare = (a, b) => builtins.localeCompare(builtins.string(a), builtins.string(b), locales, options);
       define(this, "compare", compare);
       define(this, "resolvedOptions", () => {
-        const asked = given(options, ["usage", "sensitivity", "ignorePunctuation", "numeric", "caseFirst"]);
+        const asked = snapshot(options, COLLATOR_OPTION_NAMES);
         return {
           locale: "en-US",
           usage: asked.usage === undefined ? "sort" : asked.usage,
@@ -246,11 +259,17 @@
 
   const DATE_FORMAT_FIELDS = ["weekday", "year", "month", "day", "dateStyle"];
   const TIME_FORMAT_FIELDS = ["hour", "minute", "second", "fractionalSecondDigits", "timeStyle"];
+  // Every option the formats read, copied once when the formatter is made.
+  const DATE_OPTION_NAMES = [
+    "weekday", "era", "year", "month", "day", "dayPeriod", "hour", "minute", "second", "fractionalSecondDigits",
+    "timeZoneName", "dateStyle", "timeStyle", "hour12", "hourCycle", "timeZone", "calendar", "numberingSystem",
+    "localeMatcher", "formatMatcher",
+  ];
 
   class DateTimeFormat {
     constructor(locales, options) {
       if (options === null) throw new TypeError("Cannot convert undefined or null to object");
-      let given = options === undefined ? { __proto__: null } : Object(options);
+      let given = snapshot(options, DATE_OPTION_NAMES);
       // with nothing asked for, a date is written; toLocaleString would add the time
       if (!builtins.some(FORMAT_FIELDS, (name) => given[name] !== undefined)) {
         given = builtins.assign({ __proto__: null }, given, { year: "numeric", month: "numeric", day: "numeric" });
