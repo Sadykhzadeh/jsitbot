@@ -135,6 +135,9 @@ export function opensWithDeclarationAndMore(code: string): boolean {
   return read !== undefined && read.includes(RETURNS_LAST_VALUE) && !CLASS_AS_VALUE.test(read);
 }
 
+// Block comments that begin a statement and end on its line.
+const LEADING_BLOCK_COMMENTS = /^(?:\/\*[^\n\r\u2028\u2029]*?\*\/[ \t]*)+/;
+
 // How far back from the end to look for where the last statement begins.
 const MAX_STATEMENT_STARTS = 1000;
 
@@ -170,7 +173,9 @@ export function wrapAsStatementsWithValue(code: string): string | undefined {
     const rest = code.slice(start);
     const last = rest.trimStart();
     const from = start + (rest.length - last.length);
-    if (last === "" || last.startsWith("//") || last.startsWith("/*")) {
+    // A block comment on the line of the statement is part of what follows return.
+    const bare = last.replace(LEADING_BLOCK_COMMENTS, "");
+    if (bare === "" || bare.startsWith("//") || bare.startsWith("/*") || /^[\r\n\u2028\u2029]/.test(bare)) {
       continue;
     }
 

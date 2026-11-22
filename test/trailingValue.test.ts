@@ -35,6 +35,11 @@ describe("the value of the last statement of code that awaits", () => {
     expect(await show(`await null;\nawait Promise.all([\n  1,\n  2,\n])`)).toBe("[ 1, 2 ]");
   });
 
+  test("a block comment in front of the last statement on its line", async () => {
+    expect(await show(`await null; /* total */ 8`)).toBe("8");
+    expect(await show(`const n = await Promise.resolve(2);\n/** doubled */ n * 2 /* end */`)).toBe("4");
+  });
+
   test("a last statement of a hundred lines is still the result", async () => {
     const rows = Array.from({ length: 100 }, (_, i) => `  { n: ${i} },`).join("\n");
     const execution = await run(`await null;\n[\n${rows}\n].length`);
