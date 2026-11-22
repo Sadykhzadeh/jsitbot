@@ -406,3 +406,74 @@ describe("URLSearchParams from null", () => {
     expect(await value(`return [new URLSearchParams(null) + "", new URLSearchParams(undefined) + "", new URLSearchParams().size].join("|")`)).toBe("null=||0");
   });
 });
+
+describe("URL setters and the characters a URL cannot hold", () => {
+  test("drop tabs and line breaks from search, hash, pathname and port, and keep them in a user name", async () => {
+    const result = await value(`
+      const u = new URL("http://h/p");
+      u.hash = "a\\tb\\nc"; u.search = "x\\ty"; u.pathname = "/a\\tb"; u.port = "8\\t1"; u.username = "u\\tv";
+      const e = new URL("http://h/?q#f");
+      e.search = "\\t"; e.hash = "\\n";
+      return [u.href, e.href].join(" ");
+    `);
+
+    expect(result).toBe("http://u%09v@h:81/ab?xy#abc http://h/?#");
+  });
+
+  test("protocol takes the scheme before a colon, and refuses text that is not a scheme, as Node does", async () => {
+    const result = await value(`
+      const out = [];
+      const mail = new URL("mailto:a@b"); mail.protocol = "userC:|~"; out.push(mail.href);
+      const foo = new URL("foo://h/p");
+      foo.protocol = "a(b"; out.push(foo.href);
+      foo.protocol = "x+y.z-1:"; out.push(foo.href);
+      foo.protocol = "http"; out.push(foo.href);
+      return out.join(" ");
+    `);
+
+    expect(result).toBe("userc:a@b foo://h/p x+y.z-1://h/p x+y.z-1://h/p");
+  });
+});
+
+describe("URL host setters", () => {
+  test("end the host at the first colon outside brackets and refuse an empty host as Node does", async () => {
+    const result = await value(`
+      const out = [];
+      const set = (base, key, text) => { const u = new URL(base); u[key] = text; out.push(u.href); };
+      set("http://h/a", "host", "c:https^; 00:80");
+      set("http://h/a", "host", "0x7fC:C:");
+      set("http://[::1]:8/", "host", "[::2]:99");
+      set("http://[::1]:8/", "hostname", "[::2]");
+      set("foo://h/p/q", "host", ":80");
+      set("foo://h/p/q", "host", "");
+      set("foo://u:p@h/p", "host", "");
+      set("foo://h:5/p", "hostname", "");
+      set("foo://h/p", "hostname", "x:y");
+      set("file:///C:/x", "hostname", "\\\\a");
+      set("file:///C:/x", "host", "a:1");
+      set("http://h:5/a", "host", "x:");
+      set("http://h:5/a", "host", "x:8a");
+      set("http://h/a", "hostname", "");
+      return out.join("\\n");
+    `);
+
+    expect(result).toBe(
+      [
+        "http://c/a",
+        "http://0.0.7.252/a",
+        "http://[::2]:99/",
+        "http://[::2]:8/",
+        "foo://h/p/q",
+        "foo:///p/q",
+        "foo://u:p@h/p",
+        "foo://h:5/p",
+        "foo://h/p",
+        "file:///C:/x",
+        "file:///C:/x",
+        "http://x:5/a",
+        "http://x:8/a",
+        "http://h/a",
+      ].join("\n"),
+    );
+  });
+});

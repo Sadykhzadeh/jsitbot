@@ -1029,6 +1029,23 @@
 
   // URL ----------------------------------------------------------------------
 
+  // The text of a value given to a setter, without the tabs and line breaks that a URL never holds.
+  function withoutBreaks(value) {
+    return builtins.replace(builtins.string(value), /[\t\n\r]/g, "");
+  }
+
+  // The index of the colon that starts the port of a host, which is the first one outside brackets.
+  function portColon(authority) {
+    let inside = false;
+    for (let i = 0; i < authority.length; i++) {
+      const char = authority[i];
+      if (char === "[") inside = true;
+      else if (char === "]") inside = false;
+      else if (char === ":" && !inside) return i;
+    }
+    return -1;
+  }
+
   class URL {
     #record;
     #params = null;
@@ -1092,10 +1109,10 @@
     }
 
     set protocol(value) {
-      const match = builtins.exec(/^([a-zA-Z][a-zA-Z0-9+.\-]*):?/, builtins.string(value));
+      const match = builtins.exec(/^([a-zA-Z][a-zA-Z0-9+.\-]*)(?::|$)/, withoutBreaks(value));
       if (!match) return;
       const scheme = builtins.toLowerCase(match[1]);
-      if (isSpecial(scheme) !== isSpecial(this.#record.scheme) || this.#record.opaque) return;
+      if (isSpecial(scheme) !== isSpecial(this.#record.scheme)) return;
       if (this.#record.scheme === "file" && this.#record.host === "") return;
       if (scheme === "file" && (this.#record.username !== "" || this.#record.password !== "" || this.#record.port !== "")) return;
       this.#update({
@@ -1131,17 +1148,17 @@
       const record = this.#record;
       if (record.opaque) return;
       const special = isSpecial(record.scheme);
-      const text = builtins.replace(builtins.string(value), /[\t\n\r]/g, "");
+      const text = withoutBreaks(value);
       const end = builtins.search(text, special ? /[\/\\?#]/ : /[\/?#]/);
       const authority = end === -1 ? text : builtins.slice(text, 0, end);
-      const colon = builtins.lastIndexOf(authority, ":");
-      const hasPort = colon > builtins.lastIndexOf(authority, "]");
-      const hostText = hasPort ? builtins.slice(authority, 0, colon) : authority;
-      if (hostText === "" && special) return;
+      const colon = portColon(authority);
+      const hostText = colon === -1 ? authority : builtins.slice(authority, 0, colon);
+      if (colon !== -1 && record.scheme === "file") return;
+      if (!this.#hostAllowed(hostText, colon !== -1)) return;
       const host = hostText === "" ? "" : parseHost(hostText, !special);
       if (host === null) return;
       this.#update({ host: record.scheme === "file" && host === "localhost" ? "" : host });
-      const digits = hasPort ? builtins.exec(/^[0-9]+/, builtins.slice(authority, colon + 1)) : null;
+      const digits = colon === -1 ? null : builtins.exec(/^[0-9]+/, builtins.slice(authority, colon + 1));
       if (digits === null) return;
       const number = builtins.parseInteger(digits[0], 10);
       if (number > 65535) return;
@@ -1156,13 +1173,23 @@
       const record = this.#record;
       if (record.opaque) return;
       const special = isSpecial(record.scheme);
-      const text = builtins.replace(builtins.string(value), /[\t\n\r]/g, "");
-      const end = builtins.search(text, special ? /[\/\\?#:]/ : /[\/?#:]/);
-      if (end !== -1 && text[end] === ":") return;
-      const hostText = end === -1 ? text : builtins.slice(text, 0, end);
-      if (hostText === "" && special) return;
-      const host = hostText === "" ? "" : parseHost(hostText, !special);
+      const text = withoutBreaks(value);
+      const end = builtins.search(text, special ? /[\/\\?#]/ : /[\/?#]/);
+      const authority = end === -1 ? text : builtins.slice(text, 0, end);
+      if (portColon(authority) !== -1) return;
+      if (!this.#hostAllowed(authority, false)) return;
+      const host = authority === "" ? "" : parseHost(authority, !special);
       if (host !== null) this.#update({ host: record.scheme === "file" && host === "localhost" ? "" : host });
+    }
+
+    // Whether a host setter may go on with this text: a special URL needs a host, except for file, and
+    // an empty host is refused after a colon or for a URL that has credentials or a port.
+    #hostAllowed(hostText, afterColon) {
+      if (hostText !== "") return true;
+      const record = this.#record;
+      if (record.scheme === "file") return true;
+      if (isSpecial(record.scheme) || afterColon) return false;
+      return record.username === "" && record.password === "" && record.port === "";
     }
 
     get port() {
@@ -1172,11 +1199,11 @@
     set port(value) {
       const record = this.#record;
       if (record.host === null || record.host === "" || record.scheme === "file") return;
-      const text = builtins.string(value);
-      if (text === "") {
+      if (builtins.string(value) === "") {
         this.#update({ port: "" });
         return;
       }
+      const text = withoutBreaks(value);
       const digits = builtins.exec(/^[0-9]+/, text);
       if (!digits || builtins.number(digits[0]) > 65535) return;
       const port = builtins.string(builtins.number(digits[0]));
@@ -1189,7 +1216,7 @@
 
     set pathname(value) {
       if (this.#record.opaque) return;
-      this.#update({ path: pathOf(builtins.string(value), isSpecial(this.#record.scheme)) });
+      this.#update({ path: pathOf(withoutBreaks(value), isSpecial(this.#record.scheme)) });
     }
 
     get search() {
@@ -1198,8 +1225,8 @@
     }
 
     set search(value) {
-      const text = builtins.string(value);
-      const query = text === "" ? null : pct(builtins.startsWith(text, "?") ? builtins.slice(text, 1) : text, isSpecial(this.#record.scheme) ? SPECIAL_QUERY_SET : QUERY_SET);
+      const text = withoutBreaks(value);
+      const query = builtins.string(value) === "" ? null : pct(builtins.startsWith(text, "?") ? builtins.slice(text, 1) : text, isSpecial(this.#record.scheme) ? SPECIAL_QUERY_SET : QUERY_SET);
       this.#update({ query });
       this.#resetParams();
     }
@@ -1221,8 +1248,8 @@
     }
 
     set hash(value) {
-      const text = builtins.string(value);
-      this.#update({ fragment: text === "" ? null : pct(builtins.startsWith(text, "#") ? builtins.slice(text, 1) : text, FRAGMENT_SET) });
+      const text = withoutBreaks(value);
+      this.#update({ fragment: builtins.string(value) === "" ? null : pct(builtins.startsWith(text, "#") ? builtins.slice(text, 1) : text, FRAGMENT_SET) });
     }
 
     toString() {
