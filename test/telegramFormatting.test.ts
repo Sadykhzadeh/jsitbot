@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  formatCompactExecution,
   formatExecutionDocument,
   formatExecutionMessage,
   formatInlineExecutionPreview,
@@ -600,5 +601,11 @@ describe("inline preview and share cut-offs", () => {
     const preview = formatInlineExecutionPreview(run("1", ["b".repeat(200)]));
 
     expect(preview.description).toBe(`console: ${"b".repeat(116)}...`);
+  });
+
+  test("a share keeps code of up to 600 characters and a result of up to 300", () => {
+    expect(formatCompactExecution(run("a".repeat(300)), "x".repeat(600))).toBeDefined();
+    expect(formatCompactExecution(run("a".repeat(301)), "x")).toBeUndefined();
+    expect(formatCompactExecution(run("1"), "x".repeat(601))).toBeUndefined();
   });
 });
