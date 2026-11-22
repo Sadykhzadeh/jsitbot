@@ -100,6 +100,19 @@ describe("tampering with built-ins", () => {
     `)).toBe("I|ı|ABC|1/1/1970, 9:00:00 AM|true");
   });
 
+  test("locale tags are checked the same way after the array iterator is replaced", async () => {
+    expect(await value(`
+      Array.prototype[Symbol.iterator] = function* () { yield "hijacked"; };
+      return [
+        (1).toLocaleString("en"),
+        "ABC".toLocaleLowerCase("en-US"),
+        "a".localeCompare("b", "en"),
+        new Intl.Collator("en").compare("a", "b"),
+        new Intl.NumberFormat("en").format(1),
+      ].join("|");
+    `)).toBe("1|abc|-1|-1|1");
+  });
+
   test("date formatting keeps working after its prototypes are replaced", async () => {
     expect(await value(`
       String.prototype.indexOf = () => -1;

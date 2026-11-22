@@ -27,7 +27,7 @@
       if (tags[i] === undefined) continue;
       const tag = builtins.string(tags[i]);
       const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
-      if (!builtins.test(LANGUAGE_TAG, tag) || new Set(singletons).size !== singletons.length) {
+      if (!builtins.test(LANGUAGE_TAG, tag) || builtins.some(singletons, (subtag, at) => builtins.indexOfIn(singletons, subtag) !== at)) {
         throw new RangeError("Invalid language tag: " + tag);
       }
     }

@@ -32,7 +32,7 @@
 
     if (builtins.includes(tag, "-")) {
       const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
-      if (new Set(singletons).size !== singletons.length) throw new RangeError("Invalid language tag: " + tag);
+      if (builtins.some(singletons, (subtag, at) => builtins.indexOfIn(singletons, subtag) !== at)) throw new RangeError("Invalid language tag: " + tag);
     }
     if (!builtins.test(LANGUAGE_TAG, tag)) throw new RangeError("Invalid language tag: " + tag);
 

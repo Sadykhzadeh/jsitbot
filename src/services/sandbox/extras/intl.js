@@ -313,7 +313,7 @@
       if (tags[i] === undefined) continue;
       const tag = builtins.string(tags[i]);
       const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(tag), "-x-")[0], "-"), (subtag) => subtag.length === 1);
-      if (!builtins.test(LANGUAGE_TAG, tag) || new Set(singletons).size !== singletons.length) {
+      if (!builtins.test(LANGUAGE_TAG, tag) || builtins.some(singletons, (subtag, at) => builtins.indexOfIn(singletons, subtag) !== at)) {
         throw new RangeError("Invalid language tag: " + tag);
       }
     }
@@ -1026,7 +1026,7 @@
       }
       const text = builtins.string(tag);
       const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(text), "-x-")[0], "-"), (subtag) => subtag.length === 1);
-      if (!builtins.test(LANGUAGE_TAG, text) || new Set(singletons).size !== singletons.length) {
+      if (!builtins.test(LANGUAGE_TAG, text) || builtins.some(singletons, (subtag, at) => builtins.indexOfIn(singletons, subtag) !== at)) {
         throw new RangeError("Incorrect locale information provided");
       }
       if (options === null) throw new TypeError("Intl.Locale called on null or undefined");
@@ -1235,7 +1235,7 @@
 
   function canonicalTag(text) {
     const singletons = builtins.filter(builtins.split(builtins.split(builtins.toLowerCase(text), "-x-")[0], "-"), (subtag) => subtag.length === 1);
-    if (!builtins.test(LANGUAGE_TAG, text) || new Set(singletons).size !== singletons.length) {
+    if (!builtins.test(LANGUAGE_TAG, text) || builtins.some(singletons, (subtag, at) => builtins.indexOfIn(singletons, subtag) !== at)) {
       throw new RangeError("Invalid language tag: " + text);
     }
     return new Locale(text).toString();
