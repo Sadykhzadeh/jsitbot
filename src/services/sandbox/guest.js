@@ -1837,7 +1837,7 @@
       throw new TypeError("The callback must be a function");
     }
 
-    const wait = delay >= 1 && delay <= MAX_TIMER_DELAY ? +delay : 1;
+    const wait = delay >= 1 && delay <= MAX_TIMER_DELAY ? mathFloor(+delay) : 1;
     const timer = {
       id: ++lastTimerId,
       at: timerClock + wait,

@@ -36,6 +36,20 @@ describe("setTimeout", () => {
     expect(order).toBe("abcd");
   });
 
+  test("a delay is a whole number of milliseconds, as in Node", async () => {
+    const order = await value(`
+      const seen = [];
+      setTimeout(() => seen.push("a"), 2.9);
+      setTimeout(() => seen.push("b"), 2.1);
+      setTimeout(() => seen.push("c"), "3.5");
+      setTimeout(() => seen.push("d"), 3);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return seen.join("");
+    `);
+
+    expect(order).toBe("abcd");
+  });
+
   test("a timer set inside a timer counts from when its parent fired", async () => {
     const order = await value(`
       const seen = [];
