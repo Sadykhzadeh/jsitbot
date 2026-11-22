@@ -608,4 +608,20 @@ describe("inline preview and share cut-offs", () => {
     expect(formatCompactExecution(run("a".repeat(301)), "x")).toBeUndefined();
     expect(formatCompactExecution(run("1"), "x".repeat(601))).toBeUndefined();
   });
+
+  test("a line of code longer than 80 characters is cut around the error", () => {
+    const failure = {
+      ok: false as const,
+      logs: [],
+      error: "SyntaxError: unexpected token in expression: ';'",
+      line: 1,
+      column: 81,
+      durationMs: 1,
+      timedOut: false,
+      truncated: false,
+    };
+    const message = formatExecutionMessage(failure, "x".repeat(81));
+
+    expect(message.text).toContain(`...${"x".repeat(80)}\n${" ".repeat(82)}^`);
+  });
 });
