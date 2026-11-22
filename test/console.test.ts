@@ -147,6 +147,25 @@ describe("console.table of collections and columns", () => {
       "└─────────┴───┴───┴───┘",
     ]);
   });
+
+  test("a primitive row under a column list is left empty, with no Values column", async () => {
+    const [table] = await logs(`console.table([{ a: 1 }, 5], ["a"])`);
+
+    expect(table.split("\n")).toEqual([
+      "┌─────────┬───┐",
+      "│ (index) │ a │",
+      "├─────────┼───┤",
+      "│ 0       │ 1 │",
+      "│ 1       │   │",
+      "└─────────┴───┘",
+    ]);
+  });
+
+  test("a column list with no rows to print prints no columns", async () => {
+    expect(await logs(`console.table([], ["x"])`)).toEqual([
+      ["┌─────────┐", "│ (index) │", "├─────────┤", "└─────────┘"].join("\n"),
+    ]);
+  });
 });
 
 describe("console.assert", () => {

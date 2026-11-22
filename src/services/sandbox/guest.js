@@ -1532,7 +1532,7 @@
             row.cells[fields[j]] = "[Unreadable]";
           }
         }
-      } else {
+      } else if (!chosen) {
         hasValues = true;
         row.value = cell(item);
       }
@@ -1540,7 +1540,7 @@
     }
 
     // The columns the rows found are ordered as the keys of an object are, so a number-like key comes first.
-    const names = chosen ? columns : getKeys(known);
+    const names = chosen ? (keys.length > 0 ? columns : []) : getKeys(known);
     const headers = ["(index)"];
     for (let i = 0; i < names.length; i++) headers[headers.length] = names[i];
     if (hasValues) headers[headers.length] = "Values";
