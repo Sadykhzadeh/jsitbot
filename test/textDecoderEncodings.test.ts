@@ -66,3 +66,14 @@ describe("printing TextDecoder and TextEncoder", () => {
     ]);
   });
 });
+
+describe("UTF-16 text that ends inside a character", () => {
+  test("gives one replacement character for a lone surrogate and the byte after it", async () => {
+    expect(
+      await value(`
+        const show = (bytes, label) => [...new TextDecoder(label).decode(new Uint8Array(bytes))].map((c) => c.codePointAt(0).toString(16)).join(".");
+        return [show([0x3d, 0xd8, 0x41], "utf-16le"), show([0xd8, 0x3d, 0x41], "utf-16be"), show([0x41, 0, 0x3d, 0xd8], "utf-16le"), show([0x41, 0, 0x3d, 0xd8, 0x42], "utf-16le")].join(" ");
+      `),
+    ).toBe("fffd fffd 41.fffd 41.fffd");
+  });
+});

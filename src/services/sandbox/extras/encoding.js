@@ -225,6 +225,8 @@
           }
           i += 2;
           invalid();
+          // A single byte left after the surrogate belongs to the same error.
+          i = bytes.length;
           continue;
         }
         const next = at(i + 2);
