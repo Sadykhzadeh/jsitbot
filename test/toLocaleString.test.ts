@@ -78,6 +78,14 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await value(`return (1234.5).toLocaleString("en-US", { style: "currency", currency: "bhd", maximumFractionDigits: 1 })`)).toBe("BHD\u00a01,234.5");
   });
 
+  test("writes the symbol of a currency that has one in English, and its code otherwise", async () => {
+    expect(await value(`return (-2500.5).toLocaleString("en-US", { style: "currency", currency: "BRL" })`)).toBe("-R$2,500.50");
+    expect(await value(`return (3).toLocaleString("en-US", { style: "currency", currency: "XOF", currencySign: "accounting" })`)).toBe("F\u202fCFA\u00a03");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { style: "currency", currency: "XCG" })`)).toBe("Cg.\u00a01,234.50");
+    expect(await value(`return (NaN).toLocaleString("en-US", { style: "currency", currency: "PHP" })`)).toBe("₱NaN");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { style: "currency", currency: "CHF" })`)).toBe("CHF\u00a01,234.50");
+  });
+
   test("writes the code of a currency when currencyDisplay asks for it", async () => {
     const coded = (n: string, options: string) =>
       value(`return (${n}).toLocaleString("en-US", { style: "currency", ${options} })`);

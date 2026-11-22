@@ -39,7 +39,11 @@
       }
     }
   }
-  const SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "CN¥", CAD: "CA$", AUD: "A$" };
+  const SYMBOLS = {
+    USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "CN¥", CAD: "CA$", AUD: "A$",
+    BRL: "R$", HKD: "HK$", ILS: "₪", MXN: "MX$", NZD: "NZ$", PHP: "₱", TWD: "NT$", VND: "₫",
+    XAF: "FCFA", XCD: "EC$", XCG: "Cg.", XOF: "F\u202fCFA", XPF: "CFPF",
+  };
   const NARROW_SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "¥", CAD: "$", AUD: "$" };
   // The name of each currency in NARROW_SYMBOLS: singular, then plural, as English writes it.
   const CURRENCY_NAMES = {
@@ -405,7 +409,10 @@
         text += " " + (names === undefined ? currency : names[text === "1" ? 0 : 1]);
       } else {
         const symbol = display === "code" ? undefined : display === "narrowSymbol" ? NARROW_SYMBOLS[currency] : SYMBOLS[currency];
-        text = (symbol === undefined ? currency + (builtins.test(/^\d/, text) ? " " : "") : symbol) + text;
+        const label = symbol === undefined ? currency : symbol;
+        // A label that ends in a letter or a point, such as the code or F CFA, is set apart from the digits by a no-break space.
+        const gap = builtins.test(/^\d/, text) && !builtins.test(/\p{S}$/u, label) ? "\u00a0" : "";
+        text = label + gap + text;
       }
     }
     // A compact number keeps its minus sign, as ICU writes it. A currency name is not put in brackets.
