@@ -261,20 +261,20 @@ describe("the child process", () => {
     await service.dispose();
   });
 
-  test("a child that cannot be spawned leaves no start timer to fail later", async () => {
+  test("a child that cannot be spawned starts no timer that would fire later", async () => {
     const spawn = spyOn(Bun, "spawn").mockImplementation(() => {
       throw new Error("spawn EAGAIN");
     });
+    const schedule = spyOn(globalThis, "setTimeout");
 
     try {
       const service = new ProcessSandboxService(options);
       await expect(service.warmUp()).rejects.toThrow("spawn EAGAIN");
+      expect(schedule).not.toHaveBeenCalled();
     } finally {
       spawn.mockRestore();
+      schedule.mockRestore();
     }
-
-    // The start timer is 10 s long; a timer left behind by the failed spawn fires in this window.
-    await new Promise((resolve) => setTimeout(resolve, 10_500));
   });
 
   test("gets none of the bot's configuration", () => {

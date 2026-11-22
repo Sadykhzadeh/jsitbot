@@ -93,13 +93,15 @@ describe("String.prototype.localeCompare", () => {
   });
 
   test("sorts more strings than it keeps apart, in the same order as before", async () => {
-    expect(
-      await value(`
+    // The sort takes a few hundred milliseconds, more on a busy machine, so it gets a longer limit than the default.
+    const patient = new QuickJsSandboxService({ timeoutMs: 10_000 });
+    const result = await patient.execute(`
         const words = Array.from({ length: 1_200 }, (_, i) => "w" + ((i * 7919) % 1_200));
         const sorted = words.slice().sort((x, y) => x.localeCompare(y));
         return sorted.every((word, i) => i === 0 || sorted[i - 1].localeCompare(word) < 0) ? sorted[0] + " " + sorted[1199] : "unsorted";
-      `),
-    ).toBe("w0 w999");
+      `);
+
+    expect(result.ok ? result.result : result.error).toBe("w0 w999");
   });
 
   test("is not carried into the next run", async () => {

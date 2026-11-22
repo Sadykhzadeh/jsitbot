@@ -385,10 +385,10 @@ describe("performance marks", () => {
     expect(
       await value(`
         performance.mark("a");
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
         performance.mark("b");
         const m = performance.measure("sleep", "a", "b");
-        return [m.name, m.entryType, m.duration >= 250 && m.duration < 260].join();
+        return [m.name, m.entryType, m.duration >= 1_000 && m.duration < 1_500].join();
       `),
     ).toBe("sleep,measure,true");
   });

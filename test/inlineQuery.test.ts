@@ -64,9 +64,14 @@ describe("inline queries", () => {
 
 describe("sandbox time budget", () => {
   test("is shared between inline queries and private messages", async () => {
+    // Each run is charged 100 ms whatever the machine takes, so the budget of 150 ms
+    // is used up by the second run in every case.
+    const runner = new QuickJsSandboxService({ timeoutMs: 100 });
     const harness = createHarness({
       maxSandboxMs: 150,
-      sandbox: new QuickJsSandboxService({ timeoutMs: 100 }),
+      sandbox: {
+        execute: async (code) => ({ ...(await runner.execute(code)), durationMs: 100 }),
+      },
     });
 
     await harness.sendMessage("while (true) {}", 1);
