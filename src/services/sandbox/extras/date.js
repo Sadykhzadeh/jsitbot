@@ -155,9 +155,11 @@
       if (needDefaults && defaults !== "date") {
         f.hour = f.minute = f.second = "numeric";
       }
-      // With the defaults, Node writes the hour of h11 as h12 does, and a time
-      // that names its hour counts it from 0 to 11.
+      // With the defaults, Node writes the hour of h11 as h12 does and the hour
+      // of h24 as h23, and a time that names its hour counts it from 0 to 11 or
+      // from 1 to 24.
       if (needDefaults && cycle === "h11") cycle = "h12";
+      if (needDefaults && cycle === "h24") cycle = "h23";
     }
 
     // The fraction is written in the place of the seconds, and it comes with them
@@ -242,6 +244,7 @@
       let hour = c.hours;
       if (cycle === "h12") hour = hour % 12 || 12;
       else if (cycle === "h11") hour = hour % 12;
+      else if (cycle === "h24") hour = hour || 24;
       fields[fields.length] = ["hour", !twelve || f.hour === "2-digit" ? pad(hour) : builtins.string(hour)];
     }
     if (f.minute !== undefined) {
