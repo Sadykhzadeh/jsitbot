@@ -18,8 +18,8 @@ if (!corpusPath || !outPath) {
 }
 
 const snippets = readFileSync(corpusPath, "utf8")
-  .split(/\n---8<---\n/)
-  .map((snippet) => snippet.replace(/\n$/, ""));
+  .split(/\r?\n---8<---\r?\n/)
+  .map((snippet) => snippet.replace(/\r?\n$/, ""));
 
 const results = [];
 for (const code of snippets) {

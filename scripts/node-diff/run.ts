@@ -53,8 +53,8 @@ if (!version.startsWith("26.")) {
 
 function readSnippets(path: string): string[] {
   return readFileSync(path, "utf8")
-    .split(/\n---8<---\n/)
-    .map((snippet) => snippet.replace(/\n$/, ""));
+    .split(/\r?\n---8<---\r?\n/)
+    .map((snippet) => snippet.replace(/\r?\n$/, ""));
 }
 
 type Record = { logs: string[]; error: string | null };
