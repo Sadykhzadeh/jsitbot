@@ -2152,6 +2152,21 @@
     getTime: uncurry(Date.prototype.getTime),
     RegExp,
   };
+  // What structuredClone treats an object as. A tag the program set on an object is
+  // not believed, so what the internal slots say it is wins, and Object when they
+  // say nothing, as it does for the engine's own Math and JSON.
+  function cloneKind(value) {
+    const tag = objectToString(value);
+    if (!programDefined(value, Symbol.toStringTag)) return kindOf(value, tag);
+    if (isArray(value)) return "[object Array]";
+    const tags = ["[object Map]", "[object Set]", "[object Date]", "[object RegExp]", "[object Number]", "[object String]", "[object Boolean]", "[object BigInt]", "[object ArrayBuffer]", "[object SharedArrayBuffer]", "[object DataView]"];
+    for (let i = 0; i < tags.length; i++) {
+      if (hasSlotsOf(value, tags[i])) return tags[i];
+    }
+    const typed = typedArrayNameOf(value);
+    return typed === undefined ? "[object Object]" : "[object " + typed + "]";
+  }
+
   const hostFunctions = {
     setTimeout,
     queueMicrotask,
@@ -2164,6 +2179,7 @@
     },
     now: performance.now,
     isProxy: (value) => weakMapHas(proxyTargets, value),
+    cloneKind,
     extra: (module) => loaders[module](),
   };
 

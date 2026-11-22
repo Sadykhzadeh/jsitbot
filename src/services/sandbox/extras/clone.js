@@ -88,7 +88,7 @@
       if (builtins.mapHas(seen, source)) return builtins.mapGet(seen, source);
       if (host.isProxy(source)) throw cloneError(builtins.isArray(source) ? "[object Array]" : "#<Object>");
 
-      let tag = builtins.tag(source);
+      let tag = host.cloneKind(source);
       let out;
 
       // A Blob or a File is copied only when it holds data. An object that only claims the tag,

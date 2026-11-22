@@ -37,3 +37,30 @@ const fromPrototype = structuredClone(Object.create(Blob.prototype));
     expect(result.ok ? result.result : result.error).toBe('{} {"a":1} true');
   });
 });
+
+describe("structuredClone of objects that carry a tag of their own", () => {
+  test("copies them by what they are and not by what they say, as Node does", async () => {
+    const result = await sandbox.execute(`
+      class Tagged { constructor() { this.a = 1; } get [Symbol.toStringTag]() { return "Tagged"; } }
+      class Rows extends Map { get [Symbol.toStringTag]() { return "Rows"; } }
+      const out = [];
+      for (const value of [new Tagged(), { [Symbol.toStringTag]: "Map", b: 2 }, { [Symbol.toStringTag]: "Date" }, Math, JSON, Object.create(Map.prototype), new Rows([[1, 2]])]) {
+        const copy = structuredClone(value);
+        out.push(Object.prototype.toString.call(copy) + " " + JSON.stringify(copy) + " " + (copy instanceof Map));
+      }
+      console.log(out.join("\\n"));
+    `);
+
+    expect(result.logs).toEqual([
+      [
+        '[object Object] {"a":1} false',
+        '[object Object] {"b":2} false',
+        "[object Object] {} false",
+        "[object Object] {} false",
+        "[object Object] {} false",
+        "[object Object] {} false",
+        "[object Map] {} true",
+      ].join("\n"),
+    ]);
+  });
+});
