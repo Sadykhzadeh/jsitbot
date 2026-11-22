@@ -101,6 +101,12 @@ describe("resolvedOptions", () => {
       await value(`const o = new Intl.NumberFormat("en-US", { style: "percent" }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
     ).toBe("0,0");
     expect(
+      await value(`return ["JPY", "KWD", "usd"].map((currency) => { const o = new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join("-") }).join(" ")`),
+    ).toBe("0-0 3-3 2-2");
+    expect(
+      await value(`const o = new Intl.NumberFormat("en-US", { style: "currency", currency: "KWD", maximumFractionDigits: 1 }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
+    ).toBe("1,1");
+    expect(
       await value(`const o = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
     ).toBe("2,3");
     expect(await value(`return new Intl.NumberFormat("en-US", { useGrouping: false }).resolvedOptions().useGrouping`)).toBe("false");

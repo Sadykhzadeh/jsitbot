@@ -28,6 +28,14 @@
 
   const COMPACT_WORDS = ["K", "M", "B", "T", "thousand", "million", "billion", "trillion"];
 
+  // The fraction digits a currency has by default. The number formatter knows them,
+  // and a zero written with the code has no symbol that could hold a point.
+  function currencyDigits(code) {
+    const text = builtins.numberToLocaleString(0, "en-US", { style: "currency", currency: code, currencyDisplay: "code" });
+    const point = builtins.indexOf(text, ".");
+    return point === -1 ? 0 : text.length - point - 1;
+  }
+
   // Cuts what the number formatter wrote into the parts formatToParts names.
   // Its output has one shape, so each piece is told by what it is made of.
   function numberParts(text) {
@@ -169,8 +177,8 @@
           out.minimumSignificantDigits = asked.minimumSignificantDigits === undefined ? 1 : builtins.number(asked.minimumSignificantDigits);
           out.maximumSignificantDigits = asked.maximumSignificantDigits === undefined ? 21 : builtins.number(asked.maximumSignificantDigits);
         } else {
-          const base = style === "currency" ? 2 : 0;
-          const top = style === "currency" ? 2 : style === "percent" ? 0 : 3;
+          const base = style === "currency" ? currencyDigits(out.currency) : 0;
+          const top = style === "currency" ? base : style === "percent" ? 0 : 3;
           const min = asked.minimumFractionDigits === undefined ? undefined : builtins.number(asked.minimumFractionDigits);
           const max = asked.maximumFractionDigits === undefined ? undefined : builtins.number(asked.maximumFractionDigits);
           out.minimumFractionDigits = min === undefined ? builtins.min(base, max === undefined ? base : max) : min;
