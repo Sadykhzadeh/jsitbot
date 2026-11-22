@@ -59,3 +59,15 @@ describe("long arrays that hold wide characters", () => {
     ]);
   });
 });
+
+describe("functions, dates and patterns that have properties past the depth shown", () => {
+  test("show a function or a date as its constructor and a pattern as its text, as Node does", async () => {
+    const result = await sandbox.execute(`
+      console.log({ a: { b: { c: { d: Object.assign(() => 1, { p: 1 }), e: Object.assign(new Date(0), { z: 1 }), f: Object.assign(/r/, { z: 1 }), g: Object.assign(async () => {}, { q: 1 }), h: Object.assign(function named() {}, { r: 1 }), i: () => 1, j: new Date(0), k: Object.assign(class K {}, { s: 1 }) } } } });
+    `);
+
+    expect(result.logs).toEqual([
+      "{\n  a: {\n    b: {\n      c: {\n        d: [Function],\n        e: [Date],\n        f: /r/,\n        g: [AsyncFunction],\n        h: [Function],\n        i: [Function: i],\n        j: 1970-01-01T00:00:00.000Z,\n        k: [Function]\n      }\n    }\n  }\n}",
+    ]);
+  });
+});

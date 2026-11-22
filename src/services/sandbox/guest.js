@@ -923,6 +923,13 @@
   // Text that stands for the whole value, followed by the properties that were
   // added to it, as in `[Function: f] { calls: 2 }`.
   function withProperties(text, object, depth, state, skipIndexes) {
+    // Past the depth shown, a function or a date that has properties is only named by its constructor.
+    if (depth > depthLimit && (typeof object === "function" || hasSlotsOf(object, "[object Date]")) && hasEnumerableKeys(object)) {
+      const kind = constructorName(object);
+      if (kind !== null) return "[" + kind + "]";
+    }
+    // A regular expression past that depth is its own text.
+    if (depth > depthLimit && typeof object === "object" && hasSlotsOf(object, "[object RegExp]")) return text;
     const parts = [];
     const before = enter(depth);
     addProperties(object, parts, depth, state, skipIndexes);
@@ -1033,12 +1040,17 @@
 
   // An empty object, array, map, set or typed array is shown as it is even past
   // the depth limit, since there is nothing in it to go down into.
-  function isEmptyContainer(value, tag) {
-    if (getKeys(value).length !== 0) return false;
+  function hasEnumerableKeys(value) {
+    if (getKeys(value).length !== 0) return true;
     const symbols = getOwnPropertySymbols(value);
     for (let i = 0; i < symbols.length; i++) {
-      if (isEnumerable(value, symbols[i])) return false;
+      if (isEnumerable(value, symbols[i])) return true;
     }
+    return false;
+  }
+
+  function isEmptyContainer(value, tag) {
+    if (hasEnumerableKeys(value)) return false;
     if (isArray(value)) return value.length === 0;
     if (tag === "[object Map]") return mapSize(value) === 0;
     if (tag === "[object Set]") return setSize(value) === 0;
@@ -1156,7 +1168,7 @@
     try {
       if (typeof value === "function") {
         const text = formatFunction(value);
-        return depth > depthLimit ? text : withProperties(text, value, depth, state);
+        return withProperties(text, value, depth, state);
       }
       return formatObject(value, depth, state);
     } catch (ignored) {
