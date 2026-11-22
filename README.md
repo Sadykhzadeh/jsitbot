@@ -99,7 +99,7 @@ Known gaps, not fixed yet:
 - An object whose prototype chain has no constructor, such as `Object.create(Object.create(null))`, is shown as a null-prototype object, where Node adds the prototype after `Object <…>`.
 - A class instance whose prototype was removed prints as `[Object: null prototype]`; Node names the class it was made by, which the engine does not keep.
 - An async or generator function whose prototype is not the one of its kind is shown as a plain function, where Node names its kind.
-- A number above 2^53 with a `roundingIncrement` can differ from Node in its last digits: `12345678901234567890` with a step of 2 is `12,345,678,901,234,568,000` in Node and `...567,000` here.
+- A number above 2^53 with a `roundingIncrement` can differ from Node in its digits, as Node rounds a decimal form of the number that the sandbox does not reproduce: `12345678901234567890` with a step of 2 is `12,345,678,901,234,568,000` in Node and `12,345,678,901,234,567,000` here, and `1e308` with a step of 5000 is `99,999,...` in Node and `100,000,...` here.
 - A rejected promise that nothing handles does not stop the run, where Node stops with the error. The engine does not report such a rejection, so the sandbox only shows it when it is the value of the run; otherwise the run gives its own result, as if the rejection had been handled. An error thrown by a timer does stop the run, as in Node.
 - `Temporal` and `Intl.DurationFormat` are not provided yet. `Math.sumPrecise` is provided, which Node 26 does not have.
 
