@@ -147,6 +147,14 @@ describe("SandboxTimeBudget", () => {
     expect(budget.check("a", policy, 11_001).allowed).toBe(true);
   });
 
+  test("a run stops counting the moment its window is over", () => {
+    const budget = new SandboxTimeBudget();
+    budget.record("a", 1_000, policy, 0);
+
+    expect(budget.check("a", policy, 9_999).allowed).toBe(false);
+    expect(budget.check("a", policy, 10_000).allowed).toBe(true);
+  });
+
   test("keeps users apart, and many quick runs do not add up to much", () => {
     const budget = new SandboxTimeBudget();
     for (let run = 0; run < 100; run++) {
