@@ -90,33 +90,14 @@
     builtins.pop(url.path);
   }
 
-  // Decodes a run of %XX escapes as UTF-8. A byte that does not start or continue a
-  // character becomes U+FFFD, and a valid character is kept whole.
+  // Decodes a run of %XX escapes as UTF-8. Bytes that do not form a character
+  // become U+FFFD, one for each invalid sequence, as the Encoding Standard says.
   function decodeRun(run) {
     try {
       return builtins.decodeURIComponent(run);
     } catch (error) {
       const bytes = builtins.map(builtins.match(run, /%[0-9a-fA-F]{2}/g), (escape) => builtins.parseInteger(builtins.slice(escape, 1), 16));
-      let out = "";
-      for (let i = 0; i < bytes.length; ) {
-        const first = bytes[i];
-        const length = first < 0x80 ? 1 : first >= 0xc2 && first < 0xe0 ? 2 : first >= 0xe0 && first < 0xf0 ? 3 : first >= 0xf0 && first < 0xf5 ? 4 : 0;
-        let whole = length > 0 && i + length <= bytes.length;
-        for (let k = 1; whole && k < length; k++) if ((bytes[i + k] & 0xc0) !== 0x80) whole = false;
-        if (whole && length > 1) {
-          const piece = builtins.join(builtins.map(builtins.sliceOf(bytes, i, i + length), (byte) => "%" + builtins.padStart(builtins.numberToString(byte, 16), 2, "0")), "");
-          try {
-            out += builtins.decodeURIComponent(piece);
-            i += length;
-            continue;
-          } catch (inner) {
-            // Not a character after all: the first byte is replaced below.
-          }
-        }
-        out += length === 1 ? builtins.fromCharCode(first) : "�";
-        i++;
-      }
-      return out;
+      return host.extra("encoding").decodeUtf8(builtins.typedArrayFrom(bytes));
     }
   }
 

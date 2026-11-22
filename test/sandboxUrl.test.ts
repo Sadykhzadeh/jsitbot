@@ -345,3 +345,29 @@ describe("hostile input to URL", () => {
     expect((await sandbox.execute("1 + 1")).ok).toBe(true);
   }, 30_000);
 });
+
+describe("URLSearchParams decoding of invalid UTF-8", () => {
+  test("turns each invalid byte sequence into one replacement character, as Node does", async () => {
+    const result = await value(`
+      const out = [];
+      for (const text of ["%E2%82", "%E2%82x", "%F0%9F%98", "%E2%82%E2%82%AC", "%E0%A0", "%F0%90%80", "%E2%82%28", "%C0%80", "%FF%FE"]) {
+        out.push(text + "=" + [...new URLSearchParams("a=" + text)][0][1].split("").map((c) => c.charCodeAt(0).toString(16)).join(" "));
+      }
+      return out.join("\\n");
+    `);
+
+    expect(result).toBe(
+      [
+        "%E2%82=fffd",
+        "%E2%82x=fffd 78",
+        "%F0%9F%98=fffd",
+        "%E2%82%E2%82%AC=fffd 20ac",
+        "%E0%A0=fffd",
+        "%F0%90%80=fffd",
+        "%E2%82%28=fffd 28",
+        "%C0%80=fffd fffd",
+        "%FF%FE=fffd fffd",
+      ].join("\n"),
+    );
+  });
+});
