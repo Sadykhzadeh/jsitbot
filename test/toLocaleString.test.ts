@@ -116,6 +116,10 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await shown("1234.5", `currency: "USD", currencyDisplay: "narrowSymbol"`)).toBe("$1,234.50");
     expect(await shown("3", `currency: "CAD", currencyDisplay: "narrowSymbol"`)).toBe("$3.00");
     expect(await shown("-2", `currency: "CNY", currencyDisplay: "narrowSymbol"`)).toBe("-\u00a52.00");
+    expect(await shown("1.5", `currency: "ILS", currencyDisplay: "narrowSymbol"`)).toBe("₪1.50");
+    expect(await shown("1.5", `currency: "AOA", currencyDisplay: "narrowSymbol"`)).toBe("Kz\u00a01.50");
+    expect(await shown("1.5", `currency: "XOF", currencyDisplay: "narrowSymbol"`)).toBe("F\u202fCFA\u00a02");
+    expect(await shown("1.5", `currency: "AED", currencyDisplay: "narrowSymbol"`)).toBe("AED\u00a01.50");
     expect(await value(`return (-3).toLocaleString("en-US", { style: "currency", currency: "USD", currencySign: "accounting", currencyDisplay: "name" })`)).toBe("-3.00 US dollars");
     expect(await value(`return (1234.5).toLocaleString("en-US", { currencyDisplay: "name" })`)).toBe("1,234.5");
   });

@@ -44,8 +44,30 @@
     BRL: "R$", HKD: "HK$", ILS: "₪", MXN: "MX$", NZD: "NZ$", PHP: "₱", TWD: "NT$", VND: "₫",
     XAF: "FCFA", XCD: "EC$", XCG: "Cg.", XOF: "F\u202fCFA", XPF: "CFPF",
   };
-  const NARROW_SYMBOLS = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", INR: "₹", KRW: "₩", CNY: "¥", CAD: "$", AUD: "$" };
-  // The name of each currency in NARROW_SYMBOLS: singular, then plural, as English writes it.
+  const NARROW_SYMBOLS = {
+    AFN: "؋", AMD: "֏", AOA: "Kz", ARS: "$", AUD: "$",
+    AZN: "₼", BAM: "KM", BBD: "$", BDT: "৳", BMD: "$",
+    BND: "$", BOB: "Bs", BRL: "R$", BSD: "$", BWP: "P",
+    BZD: "$", CAD: "$", CLP: "$", CNY: "¥", COP: "$",
+    CRC: "₡", CUC: "$", CUP: "$", CZK: "Kč", DKK: "kr",
+    DOP: "$", EGP: "E£", EUR: "€", FJD: "$", FKP: "£",
+    GBP: "£", GEL: "₾", GHS: "GH₵", GIP: "£", GNF: "FG",
+    GTQ: "Q", GYD: "$", HKD: "$", HNL: "L", HRK: "kn",
+    HUF: "Ft", IDR: "Rp", ILS: "₪", INR: "₹", ISK: "kr",
+    JMD: "$", JPY: "¥", KGS: "\u20c0", KHR: "៛", KMF: "CF",
+    KPW: "₩", KRW: "₩", KYD: "$", KZT: "₸", LAK: "₭",
+    LBP: "L£", LKR: "Rs", LRD: "$", MGA: "Ar", MMK: "K",
+    MNT: "₮", MUR: "Rs", MXN: "$", MYR: "RM", NAD: "$",
+    NGN: "₦", NIO: "C$", NOK: "kr", NPR: "Rs", NZD: "$",
+    PHP: "₱", PKR: "Rs", PLN: "zł", PYG: "₲", RON: "lei",
+    RUB: "₽", RWF: "RF", SBD: "$", SEK: "kr", SGD: "$",
+    SHP: "£", SRD: "$", SSP: "£", STN: "Db", SYP: "£",
+    THB: "฿", TOP: "T$", TRY: "₺", TTD: "$", TWD: "$",
+    UAH: "₴", USD: "$", UYU: "$", VND: "₫", XAF: "FCFA",
+    XCD: "$", XCG: "Cg.", XOF: "F\u202fCFA", XPF: "CFPF", ZAR: "R",
+    ZMW: "ZK",
+  };
+  // The names currencyDisplay "name" writes out: singular, then plural, as English writes them.
   const CURRENCY_NAMES = {
     USD: ["US dollar", "US dollars"],
     EUR: ["euro", "euros"],
