@@ -45,6 +45,22 @@ describe("Intl.PluralRules", () => {
     ).toBe("other one other other");
   });
 
+  test("reads the whole number of an ordinal, so shown zeros do not change it but a fraction does", async () => {
+    expect(
+      await value(`
+        const ordinal = (n, options) => new Intl.PluralRules("en", { type: "ordinal", ...options }).select(n);
+        return [
+          ordinal(2, { minimumFractionDigits: 1 }),
+          ordinal(1, { minimumFractionDigits: 1 }),
+          ordinal(2.5, { maximumFractionDigits: 2 }),
+          ordinal(1.5, { maximumFractionDigits: 0 }),
+          ordinal(1.996, { maximumFractionDigits: 2 }),
+          ordinal(2.999, { maximumFractionDigits: 2 }),
+        ].join(" ");
+      `),
+    ).toBe("two one other two two few");
+  });
+
   test("gives every range of numbers the category other, and refuses an end that is not a number", async () => {
     expect(await value(`const pr = new Intl.PluralRules("en"); return [pr.selectRange(1, 1), pr.selectRange(0, 1), pr.selectRange(-1, 2.5), pr.selectRange("3", "4")].join()`)).toBe(
       "other,other,other,other",

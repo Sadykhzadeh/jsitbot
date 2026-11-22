@@ -353,8 +353,10 @@
       const shown = builtins.numberToLocaleString(builtins.abs(number), "en-US", this.#digits);
       const point = builtins.indexOf(shown, ".");
       const whole = point === -1 ? shown : builtins.slice(shown, 0, point);
-      if (point !== -1) return "other";
-      if (type === "cardinal") return whole === "1" ? "one" : "other";
+      const fraction = point === -1 ? "" : builtins.slice(shown, point + 1);
+      if (type === "cardinal") return fraction === "" && whole === "1" ? "one" : "other";
+      // An ordinal rule reads the whole number, so 2.0 is "two", but 2.5 is "other".
+      if (builtins.test(/[1-9]/, fraction)) return "other";
 
       const last = builtins.charCodeAt(whole, whole.length - 1) - 48;
       const tens = whole.length > 1 ? builtins.charCodeAt(whole, whole.length - 2) - 48 : 0;
