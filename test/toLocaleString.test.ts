@@ -37,6 +37,15 @@ describe("Number.prototype.toLocaleString", () => {
     ).toBe("error: RangeError: maximumFractionDigits value is out of range.");
   });
 
+  test("drops the fraction zeros of a whole number when trailingZeroDisplay asks for it", async () => {
+    expect(await value(`return (1).toLocaleString("en-US", { minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" })`)).toBe("1");
+    expect(await value(`return (1.25).toLocaleString("en-US", { minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" })`)).toBe("1.25");
+    expect(await value(`return (1.001).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" })`)).toBe("1");
+    expect(await value(`return (1e21).toLocaleString("en-US", { minimumSignificantDigits: 3, trailingZeroDisplay: "stripIfInteger" })`)).toBe("1,000,000,000,000,000,000,000");
+    expect(await value(`return (-2).toLocaleString("en-US", { style: "currency", currency: "USD", currencySign: "accounting", minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" })`)).toBe("($2)");
+    expect(await value(`return (1000).toLocaleString("en-US", { notation: "compact", minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" })`)).toBe("1K");
+  });
+
   test("formats percentages and currencies", async () => {
     expect(await value(`return (0.256).toLocaleString("en-US", { style: "percent" })`)).toBe("26%");
     expect(await value(`return (0.07).toLocaleString("en-US", { style: "percent", minimumFractionDigits: 1 })`)).toBe("7.0%");
@@ -322,6 +331,7 @@ describe("toLocaleString options, checked against Node 26.13", () => {
       [`(1).toLocaleString("en", { style: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property style"],
       [`(1).toLocaleString("en", { currency: "us" })`, "RangeError: Invalid currency code : us"],
       [`(1).toLocaleString("en", { notation: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property notation"],
+      [`(1).toLocaleString("en", { trailingZeroDisplay: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property trailingZeroDisplay"],
       [`(1).toLocaleString("en", { style: "unit" })`, "TypeError: Invalid unit argument for Number.prototype.toLocaleString() ''"],
       [`(1).toLocaleString("en", { style: "unit", unit: "furlong" })`, "RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'furlong'"],
       [`(1).toLocaleString("en", { unit: "per-second" })`, "RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'per-second'"],

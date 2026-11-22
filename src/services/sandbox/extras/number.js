@@ -120,6 +120,7 @@
     compactDisplay: ["short", "long"],
     signDisplay: ["auto", "never", "always", "exceptZero", "negative"],
     roundingMode: ["ceil", "floor", "expand", "trunc", "halfCeil", "halfFloor", "halfExpand", "halfTrunc", "halfEven"],
+    trailingZeroDisplay: ["auto", "stripIfInteger"],
   };
   const UNSUPPORTED = ["roundingIncrement"];
   const SHORT_UNITS = ["", "K", "M", "B", "T"];
@@ -324,6 +325,8 @@
       while (fraction.length > minimum && fraction[fraction.length - 1] === "0") fraction = builtins.slice(fraction, 0, -1);
       if (fraction.length < minimum) fraction += builtins.repeat("0", minimum - fraction.length);
     }
+    // A number that is whole once rounded loses its fraction zeros too when asked to.
+    if (options.trailingZeroDisplay === "stripIfInteger" && !builtins.test(/[1-9]/, fraction)) fraction = "";
     if (whole.length < integers) whole = builtins.repeat("0", integers - whole.length) + whole;
 
     const grouping = groupingOf(options.useGrouping);
