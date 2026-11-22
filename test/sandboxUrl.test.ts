@@ -477,3 +477,15 @@ describe("URL host setters", () => {
     );
   });
 });
+
+describe("the params of a URL", () => {
+  test("keep a second question mark of the query as part of the first name", async () => {
+    expect(await value(`const u = new URL("http://h/??a=1&b"); return JSON.stringify([...u.searchParams]) + " " + u.searchParams`)).toBe('[["?a","1"],["b",""]] %3Fa=1&b=');
+  });
+});
+
+describe("URLSearchParams from text with a lone surrogate", () => {
+  test("reads the surrogate as a replacement character, as Node does", async () => {
+    expect(await value(`return JSON.stringify([...new URLSearchParams("a=\\ud800x&\\udc00=1")])`)).toBe('[["a","�x"],["�","1"]]');
+  });
+});

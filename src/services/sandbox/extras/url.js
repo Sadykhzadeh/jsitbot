@@ -903,7 +903,7 @@
           }
         }
       } else {
-        const text = builtins.string(init);
+        const text = builtins.toWellFormed(builtins.string(init));
         list = parseQuery(builtins.startsWith(text, "?") ? builtins.slice(text, 1) : text);
       }
 
@@ -1233,7 +1233,8 @@
 
     get searchParams() {
       if (this.#params === null) {
-        const params = new URLSearchParams(this.#record.query === null ? "" : this.#record.query);
+        const params = new URLSearchParams();
+        builtins.weakMapSet(lists, params, parseQuery(this.#record.query === null ? "" : this.#record.query));
         builtins.weakMapSet(links, params, (query) => {
           this.#record = builtins.assign({}, this.#record, { query: query === "" ? null : query });
         });
