@@ -69,7 +69,9 @@ export function addressedCode(message: Message, botUsername: string): AddressedC
     return undefined;
   }
 
-  const own = stripCodeFence(rest.trim());
+  // A block the message marks as code is the code, with text around it, as in a private chat.
+  const entities = message.text !== undefined ? message.entities : message.caption_entities;
+  const own = entities?.some((entity) => entity.type === "pre") ? codeInMessage(text, entities) : stripCodeFence(rest.trim());
   if (own.trim() !== "") {
     return { code: own };
   }

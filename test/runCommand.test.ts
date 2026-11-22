@@ -161,6 +161,14 @@ describe("addressedCode", () => {
     expect(addressedCode(message("/run ```js\n1 + 1\n```"), "jsitbot")).toEqual({ code: "1 + 1" });
   });
 
+  test("takes the block that a message marks as code when there is text around it, as a private chat does", () => {
+    const code = "const a: number = 2;\na * 3";
+    const withBlock = (text: string) => message(text, { entities: [{ type: "pre", offset: text.indexOf("const"), length: code.length }] });
+
+    expect(addressedCode(withBlock("/run here it is:\n```ts\n" + code + "\n```"), "jsitbot")).toEqual({ code });
+    expect(addressedCode(withBlock("@jsitbot here it is:\n```ts\n" + code + "\n```"), "jsitbot")).toEqual({ code });
+  });
+
   test("leaves everything else alone", () => {
     for (const text of ["1 + 1", "hello @jsitbot", "/runaway 1", "/run@other_bot 1", "@jsitbotx 1", "/start", "/ru"]) {
       expect(addressedCode(message(text), "jsitbot")).toBeUndefined();
