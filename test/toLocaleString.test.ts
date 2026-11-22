@@ -219,6 +219,34 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await rounded("1.5", `roundingMode: "ceil", style: "currency", currency: "JPY"`)).toBe("¥2");
   });
 
+  test("rounds to a multiple of roundingIncrement, as Node does", async () => {
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 5, maximumFractionDigits: 0 })`)).toBe("1,235");
+    expect(await value(`return (-12.5).toLocaleString("en-US", { roundingIncrement: 5, maximumFractionDigits: 0 })`)).toBe("-15");
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 5, maximumFractionDigits: 0, roundingMode: "floor" })`)).toBe("1,230");
+    expect(await value(`return (-12.5).toLocaleString("en-US", { roundingIncrement: 5, maximumFractionDigits: 0, roundingMode: "ceil" })`)).toBe("-10");
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 25, maximumFractionDigits: 2, minimumFractionDigits: 2 })`)).toBe("1,234.50");
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 5, style: "currency", currency: "USD" })`)).toBe("$1,234.55");
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 5, maximumFractionDigits: 0, style: "percent" })`)).toBe("123,455%");
+  });
+
+  test("refuses a roundingIncrement it cannot round by, with the message Node gives", async () => {
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 3, maximumFractionDigits: 0 })`)).toBe(
+      "error: RangeError: roundingIncrement value is out of range.",
+    );
+    expect(await value(`return (NaN).toLocaleString("en-US", { roundingIncrement: 3 })`)).toBe(
+      "error: RangeError: roundingIncrement value is out of range.",
+    );
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 5 })`)).toBe(
+      "error: RangeError: maximumFractionDigits value is out of range.",
+    );
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 5, maximumSignificantDigits: 3, maximumFractionDigits: 0 })`)).toBe(
+      "error: TypeError: RoundingType is not fractionDigits",
+    );
+    expect(await value(`return (1234.5678).toLocaleString("en-US", { roundingIncrement: 5, maximumFractionDigits: 0, notation: "compact" })`)).toBe(
+      "error: RangeError: roundingIncrement is not supported with compact notation",
+    );
+  });
+
   test("groups a number from five digits under useGrouping min2, and refuses a value it does not know", async () => {
     expect(await value(`return (1234).toLocaleString("en-US", { useGrouping: "min2" })`)).toBe("1234");
     expect(await value(`return (12345).toLocaleString("en-US", { useGrouping: "min2" })`)).toBe("12,345");

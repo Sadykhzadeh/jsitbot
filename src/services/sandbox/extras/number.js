@@ -6,8 +6,9 @@
 // Formats the way English does (a comma between thousands, a point before the
 // decimals) for the style decimal, percent and currency, with the options
 // minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,
-// minimumSignificantDigits, maximumSignificantDigits, useGrouping, signDisplay
-// and notation "compact" (with compactDisplay), "scientific" and "engineering",
+// minimumSignificantDigits, maximumSignificantDigits, roundingIncrement (in the
+// standard notation), useGrouping, signDisplay and notation "compact" (with
+// compactDisplay), "scientific" and "engineering",
 // and for currencies currencyDisplay "symbol", "narrowSymbol", "code" and "name"
 // (the name for the currencies CURRENCY_NAMES lists, the code for any other) and
 // currencySign. The
@@ -149,7 +150,8 @@
     trailingZeroDisplay: ["auto", "stripIfInteger"],
     roundingPriority: ["auto", "morePrecision", "lessPrecision"],
   };
-  const UNSUPPORTED = ["roundingIncrement"];
+  // The steps roundingIncrement takes: 1, and 1, 2, 2.5 or 5 times a power of ten, up to 5000.
+  const INCREMENTS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000];
   // Every option the formats read. A call copies them once, so a getter on the
   // options is called once, as Node calls it, and every read sees the same value.
   const OPTION_NAMES = [
@@ -280,6 +282,86 @@
     return { whole: rounded.whole, fraction };
   }
 
+  // The fraction digits a format is given, or the defaults of its style for the ones it is not.
+  function fractionDigits(options, defaultMin, defaultMax) {
+    let minimum = digitsOption(options, "minimumFractionDigits", undefined, 0, 100);
+    let maximum = digitsOption(options, "maximumFractionDigits", undefined, 0, 100);
+    if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
+      throw new RangeError("maximumFractionDigits value is out of range.");
+    }
+    const given = minimum !== undefined || maximum !== undefined;
+    if (minimum === undefined) minimum = maximum === undefined ? defaultMin : builtins.min(defaultMin, maximum);
+    if (maximum === undefined) maximum = builtins.max(defaultMax, minimum);
+    return { minimum, maximum, given };
+  }
+
+  // roundingIncrement, as Node takes it: a step from INCREMENTS, with fraction digits
+  // only, and the same minimum and maximum of them. A step of 1 is the default. Only
+  // the standard notation takes a step: Node's compact, scientific and engineering
+  // numbers come out with digits that no rounding of the step explains, so they are refused.
+  function incrementOf(options, defaultMin, defaultMax, notation) {
+    if (options.roundingIncrement === undefined) return 1;
+    const step = builtins.floor(builtins.number(options.roundingIncrement));
+    if (builtins.indexOfIn(INCREMENTS, step) === -1) throw new RangeError("roundingIncrement value is out of range.");
+    if (step === 1) return 1;
+    if (notation !== undefined && notation !== "standard") {
+      throw new RangeError("roundingIncrement is not supported with " + notation + " notation");
+    }
+
+    const significant = options.minimumSignificantDigits !== undefined || options.maximumSignificantDigits !== undefined;
+    const priority = options.roundingPriority === undefined ? "auto" : builtins.string(options.roundingPriority);
+    const fraction = fractionDigits(options, defaultMin, defaultMax);
+    if (significant || priority !== "auto") throw new TypeError("RoundingType is not fractionDigits");
+    if (fraction.minimum !== fraction.maximum) throw new RangeError("maximumFractionDigits value is out of range.");
+    return step;
+  }
+
+  // The quotient of a string of digits divided by a step of at most 5000, one digit at a time.
+  function divide(digits, by) {
+    let rest = 0;
+    let quotient = "";
+    for (let i = 0; i < digits.length; i++) {
+      const current = rest * 10 + builtins.number(digits[i]);
+      quotient += builtins.string(builtins.floor(current / by));
+      rest = current % by;
+    }
+    return quotient;
+  }
+
+  // A string of digits multiplied by a number of at most 5000.
+  function times(digits, by) {
+    let carry = 0;
+    let out = "";
+    for (let i = digits.length - 1; i >= 0; i--) {
+      const current = builtins.number(digits[i]) * by + carry;
+      out = builtins.string(current % 10) + out;
+      carry = builtins.floor(current / 10);
+    }
+    while (carry > 0) {
+      out = builtins.string(carry % 10) + out;
+      carry = builtins.floor(carry / 10);
+    }
+    return out;
+  }
+
+  // Rounds to a multiple of the step, `places` digits after the point. The digits up to
+  // the places are divided by the step, and the digits after them give the part that the
+  // rule decides on: the division goes on past the digits with four zeros, which is
+  // enough for every step, as each one divides a power of ten of at most 10^4.
+  function roundToIncrement(parts, places, step, rule) {
+    const fraction = parts.fraction.length < places ? parts.fraction + builtins.repeat("0", places - parts.fraction.length) : parts.fraction;
+    const head = parts.whole + builtins.slice(fraction, 0, places);
+    const divided = divide(head + builtins.slice(fraction, places) + "0000", step);
+
+    let kept = builtins.replace(builtins.slice(divided, 0, head.length), /^0+/, "");
+    if (kept === "") kept = "0";
+    if (rule(kept, builtins.slice(divided, head.length))) kept = increment(kept);
+
+    const units = times(kept, step);
+    const text = builtins.repeat("0", builtins.max(0, places + 1 - units.length)) + units;
+    return { whole: builtins.slice(text, 0, text.length - places), fraction: builtins.slice(text, text.length - places) };
+  }
+
   function group(whole) {
     let out = "";
     for (let i = 0; i < whole.length; i++) {
@@ -303,15 +385,8 @@
   // number is written as a smaller number with a word or a letter after it, and
   // one in scientific or engineering notation as a smaller number and a power
   // of ten.
-  function digits(magnitude, negative, style, options, defaultMin, defaultMax, compact, notation) {
-    let minimum = digitsOption(options, "minimumFractionDigits", undefined, 0, 100);
-    let maximum = digitsOption(options, "maximumFractionDigits", undefined, 0, 100);
-    if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
-      throw new RangeError("maximumFractionDigits value is out of range.");
-    }
-    const fractionGiven = minimum !== undefined || maximum !== undefined;
-    if (minimum === undefined) minimum = maximum === undefined ? defaultMin : builtins.min(defaultMin, maximum);
-    if (maximum === undefined) maximum = builtins.max(defaultMax, minimum);
+  function digits(magnitude, negative, style, options, defaultMin, defaultMax, compact, notation, step) {
+    const { minimum, maximum, given: fractionGiven } = fractionDigits(options, defaultMin, defaultMax);
     const integers = digitsOption(options, "minimumIntegerDigits", 1, 1, 21);
 
     let leastSignificant = digitsOption(options, "minimumSignificantDigits", undefined, 1, 21);
@@ -334,7 +409,7 @@
       if (compactRounding) {
         return builtins.replace(parts.whole, /^0+/, "").length >= 2 ? roundAt(parts, 0, rule) : roundSignificant(parts, 1, 2, rule);
       }
-      return roundAt(parts, maximum, rule);
+      return step === 1 ? roundAt(parts, maximum, rule) : roundToIncrement(parts, maximum, step, rule);
     };
 
     let parts = split(magnitude, shift);
@@ -425,10 +500,11 @@
       defaultMax = 3;
     }
 
+    const step = incrementOf(options, defaultMin, defaultMax, notation);
     let text;
     if (magnitude !== magnitude) text = "NaN";
     else if (magnitude === Infinity) text = "∞";
-    else text = digits(magnitude, negative, style, options, defaultMin, defaultMax, notation === "compact", notation);
+    else text = digits(magnitude, negative, style, options, defaultMin, defaultMax, notation === "compact", notation, step);
     const sign = signOf(negative, text, options);
     if (style === "percent") text += "%";
     if (style === "unit") text += unitSuffix(options, text);
@@ -456,9 +532,6 @@
     const tag = builtins.isArray(locales) ? locales[0] : locales;
     if (tag !== undefined && !builtins.test(ENGLISH, builtins.string(tag))) return false;
     if (options === undefined || options === null) return true;
-    for (let i = 0; i < UNSUPPORTED.length; i++) {
-      if (options[UNSUPPORTED[i]] !== undefined) return false;
-    }
     const notation = options.notation;
     if (notation !== undefined && notation !== "standard" && notation !== "compact" && notation !== "scientific" && notation !== "engineering") return false;
     if (options.compactDisplay !== undefined && options.compactDisplay !== "short" && options.compactDisplay !== "long") return false;

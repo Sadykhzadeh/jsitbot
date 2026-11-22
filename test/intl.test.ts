@@ -161,6 +161,7 @@ describe("resolvedOptions", () => {
     expect(
       await value(`const o = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).resolvedOptions(); return [o.minimumFractionDigits, o.maximumFractionDigits].join()`),
     ).toBe("2,3");
+    expect(await value(`return new Intl.NumberFormat("en-US", { roundingIncrement: 25, maximumFractionDigits: 2, minimumFractionDigits: 2 }).resolvedOptions().roundingIncrement`)).toBe("25");
     expect(
       await value(`return [{ roundingMode: "floor", roundingPriority: "lessPrecision", maximumFractionDigits: 1 }, { trailingZeroDisplay: "stripIfInteger", roundingPriority: "morePrecision", maximumFractionDigits: 1 }, { notation: "compact" }].map((options) => { const o = new Intl.NumberFormat("en-US", options).resolvedOptions(); return [o.roundingIncrement, o.roundingMode, o.roundingPriority, o.trailingZeroDisplay].join() }).join(" ")`),
     ).toBe("1,floor,lessPrecision,auto 1,halfExpand,auto,stripIfInteger 1,halfExpand,morePrecision,auto");

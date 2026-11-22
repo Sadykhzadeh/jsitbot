@@ -170,7 +170,7 @@
         const asked = snapshot(options, [
           "style", "currency", "currencyDisplay", "currencySign", "unit", "unitDisplay", "minimumIntegerDigits",
           "minimumFractionDigits", "maximumFractionDigits", "minimumSignificantDigits", "maximumSignificantDigits",
-          "useGrouping", "notation", "compactDisplay", "signDisplay", "roundingMode", "roundingPriority", "trailingZeroDisplay",
+          "useGrouping", "notation", "compactDisplay", "signDisplay", "roundingIncrement", "roundingMode", "roundingPriority", "trailingZeroDisplay",
         ]);
         const style = asked.style === undefined ? "decimal" : builtins.string(asked.style);
         const out = { locale: "en-US", numberingSystem: "latn", style };
@@ -212,7 +212,7 @@
         out.signDisplay = asked.signDisplay === undefined ? "auto" : asked.signDisplay;
         // stripIfInteger reports the priority as auto, as Node does.
         const trailingZeros = asked.trailingZeroDisplay === undefined ? "auto" : builtins.string(asked.trailingZeroDisplay);
-        out.roundingIncrement = 1;
+        out.roundingIncrement = asked.roundingIncrement === undefined ? 1 : builtins.floor(builtins.number(asked.roundingIncrement));
         out.roundingMode = asked.roundingMode === undefined ? "halfExpand" : builtins.string(asked.roundingMode);
         out.roundingPriority = trailingZeros === "stripIfInteger" ? "auto" : priority;
         out.trailingZeroDisplay = trailingZeros;
