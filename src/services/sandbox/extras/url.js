@@ -884,9 +884,9 @@
     constructor(init) {
       let list = [];
 
-      if (init === undefined || init === null) {
+      if (init === undefined) {
         list = [];
-      } else if (typeof init === "object" || typeof init === "function") {
+      } else if (init !== null && (typeof init === "object" || typeof init === "function")) {
         if (init instanceof URLSearchParams) {
           list = builtins.map(builtins.weakMapGet(lists, init), (pair) => [pair[0], pair[1]]);
         } else if (typeof init[Symbol.iterator] === "function") {
@@ -974,21 +974,22 @@
 
     forEach(callback, thisArg) {
       if (typeof callback !== "function") throw new TypeError("The callback must be a function");
-      for (const pair of builtins.sliceOf(builtins.weakMapGet(lists, this))) {
+      for (let i = 0; i < builtins.weakMapGet(lists, this).length; i++) {
+        const pair = builtins.weakMapGet(lists, this)[i];
         builtins.apply(callback, thisArg, [pair[1], pair[0], this]);
       }
     }
 
     keys() {
-      return builtins.map(builtins.weakMapGet(lists, this), (pair) => pair[0])[Symbol.iterator]();
+      return new ParamsIterator(this, "key");
     }
 
     values() {
-      return builtins.map(builtins.weakMapGet(lists, this), (pair) => pair[1])[Symbol.iterator]();
+      return new ParamsIterator(this, "value");
     }
 
     entries() {
-      return builtins.map(builtins.weakMapGet(lists, this), (pair) => [pair[0], pair[1]])[Symbol.iterator]();
+      return new ParamsIterator(this, "key+value");
     }
 
     [Symbol.iterator]() {
@@ -1001,6 +1002,30 @@
   }
 
   builtins.defineProperty(URLSearchParams.prototype, Symbol.toStringTag, { value: "URLSearchParams", configurable: true });
+
+  // Reads the list as it is at each step, so a change made while looping is seen.
+  class ParamsIterator {
+    #params;
+    #kind;
+    #index = 0;
+
+    constructor(params, kind) {
+      // Throws for anything that is not a URLSearchParams.
+      builtins.weakMapGet(lists, params).length;
+      this.#params = params;
+      this.#kind = kind;
+    }
+
+    next() {
+      const list = builtins.weakMapGet(lists, this.#params);
+      if (this.#index >= list.length) return { done: true, value: undefined };
+      const pair = list[this.#index++];
+      return { done: false, value: this.#kind === "key" ? pair[0] : this.#kind === "value" ? pair[1] : [pair[0], pair[1]] };
+    }
+  }
+
+  builtins.setPrototypeOf(ParamsIterator.prototype, builtins.getPrototypeOf(builtins.getPrototypeOf([][Symbol.iterator]())));
+  builtins.defineProperty(ParamsIterator.prototype, Symbol.toStringTag, { value: "URLSearchParams Iterator", configurable: true });
 
   // URL ----------------------------------------------------------------------
 

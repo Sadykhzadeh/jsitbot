@@ -224,7 +224,7 @@ describe("URLSearchParams", () => {
     expect(await value(`return new URLSearchParams(new Map([["m", "n"]])).toString()`)).toBe("m=n");
     expect(await value(`const a = new URLSearchParams("x=1"); const b = new URLSearchParams(a); b.append("y", "2"); return [a, b].join(" ")`)).toBe("x=1 x=1&y=2");
     expect(await value(`new URLSearchParams([["only one"]])`)).toContain("TypeError");
-    expect(await value(`return new URLSearchParams().toString() + new URLSearchParams(null) + new URLSearchParams(undefined)`)).toBe("");
+    expect(await value(`return new URLSearchParams().toString() + new URLSearchParams(undefined)`)).toBe("");
   });
 
   test("encodes as a form does", async () => {
@@ -369,5 +369,40 @@ describe("URLSearchParams decoding of invalid UTF-8", () => {
         "%FF%FE=fffd fffd",
       ].join("\n"),
     );
+  });
+});
+
+describe("URLSearchParams iteration while the list changes", () => {
+  test("loops, iterators and forEach see the list as it is at each step, as Node does", async () => {
+    const result = await sandbox.execute(`
+      const p = new URLSearchParams("a=1&b=2&c=3");
+      for (const [k] of p) { console.log("loop", k); if (k === "a") p.delete("a"); }
+      const q = new URLSearchParams("a=1");
+      const it = q.keys();
+      console.log(it.next(), it.next());
+      q.append("b", "2");
+      console.log(it.next());
+      const r = new URLSearchParams("a=1&b=2&c=3");
+      r.forEach((v, k) => { console.log("each", k); if (k === "a") r.delete("b"); });
+      console.log(Object.prototype.toString.call(q.entries()), [...new URLSearchParams("x=1&y=2").values()]);
+      try { URLSearchParams.prototype.keys.call({}); } catch (e) { console.log(e.name); }
+    `);
+
+    expect(result.logs).toEqual([
+      "loop a",
+      "loop c",
+      "{ done: false, value: 'a' } { done: true, value: undefined }",
+      "{ done: false, value: 'b' }",
+      "each a",
+      "each c",
+      "[object URLSearchParams Iterator] [ '1', '2' ]",
+      "TypeError",
+    ]);
+  });
+});
+
+describe("URLSearchParams from null", () => {
+  test("reads null as the text null, as Node does", async () => {
+    expect(await value(`return [new URLSearchParams(null) + "", new URLSearchParams(undefined) + "", new URLSearchParams().size].join("|")`)).toBe("null=||0");
   });
 });
