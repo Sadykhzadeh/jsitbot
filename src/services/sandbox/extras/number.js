@@ -9,7 +9,8 @@
 // minimumSignificantDigits, maximumSignificantDigits, useGrouping, signDisplay
 // and notation "compact" (with compactDisplay), "scientific" and "engineering",
 // and for currencies currencyDisplay "symbol", "narrowSymbol", "code" and "name"
-// (the name for the currencies NARROW_SYMBOLS lists) and currencySign. The
+// (the name for the currencies CURRENCY_NAMES lists, the code for any other) and
+// currencySign. The
 // number is rounded on the digits it is written with, half away from zero by
 // default, so 1.005 gives 1.01, and the roundingMode option picks another rule.
 // For the style unit, the units are the ones Intl.supportedValuesOf lists for
@@ -386,7 +387,8 @@
     if (style === "currency") {
       const display = options.currencyDisplay;
       if (display === "name") {
-        text += " " + CURRENCY_NAMES[currency][text === "1" ? 0 : 1];
+        const names = CURRENCY_NAMES[currency];
+        text += " " + (names === undefined ? currency : names[text === "1" ? 0 : 1]);
       } else {
         const symbol = display === "code" ? undefined : display === "narrowSymbol" ? NARROW_SYMBOLS[currency] : SYMBOLS[currency];
         text = (symbol === undefined ? currency + (builtins.test(/^\d/, text) ? " " : "") : symbol) + text;
@@ -409,7 +411,6 @@
     const notation = options.notation;
     if (notation !== undefined && notation !== "standard" && notation !== "compact" && notation !== "scientific" && notation !== "engineering") return false;
     if (options.compactDisplay !== undefined && options.compactDisplay !== "short" && options.compactDisplay !== "long") return false;
-    if (options.currencyDisplay === "name" && options.style === "currency" && CURRENCY_NAMES[builtins.toUpperCase(builtins.string(options.currency))] === undefined) return false;
     if (options.currencySign !== undefined && options.currencySign !== "standard" && options.currencySign !== "accounting") return false;
     if (options.style === "unit") return unitKnown(options);
     return options.style === undefined || options.style === "decimal" || options.style === "percent" || options.style === "currency";

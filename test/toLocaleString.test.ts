@@ -77,6 +77,9 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await shown("-2", `currency: "JPY", currencyDisplay: "name"`)).toBe("-2 Japanese yen");
     expect(await shown("NaN", `currency: "USD", currencyDisplay: "name"`)).toBe("NaN US dollars");
     expect(await shown("1500", `currency: "USD", currencyDisplay: "name", notation: "compact"`)).toBe("1.5K US dollars");
+    expect(await shown("1.5", `currency: "BTC", currencyDisplay: "name"`)).toBe("1.50 BTC");
+    expect(await shown("NaN", `currency: "BTC", currencyDisplay: "name"`)).toBe("NaN BTC");
+    expect(await shown("549758", `currency: "XYZ", currencyDisplay: "name", maximumFractionDigits: 2`)).toBe("549,758.00 XYZ");
     expect(await shown("1234.5", `currency: "USD", currencyDisplay: "narrowSymbol"`)).toBe("$1,234.50");
     expect(await shown("3", `currency: "CAD", currencyDisplay: "narrowSymbol"`)).toBe("$3.00");
     expect(await shown("-2", `currency: "CNY", currencyDisplay: "narrowSymbol"`)).toBe("-\u00a52.00");
