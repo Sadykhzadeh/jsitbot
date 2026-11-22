@@ -107,6 +107,16 @@ describe("code files sent in a private chat", () => {
     expect(replies[0].payload.reply_parameters.message_id).toBe(7);
   });
 
+  test("runs a file whose 2000 characters take the full byte limit", async () => {
+    const harness = createHarness({ readFile: async () => encode("\u4E2D".repeat(2_000)) });
+
+    await harness.sendFile("wide.js", 6_000);
+
+    const text = harness.callsTo("sendMessage")[0].payload.text;
+    expect(text).toContain("is not defined");
+    expect(text).not.toContain("exceeds");
+  });
+
   test("refuses code that is over the limit once it is read", async () => {
     const harness = createHarness({ readFile: async () => encode("1".repeat(2_001)) });
 
