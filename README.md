@@ -163,7 +163,7 @@ Start the bot:
 bun run start
 ```
 
-It prints `Bot started as @your_bot_name` once it is polling. Bun loads `.env` on its own. The sandbox process is started without `.env` and without the rest of the bot's environment.
+It prints `Bot started as @your_bot_name` once it is polling. Bun loads `.env` from the directory it is started in, so start the bot from the project folder, or name the file with `bun --env-file=/path/to/.env src/index.ts`. The sandbox process is started without `.env` and without the rest of the bot's environment.
 
 ### Getting a bot token
 
