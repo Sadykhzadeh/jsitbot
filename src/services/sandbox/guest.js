@@ -532,7 +532,7 @@
     let total = 0;
     let longest = 0;
     for (let i = 0; i < count; i++) {
-      const length = parts[i].length;
+      const length = columns(parts[i]);
       lengths[i] = length;
       total += length + 2;
       if (length > longest) longest = length;
@@ -543,32 +543,33 @@
 
     const bias = mathSqrt(cell - total / parts.length);
     const biased = mathMax(cell - 3 - bias, 1);
-    const columns = mathMin(
+    const perRow = mathMin(
       mathRound(mathSqrt(2.5 * biased * count) / biased),
       mathFloor((LINE_WIDTH - indentation) / cell),
       COMPACT * 4,
       15,
     );
-    if (columns <= 1) return parts;
+    if (perRow <= 1) return parts;
 
     const widths = [];
-    for (let column = 0; column < columns; column++) {
+    for (let column = 0; column < perRow; column++) {
       let widest = 0;
-      for (let i = column; i < count; i += columns) {
+      for (let i = column; i < count; i += perRow) {
         if (lengths[i] > widest) widest = lengths[i];
       }
       widths[column] = widest + 2;
     }
 
     const rows = [];
-    for (let from = 0; from < count; from += columns) {
-      const to = mathMin(from + columns, count);
+    for (let from = 0; from < count; from += perRow) {
+      const to = mathMin(from + perRow, count);
       let row = "";
       for (let i = from; i < to - 1; i++) {
         const cellText = parts[i] + ", ";
-        row += numeric ? padStartTo(cellText, widths[i - from]) : padEndTo(cellText, widths[i - from]);
+        const room = widths[i - from] + parts[i].length - lengths[i];
+        row += numeric ? padStartTo(cellText, room) : padEndTo(cellText, room);
       }
-      row += numeric ? padStartTo(parts[to - 1], widths[to - 1 - from] - 2) : parts[to - 1];
+      row += numeric ? padStartTo(parts[to - 1], widths[to - 1 - from] - 2 + parts[to - 1].length - lengths[to - 1]) : parts[to - 1];
       rows[rows.length] = row;
     }
     if (count < parts.length) rows[rows.length] = parts[count];

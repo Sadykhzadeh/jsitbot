@@ -45,3 +45,17 @@ describe("how entries are laid out", () => {
     });
   }
 });
+
+describe("long arrays that hold wide characters", () => {
+  test("line the columns up by the width of the text, as Node does", async () => {
+    const result = await sandbox.execute(`
+      console.log(["日本", "a", "bb", "ccc", "dddd", "eeeee", "日本語", "x", "y", "z", "w", "1", "2", "日"]);
+      console.log([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, "日本", 100]);
+    `);
+
+    expect(result.logs).toEqual([
+      "[\n  '日本',   'a',    'bb',\n  'ccc',    'dddd', 'eeeee',\n  '日本語', 'x',    'y',\n  'z',      'w',    '1',\n  '2',      '日'\n]",
+      "[\n  1,  2,  3,      4,   5,\n  6,  7,  8,      9,   10,\n  11, 12, 13,     14,  15,\n  16, 17, 18,     19,  20,\n  21, 22, 23,     24,  25,\n  26, 27, '日本', 100\n]",
+    ]);
+  });
+});
