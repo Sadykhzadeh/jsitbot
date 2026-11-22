@@ -121,6 +121,7 @@
     signDisplay: ["auto", "never", "always", "exceptZero", "negative"],
     roundingMode: ["ceil", "floor", "expand", "trunc", "halfCeil", "halfFloor", "halfExpand", "halfTrunc", "halfEven"],
     trailingZeroDisplay: ["auto", "stripIfInteger"],
+    roundingPriority: ["auto", "morePrecision", "lessPrecision"],
   };
   const UNSUPPORTED = ["roundingIncrement"];
   const SHORT_UNITS = ["", "K", "M", "B", "T"];
@@ -288,9 +289,15 @@
 
     const shift = style === "percent" ? 2 : 0;
     const rule = roundingRule(options.roundingMode, negative);
+    const priority = options.roundingPriority === undefined ? "auto" : builtins.string(options.roundingPriority);
+    const compactRounding = compact && !fractionGiven && priority === "auto";
+    // With morePrecision or lessPrecision, the rounding that keeps the finer
+    // digits wins (the significant one on a tie for morePrecision, the fraction one for lessPrecision).
     const round = function (parts) {
-      if (bySignificant) return roundSignificant(parts, leastSignificant, mostSignificant, rule);
-      if (compact && !fractionGiven) {
+      const finer = exponentOf(parts, false) - mostSignificant + 1 <= -maximum;
+      const significant = priority === "auto" ? bySignificant : (priority === "morePrecision") === finer;
+      if (significant) return { ...roundSignificant(parts, leastSignificant, mostSignificant, rule), significant };
+      if (compactRounding) {
         return builtins.replace(parts.whole, /^0+/, "").length >= 2 ? roundAt(parts, 0, rule) : roundSignificant(parts, 1, 2, rule);
       }
       return roundAt(parts, maximum, rule);
@@ -321,7 +328,7 @@
 
     let whole = builtins.replace(parts.whole, /^0+/, "");
     let fraction = parts.fraction;
-    if (!bySignificant && !(compact && !fractionGiven)) {
+    if (!parts.significant && !compactRounding) {
       while (fraction.length > minimum && fraction[fraction.length - 1] === "0") fraction = builtins.slice(fraction, 0, -1);
       if (fraction.length < minimum) fraction += builtins.repeat("0", minimum - fraction.length);
     }

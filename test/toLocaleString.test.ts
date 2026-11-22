@@ -46,6 +46,16 @@ describe("Number.prototype.toLocaleString", () => {
     expect(await value(`return (1000).toLocaleString("en-US", { notation: "compact", minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" })`)).toBe("1K");
   });
 
+  test("rounds on the digits that keep the finer or the coarser precision when roundingPriority asks", async () => {
+    expect(await value(`return (-88214).toLocaleString("en-US", { minimumFractionDigits: 4, roundingPriority: "morePrecision" })`)).toBe("-88,214");
+    expect(await value(`return (-55081).toLocaleString("en-US", { minimumSignificantDigits: 1, maximumSignificantDigits: 3, roundingPriority: "morePrecision" })`)).toBe("-55,081");
+    expect(await value(`return (-55081).toLocaleString("en-US", { minimumSignificantDigits: 1, maximumSignificantDigits: 3, roundingPriority: "lessPrecision" })`)).toBe("-55,100");
+    expect(await value(`return (8452.2099886090).toLocaleString("en-US", { minimumFractionDigits: 5, maximumSignificantDigits: 15, roundingPriority: "lessPrecision" })`)).toBe("8,452.20999");
+    expect(await value(`return (-0.8).toLocaleString("en-US", { minimumFractionDigits: 3, roundingPriority: "morePrecision" })`)).toBe("-0.8");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { maximumFractionDigits: 0, maximumSignificantDigits: 2, roundingPriority: "morePrecision" })`)).toBe("1,235");
+    expect(await value(`return (1234.5).toLocaleString("en-US", { maximumFractionDigits: 0, maximumSignificantDigits: 2, roundingPriority: "lessPrecision" })`)).toBe("1,200");
+  });
+
   test("writes a compact currency with no fraction digits unless it is asked for them", async () => {
     expect(await value(`return (1000).toLocaleString("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 })`)).toBe("$1K");
     expect(await value(`return (4.7).toLocaleString("en-US", { style: "currency", currency: "CAD", notation: "compact", maximumFractionDigits: 4 })`)).toBe("CA$4.7");
@@ -338,6 +348,7 @@ describe("toLocaleString options, checked against Node 26.13", () => {
       [`(1).toLocaleString("en", { currency: "us" })`, "RangeError: Invalid currency code : us"],
       [`(1).toLocaleString("en", { notation: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property notation"],
       [`(1).toLocaleString("en", { trailingZeroDisplay: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property trailingZeroDisplay"],
+      [`(1).toLocaleString("en", { roundingPriority: "bogus" })`, "RangeError: Value bogus out of range for Number.prototype.toLocaleString options property roundingPriority"],
       [`(1).toLocaleString("en", { style: "unit" })`, "TypeError: Invalid unit argument for Number.prototype.toLocaleString() ''"],
       [`(1).toLocaleString("en", { style: "unit", unit: "furlong" })`, "RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'furlong'"],
       [`(1).toLocaleString("en", { unit: "per-second" })`, "RangeError: Invalid unit argument for Number.prototype.toLocaleString() 'per-second'"],
