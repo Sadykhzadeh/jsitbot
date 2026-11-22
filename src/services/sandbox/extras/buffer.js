@@ -84,12 +84,13 @@
     return -1;
   }
 
-  // Hex pairs, read until the first pair that is not two digits.
+  // Hex pairs, read until the first pair that is not two digits. Each character
+  // counts as its low byte, as it does in Node.
   function bytesOfHex(text) {
     const out = [];
     for (let i = 0; i + 1 < text.length; i += 2) {
-      const high = hexDigit(builtins.charCodeAt(text, i));
-      const low = hexDigit(builtins.charCodeAt(text, i + 1));
+      const high = hexDigit(builtins.charCodeAt(text, i) & 255);
+      const low = hexDigit(builtins.charCodeAt(text, i + 1) & 255);
       if (high < 0 || low < 0) break;
       builtins.push(out, (high << 4) | low);
     }
@@ -106,13 +107,13 @@
   }
 
   // Base64 in either alphabet. Characters that are neither are skipped, and the
-  // first "=" ends the text.
+  // first "=" ends the text. Each character counts as its low byte, as it does in Node.
   function bytesOfBase64(text) {
     const out = [];
     let acc = 0;
     let bits = 0;
     for (let i = 0; i < text.length; i++) {
-      const code = builtins.charCodeAt(text, i);
+      const code = builtins.charCodeAt(text, i) & 255;
       if (code === 61) break;
       const value = base64Value(code);
       if (value < 0) continue;

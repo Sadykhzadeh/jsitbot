@@ -921,3 +921,17 @@ concat len 2**53 THROWS RangeError ERR_OUT_OF_RANGE The value of "length" is out
 concat len undefined <Buffer 61 62>`);
   });
 });
+
+describe("Buffer text in base64 or hex with characters above one byte, checked against Node 26.13", () => {
+  test("reads each character as its low byte", async () => {
+    const result = await sandbox.execute(`
+      const out = [];
+      for (const [text, encoding] of [["QUJD\\u{1F600}QUJD", "base64"], ["QUJD\\u00e9\\u20acQUJD", "base64"], ["\\u0141\\u0142\\u0143\\u0144", "base64"], ["\\u4141\\u4242", "base64"], ["\\u0141\\u0142\\u0143\\u0144", "hex"], ["41\\u0132", "hex"], ["4142\\u00e943", "hex"]]) {
+        out.push(Buffer.from(text, encoding).toString("hex"));
+      }
+      return out.join("|");
+    `);
+
+    expect(result.ok ? result.result : result.error).toBe("414243|414243414243|001083|00|abcd|41|4142");
+  });
+});
