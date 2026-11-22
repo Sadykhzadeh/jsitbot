@@ -108,10 +108,13 @@
         }
       }
 
+      const bits = values.reduce((acc, value) => acc * 64 + value, 0) * 64 ** (4 - data);
       const count = data === 4 ? 3 : data - 1;
+      if (handling === "strict" && data < 4 && bits % 256 ** (3 - count) !== 0) {
+        throw syntaxError("The base64 input terminates with non-zero padding bits.");
+      }
       if (bytes.length + count > limit) break;
 
-      const bits = values.reduce((acc, value) => acc * 64 + value, 0) * 64 ** (4 - data);
       for (let b = 0; b < count; b++) {
         bytes.push(Math.floor(bits / 256 ** (2 - b)) % 256);
       }

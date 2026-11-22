@@ -25,4 +25,37 @@ describe("Uint8Array base64 and hex, checked against Node 26.13", () => {
 
     expect(result.ok ? result.result : result.error).toBe("null opts THROWS TypeError  \"invalid_argument\"\nnull opts toBase64 THROWS TypeError  \"invalid_argument\"\nnull opts setFrom THROWS TypeError  \"invalid_argument\"\nsetFrom detached THROWS TypeError  \"Cannot perform Uint8Array.prototype.setFromBase64 on a detached or out-of-bounds ArrayBuffer\"\nsetFromHex detached THROWS TypeError  \"Cannot perform Uint8Array.prototype.setFromHex on a detached or out-of-bounds ArrayBuffer\"\ntoHex detached THROWS TypeError  \"Cannot perform Uint8Array.prototype.toHex on a detached or out-of-bounds ArrayBuffer\"\ntoBase64 on plain THROWS TypeError  \"Method Uint8Array.prototype.toBase64 called on incompatible receiver [object Array]\"\ntoBase64 on subclass => AQ==\nomit bool string => AQ\nalphabet undefined => AQ==\nlcH undefined => 3\nfromBase64 no args THROWS TypeError  \"input argument must be a string\"\nfromHex no args THROWS TypeError  \"input argument must be a string\"\nd1 aG!s THROWS SyntaxError  \"Found a character that cannot be part of a valid base64 string.\"\nhex odd dest THROWS SyntaxError  \"Input string must contain hex characters in even length\"\nfromBase64 wsonly => 0\nfromBase64 nbsp THROWS SyntaxError  \"Found a character that cannot be part of a valid base64 string.\"\nfromBase64 pad ws before data THROWS SyntaxError  \"Found a character that cannot be part of a valid base64 string.\"\nfromHex nonstring symbol THROWS TypeError  \"input argument must be a string\"");
   });
+
+  test("strict mode refuses padded base64 whose unused bits are not zero, and loose mode reads it", async () => {
+    const result = await sandbox.execute(`(function(){
+      const out = [];
+      for (const text of ["SGk=", "SGl=", "SA==", "SB==", "QQ==", "/w==", "/x=="]) {
+        for (const lastChunkHandling of ["strict", "loose"]) {
+          try { out.push(text + " " + lastChunkHandling + " " + Uint8Array.fromBase64(text, { lastChunkHandling }).join()); } catch (e) { out.push(text + " " + lastChunkHandling + " " + e.name + ": " + e.message); }
+        }
+      }
+      try { new Uint8Array(1).setFromBase64("QR==", { lastChunkHandling: "strict" }); } catch (e) { out.push("set " + e.message); }
+      return out.join("\\n");
+    })()`);
+
+    expect(result.ok ? result.result : result.error).toBe(
+      [
+        "SGk= strict 72,105",
+        "SGk= loose 72,105",
+        "SGl= strict SyntaxError: The base64 input terminates with non-zero padding bits.",
+        "SGl= loose 72,105",
+        "SA== strict 72",
+        "SA== loose 72",
+        "SB== strict SyntaxError: The base64 input terminates with non-zero padding bits.",
+        "SB== loose 72",
+        "QQ== strict 65",
+        "QQ== loose 65",
+        "/w== strict 255",
+        "/w== loose 255",
+        "/x== strict SyntaxError: The base64 input terminates with non-zero padding bits.",
+        "/x== loose 255",
+        "set The base64 input terminates with non-zero padding bits.",
+      ].join("\n"),
+    );
+  });
 });
