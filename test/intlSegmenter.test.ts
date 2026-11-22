@@ -98,6 +98,21 @@ describe("Intl.Segmenter", () => {
     ]);
   });
 
+  test("cuts a sentence at a line break, and not after a period that a lowercase word follows", async () => {
+    expect(await segments("sentence", "Hello\nWorld\r\nagain. how are\n\nyou?  Yes")).toEqual([
+      ["Hello\n", 0, null],
+      ["World\r\n", 6, null],
+      ["again. how are\n", 13, null],
+      ["\n", 28, null],
+      ["you?  ", 29, null],
+      ["Yes", 35, null],
+    ]);
+    expect(await segments("sentence", "e.g. foo.bar 1.2.3 and Hi. X")).toEqual([
+      ["e.g. foo.bar 1.2.3 and Hi. ", 0, null],
+      ["X", 27, null],
+    ]);
+  });
+
   test("cuts sentences after their end marks and the space that follows", async () => {
     expect(await segments("sentence", "Hi there. How are you? Fine!")).toEqual([
       ["Hi there. ", 0, null],
