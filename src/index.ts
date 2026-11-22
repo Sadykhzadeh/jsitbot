@@ -14,6 +14,12 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+const [unknownArgument] = Bun.argv.slice(2);
+if (unknownArgument !== undefined) {
+  console.error(`Unknown argument "${unknownArgument}". The bot takes no arguments; its only setting is BOT_TOKEN in .env.`);
+  process.exit(2);
+}
+
 let env;
 try {
   env = loadEnv(Bun.env);

@@ -22,7 +22,11 @@ interface Run {
  * Starts the bot the way a deploy does, from a directory with no .env, so
  * nothing but the variables given here reaches it.
  */
-async function startBot(variables: Record<string, string | undefined>, preload: string[] = []): Promise<Run> {
+async function startBot(
+  variables: Record<string, string | undefined>,
+  preload: string[] = [],
+  args: string[] = [],
+): Promise<Run> {
   const directory = mkdtempSync(join(tmpdir(), "jsitbot-start-"));
   const env: Record<string, string> = {};
 
@@ -39,7 +43,7 @@ async function startBot(variables: Record<string, string | undefined>, preload: 
 
   try {
     const bot = Bun.spawn(
-      [process.execPath, ...preload.flatMap((file) => ["--preload", file]), join(root, "src/index.ts")],
+      [process.execPath, ...preload.flatMap((file) => ["--preload", file]), join(root, "src/index.ts"), ...args],
       { cwd: directory, env, stdout: "pipe", stderr: "pipe" },
     );
     const [out, err] = await Promise.all([new Response(bot.stdout).text(), new Response(bot.stderr).text()]);
@@ -86,6 +90,16 @@ describe("starting without a usable BOT_TOKEN", () => {
 
     expectOneLine(run, "replace_with_your_bot_token");
     expect(run.output).toContain("BOT_TOKEN does not look like a Telegram bot token");
+  });
+});
+
+describe("starting with an argument", () => {
+  test("refuses --help in one line before it looks at the token", async () => {
+    const run = await startBot({ BOT_TOKEN: undefined }, [], ["--help"]);
+
+    expect(run.code).toBe(2);
+    expect(run.output.trim().split("\n")).toHaveLength(1);
+    expect(run.output).toContain('Unknown argument "--help". The bot takes no arguments');
   });
 });
 
