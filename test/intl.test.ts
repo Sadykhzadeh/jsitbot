@@ -138,6 +138,11 @@ describe("resolvedOptions", () => {
     ).toBe(
       `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumSignificantDigits":1,"maximumSignificantDigits":3,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"auto","trailingZeroDisplay":"auto"}`,
     );
+    expect(
+      await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { maximumFractionDigits: 1, minimumSignificantDigits: 3 }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumSignificantDigits":3,"maximumSignificantDigits":21,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"auto","trailingZeroDisplay":"auto"}`,
+    );
   });
 
   test("of a number format fills in the defaults of its style", async () => {

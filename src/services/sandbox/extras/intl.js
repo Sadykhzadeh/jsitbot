@@ -189,7 +189,7 @@
         // numbers when that is the nearer, as Node does; the priority reads morePrecision for it.
         const compactDigits = asked.notation === "compact" && !sigAsked && !fracAsked && (asked.roundingPriority === undefined || asked.roundingPriority === "auto");
         const priority = compactDigits ? "morePrecision" : asked.roundingPriority === undefined ? "auto" : builtins.string(asked.roundingPriority);
-        if (!sigAsked || priority !== "auto" || fracAsked) {
+        if (!sigAsked || priority !== "auto") {
           const base = style === "currency" ? currencyDigits(out.currency) : 0;
           const top = style === "currency" ? base : style === "percent" ? 0 : 3;
           const min = asked.minimumFractionDigits === undefined ? undefined : builtins.number(asked.minimumFractionDigits);
