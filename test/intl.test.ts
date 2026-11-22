@@ -114,6 +114,32 @@ describe("resolvedOptions", () => {
     );
   });
 
+  test("of a number format reports the significant digits that its rounding priority uses", async () => {
+    expect(await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { notation: "compact" }).resolvedOptions())`)).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumFractionDigits":0,"maximumFractionDigits":0,"minimumSignificantDigits":1,"maximumSignificantDigits":2,"useGrouping":"min2","notation":"compact","compactDisplay":"short","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"morePrecision","trailingZeroDisplay":"auto"}`,
+    );
+    expect(
+      await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { notation: "compact", trailingZeroDisplay: "stripIfInteger" }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumFractionDigits":0,"maximumFractionDigits":0,"minimumSignificantDigits":1,"maximumSignificantDigits":2,"useGrouping":"min2","notation":"compact","compactDisplay":"short","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"auto","trailingZeroDisplay":"stripIfInteger"}`,
+    );
+    expect(
+      await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { roundingPriority: "morePrecision", maximumFractionDigits: 2 }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumFractionDigits":0,"maximumFractionDigits":2,"minimumSignificantDigits":1,"maximumSignificantDigits":21,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"morePrecision","trailingZeroDisplay":"auto"}`,
+    );
+    expect(
+      await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", roundingPriority: "morePrecision", minimumSignificantDigits: 4 }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"currency","currency":"USD","currencyDisplay":"symbol","currencySign":"standard","minimumIntegerDigits":1,"minimumFractionDigits":2,"maximumFractionDigits":2,"minimumSignificantDigits":4,"maximumSignificantDigits":21,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"morePrecision","trailingZeroDisplay":"auto"}`,
+    );
+    expect(
+      await value(`return JSON.stringify(new Intl.NumberFormat("en-US", { maximumSignificantDigits: 3 }).resolvedOptions())`),
+    ).toBe(
+      `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumSignificantDigits":1,"maximumSignificantDigits":3,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"auto","trailingZeroDisplay":"auto"}`,
+    );
+  });
+
   test("of a number format fills in the defaults of its style", async () => {
     expect(await value(`return JSON.stringify(new Intl.NumberFormat("en-US").resolvedOptions())`)).toBe(
       `{"locale":"en-US","numberingSystem":"latn","style":"decimal","minimumIntegerDigits":1,"minimumFractionDigits":0,"maximumFractionDigits":3,"useGrouping":"auto","notation":"standard","signDisplay":"auto","roundingIncrement":1,"roundingMode":"halfExpand","roundingPriority":"auto","trailingZeroDisplay":"auto"}`,

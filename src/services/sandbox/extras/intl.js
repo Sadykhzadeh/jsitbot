@@ -183,16 +183,23 @@
           out.unitDisplay = asked.unitDisplay === undefined ? "short" : asked.unitDisplay;
         }
         out.minimumIntegerDigits = asked.minimumIntegerDigits === undefined ? 1 : builtins.number(asked.minimumIntegerDigits);
-        if (asked.minimumSignificantDigits !== undefined || asked.maximumSignificantDigits !== undefined) {
-          out.minimumSignificantDigits = asked.minimumSignificantDigits === undefined ? 1 : builtins.number(asked.minimumSignificantDigits);
-          out.maximumSignificantDigits = asked.maximumSignificantDigits === undefined ? 21 : builtins.number(asked.maximumSignificantDigits);
-        } else {
+        const sigAsked = asked.minimumSignificantDigits !== undefined || asked.maximumSignificantDigits !== undefined;
+        const fracAsked = asked.minimumFractionDigits !== undefined || asked.maximumFractionDigits !== undefined;
+        // A compact number with no digits asked for is rounded to two significant digits, or to whole
+        // numbers when that is the nearer, as Node does; the priority reads morePrecision for it.
+        const compactDigits = asked.notation === "compact" && !sigAsked && !fracAsked && (asked.roundingPriority === undefined || asked.roundingPriority === "auto");
+        const priority = compactDigits ? "morePrecision" : asked.roundingPriority === undefined ? "auto" : builtins.string(asked.roundingPriority);
+        if (!sigAsked || priority !== "auto" || fracAsked) {
           const base = style === "currency" ? currencyDigits(out.currency) : 0;
           const top = style === "currency" ? base : style === "percent" ? 0 : 3;
           const min = asked.minimumFractionDigits === undefined ? undefined : builtins.number(asked.minimumFractionDigits);
           const max = asked.maximumFractionDigits === undefined ? undefined : builtins.number(asked.maximumFractionDigits);
-          out.minimumFractionDigits = min === undefined ? builtins.min(base, max === undefined ? base : max) : min;
-          out.maximumFractionDigits = max === undefined ? builtins.max(top, out.minimumFractionDigits) : max;
+          out.minimumFractionDigits = compactDigits ? 0 : min === undefined ? builtins.min(base, max === undefined ? base : max) : min;
+          out.maximumFractionDigits = compactDigits ? 0 : max === undefined ? builtins.max(top, out.minimumFractionDigits) : max;
+        }
+        if (sigAsked || priority !== "auto") {
+          out.minimumSignificantDigits = asked.minimumSignificantDigits === undefined ? 1 : builtins.number(asked.minimumSignificantDigits);
+          out.maximumSignificantDigits = asked.maximumSignificantDigits === undefined ? (compactDigits ? 2 : 21) : builtins.number(asked.maximumSignificantDigits);
         }
         const grouping = asked.useGrouping;
         const compact = asked.notation === "compact" ? "min2" : "auto";
@@ -203,15 +210,11 @@
         out.notation = asked.notation === undefined ? "standard" : asked.notation;
         if (out.notation === "compact") out.compactDisplay = asked.compactDisplay === undefined ? "short" : asked.compactDisplay;
         out.signDisplay = asked.signDisplay === undefined ? "auto" : asked.signDisplay;
-        // A compact number with no digits asked for is rounded on the more precise of its digits, and
         // stripIfInteger reports the priority as auto, as Node does.
-        const compactDigits = out.notation === "compact" && asked.minimumFractionDigits === undefined && asked.maximumFractionDigits === undefined && asked.minimumSignificantDigits === undefined && asked.maximumSignificantDigits === undefined;
         const trailingZeros = asked.trailingZeroDisplay === undefined ? "auto" : builtins.string(asked.trailingZeroDisplay);
         out.roundingIncrement = 1;
         out.roundingMode = asked.roundingMode === undefined ? "halfExpand" : builtins.string(asked.roundingMode);
-        if (trailingZeros === "stripIfInteger") out.roundingPriority = "auto";
-        else if (asked.roundingPriority !== undefined) out.roundingPriority = builtins.string(asked.roundingPriority);
-        else out.roundingPriority = compactDigits ? "morePrecision" : "auto";
+        out.roundingPriority = trailingZeros === "stripIfInteger" ? "auto" : priority;
         out.trailingZeroDisplay = trailingZeros;
         return out;
       });
