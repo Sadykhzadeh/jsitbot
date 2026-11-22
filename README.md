@@ -189,8 +189,8 @@ The tests need no token and no network.
 | `bun run start` | Runs `src/index.ts` |
 | `bun run test` | Runs the test suite (`bun test`) |
 | `bun run typecheck` | Type-checks `src`, `test` and `scripts` with `tsc --noEmit` |
-| `bun run bench` | Starts the sandbox the way the bot does and prints startup time, first-run latency and warm p50/p95 for a few typical programs |
-| `bun run soak` | Starts the real bot against a local stand-in for the Telegram API and prints start-up time, the memory of the bot and its sandbox process, and how a burst of messages is answered. `--limit=30` makes the stand-in refuse sends above 30 a second, as Telegram does |
+| `bun run bench` | Starts the sandbox the way the bot does and prints startup time, first-run latency and warm p50/p95 for a few typical programs. `--runs=150` sets how many runs each latency measurement takes |
+| `bun run soak` | Starts the real bot against a local stand-in for the Telegram API and prints start-up time, the memory of the bot and its sandbox process, and how a burst of messages is answered. `--starts=7` sets how many starts are timed, `--messages=300` the size of the burst, `--users=60` how many users send it, `--latency=30` the milliseconds each call to the stand-in takes, and `--limit=30` makes it refuse sends above 30 a second, as Telegram does |
 | `bun run compat` | Compares the sandbox output with Node 26 for every snippet in `scripts/node-diff/corpus`; needs `NODE26`, see [Running the comparison](#running-the-comparison) |
 
 ## Configuration
