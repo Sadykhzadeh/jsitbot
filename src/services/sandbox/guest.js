@@ -1514,11 +1514,10 @@
         item = undefined;
       }
 
-      if (typeof item === "object" && item !== null) {
-        const fields = getKeys(item);
+      if (typeof item === "function" || (typeof item === "object" && item !== null)) {
+        const fields = chosen ? columns : getKeys(item);
         for (let j = 0; j < fields.length; j++) {
           if (!known[fields[j]]) {
-            if (chosen) continue;
             if (columns.length >= MAX_TABLE_COLUMNS) {
               logsCutShort = true;
               continue;
@@ -1526,6 +1525,7 @@
             known[fields[j]] = true;
             columns[columns.length] = fields[j];
           }
+          if (chosen && !hasOwn(item, fields[j])) continue;
           try {
             row.cells[fields[j]] = cell(item[fields[j]]);
           } catch (ignored) {
@@ -1540,7 +1540,7 @@
     }
 
     // The columns the rows found are ordered as the keys of an object are, so a number-like key comes first.
-    const names = chosen ? (keys.length > 0 ? columns : []) : getKeys(known);
+    const names = keys.length > 0 ? getKeys(known) : [];
     const headers = ["(index)"];
     for (let i = 0; i < names.length; i++) headers[headers.length] = names[i];
     if (hasValues) headers[headers.length] = "Values";

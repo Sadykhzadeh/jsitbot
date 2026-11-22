@@ -161,6 +161,19 @@ describe("console.table of collections and columns", () => {
     ]);
   });
 
+  test("a column list reads the own properties it names, functions included, in the order of object keys", async () => {
+    const [table] = await logs(`console.table([() => 1, [5, 6]], ["name", "length", "0"])`);
+
+    expect(table.split("\n")).toEqual([
+      "┌─────────┬───┬──────┬────────┐",
+      "│ (index) │ 0 │ name │ length │",
+      "├─────────┼───┼──────┼────────┤",
+      "│ 0       │   │ ''   │ 0      │",
+      "│ 1       │ 5 │      │ 2      │",
+      "└─────────┴───┴──────┴────────┘",
+    ]);
+  });
+
   test("a column list with no rows to print prints no columns", async () => {
     expect(await logs(`console.table([], ["x"])`)).toEqual([
       ["┌─────────┐", "│ (index) │", "├─────────┤", "└─────────┘"].join("\n"),
