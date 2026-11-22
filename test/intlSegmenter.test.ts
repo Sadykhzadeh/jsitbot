@@ -36,6 +36,37 @@ describe("Intl.Segmenter", () => {
     ]);
   });
 
+  test("keeps a joiner after a letter, and the tags of a flag, with the character they belong to", async () => {
+    expect(await segments("grapheme", "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645 \u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F} ok")).toEqual([
+      ["\u0645", 0, null],
+      ["\u06cc\u200c", 1, null],
+      ["\u062e", 3, null],
+      ["\u0648", 4, null],
+      ["\u0627", 5, null],
+      ["\u0647", 6, null],
+      ["\u0645", 7, null],
+      [" ", 8, null],
+      ["\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}", 9, null],
+      [" ", 23, null],
+      ["o", 24, null],
+      ["k", 25, null],
+    ]);
+  });
+
+  test("keeps a Devanagari conjunct, joined by a virama, in one grapheme", async () => {
+    expect(await segments("grapheme", "\u0928\u092e\u0938\u094d\u0924\u0947 \u0926\u0941\u0928\u093f\u092f\u093e \u0915\u094d\u200d\u0937\u094d\u092e")).toEqual([
+      ["\u{928}", 0, null],
+      ["\u{92E}", 1, null],
+      ["\u{938}\u{94D}\u{924}\u{947}", 2, null],
+      [" ", 6, null],
+      ["\u{926}\u{941}", 7, null],
+      ["\u{928}\u{93F}", 9, null],
+      ["\u{92F}\u{93E}", 11, null],
+      [" ", 13, null],
+      ["\u{915}\u{94D}\u{200D}\u{937}\u{94D}\u{92E}", 14, null],
+    ]);
+  });
+
   test("grapheme is the default and counts what a person sees", async () => {
     expect(await value(`return [...new Intl.Segmenter().segment("e\\u0301\\u{1F44D}\\u{1F3FD}")].length`)).toBe("2");
   });

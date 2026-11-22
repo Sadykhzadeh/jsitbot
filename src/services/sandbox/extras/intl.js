@@ -577,7 +577,7 @@
   // sentence ends after . ! or ? and the space that follows, or at a line break, and a
   // period does not end one before a lowercase word.
   const SEGMENT_PATTERNS = {
-    grapheme: /\r\n|\p{Regional_Indicator}{2}|[^\p{M}\u200d][\p{M}\ufe0f\p{Emoji_Modifier}]*(?:\u200d\p{Extended_Pictographic}[\p{M}\ufe0f\p{Emoji_Modifier}]*)*|[\s\S]/gu,
+    grapheme: /\r\n|\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:[\p{M}\u200c\ufe0f\p{Emoji_Modifier}\u{E0020}-\u{E007F}]|\u200d\p{Extended_Pictographic})*\u200d*|\p{Lo}(?:(?![\u094d\u09cd\u0acd\u0b4d\u0c4d\u0d4d\u1039\u17d2])[\p{M}\u200c\ufe0f\p{Emoji_Modifier}\u{E0020}-\u{E007F}]|\u200d)*(?:[\u094d\u09cd\u0acd\u0b4d\u0c4d\u0d4d\u1039\u17d2](?:(?![\u094d\u09cd\u0acd\u0b4d\u0c4d\u0d4d\u1039\u17d2])[\p{M}\u200c\ufe0f\p{Emoji_Modifier}\u{E0020}-\u{E007F}]|\u200d)*\p{Lo}(?:(?![\u094d\u09cd\u0acd\u0b4d\u0c4d\u0d4d\u1039\u17d2])[\p{M}\u200c\ufe0f\p{Emoji_Modifier}\u{E0020}-\u{E007F}]|\u200d)*)+|[^\p{Cc}\r\n\u2028\u2029](?:[\p{M}\u200c\ufe0f\p{Emoji_Modifier}\u{E0020}-\u{E007F}]|\u200d)*|[\s\S]/gu,
     word: /[\p{L}\p{N}\p{M}_\u200d]+(?:(?:['’.]|(?<=\p{N}),(?=\p{N}))[\p{L}\p{N}\p{M}_\u200d]+)*|\p{Regional_Indicator}{2}|\p{Extended_Pictographic}[\p{M}\ufe0f\p{Emoji_Modifier}]*(?:\u200d\p{Extended_Pictographic}[\p{M}\ufe0f\p{Emoji_Modifier}]*)*|\s+|[\s\S]\p{M}*/gu,
     sentence: /[\s\S]*?(?:[!?]+(?![!?])['")\]]*[^\S\r\n\u0085\u2028\u2029]*(?![^\S\r\n\u0085\u2028\u2029])(?![.])(?=[^\r\n\u0085\u2028\u2029]|$)|\.+(?:['")\]]+[^\S\r\n\u0085\u2028\u2029]*|[^\S\r\n\u0085\u2028\u2029]+|$)(?![^\S\r\n\u0085\u2028\u2029])(?![^\p{L}.!?\r\n\u0085\u2028\u2029]*\p{Ll})(?=[^\r\n\u0085\u2028\u2029]|$)|\r\n|[\n\r\u0085\u2028\u2029]|$)/gu,
   };
