@@ -321,7 +321,9 @@
           year: date.getFullYear(), month: date.getMonth(), day: date.getDate(), weekday: date.getDay(),
           hours: date.getHours(), minutes: date.getMinutes(), seconds: date.getSeconds(), milliseconds: date.getMilliseconds(),
         };
-    if (c.year < 1 || c.year > 9999) return undefined;
+    // A year before 1 is written as the year of its era, which Node writes without the era: year 0 is 1.
+    if (c.year < 1) c.year = 1 - c.year;
+    if (c.year > 9999) return undefined;
 
     const dateParts = has(f, DATE_FIELDS) ? datePart(f, c) : [];
     const timeParts = has(f, ["hour", "minute", "second", "fractionalSecondDigits"])

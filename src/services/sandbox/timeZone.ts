@@ -17,7 +17,7 @@ function formatterFor(zone: string, style: string): Intl.DateTimeFormat {
     }
     formatter = new Intl.DateTimeFormat("en-US", {
       ...(zone === "" ? {} : { timeZone: zone }),
-      ...(style === "" ? { hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" } : { hour: "numeric", timeZoneName: style }),
+      ...(style === "" ? { hourCycle: "h23", era: "short", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" } : { hour: "numeric", timeZoneName: style }),
     } as Intl.DateTimeFormatOptions);
     formatters.set(key, formatter);
   }
@@ -43,9 +43,11 @@ export function zoneInfo(zone: string, ms: number, style: string): string {
     const parts = formatterFor(zone, "").formatToParts(ms);
     const field = (type: string) => Number(parts.find((part) => part.type === type)?.value);
 
-    // Date.UTC reads the years 0 to 99 as 1900 to 1999, so the year is set apart.
+    // Date.UTC reads the years 0 to 99 as 1900 to 1999, so the year is set apart. A year
+    // before 1 is written with its era, BC, and counted from 0 as the Date object counts it.
+    const year = parts.find((part) => part.type === "era")?.value === "BC" ? 1 - field("year") : field("year");
     const moment = new Date(0);
-    moment.setUTCFullYear(field("year"), field("month") - 1, field("day"));
+    moment.setUTCFullYear(year, field("month") - 1, field("day"));
     moment.setUTCHours(field("hour") % 24, field("minute"), field("second"), 0);
     const offset = moment.getTime() - Math.floor(ms / 1000) * 1000;
     if (!Number.isFinite(offset)) {

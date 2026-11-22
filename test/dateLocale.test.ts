@@ -302,6 +302,18 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
     expect(await at("2024-03-10T07:00:00Z", "America/New_York", clock)).toBe("3:00 AM EDT");
   });
 
+  test("tell the weekday and the date in a named zone before the year 1, as Node does", async () => {
+    const at = (time: number, zone: string, options: string) => value(`return new Date(${time}).toLocaleString("en-US", { timeZone: "${zone}"${options} })`);
+
+    expect(await at(-62135596800000, "America/New_York", ', weekday: "long"')).toBe("Sunday");
+    expect(await at(-62135596800000, "Asia/Tokyo", ', dateStyle: "full", timeStyle: "long"')).toBe(
+      "Monday, January 1, 1 at 9:18:59 AM GMT+9:18:59",
+    );
+    expect(await at(-62167219200001, "America/New_York", ', weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "numeric"')).toBe(
+      "Friday, December 31, 2 at 7:03 PM",
+    );
+  });
+
   test("tell the time in a named zone with the other methods and Intl.DateTimeFormat", async () => {
     expect(
       await value(`return new Date("2024-01-01T23:30:00Z").toLocaleDateString("en-US", { timeZone: "Asia/Tokyo", weekday: "long", day: "numeric" })`),
