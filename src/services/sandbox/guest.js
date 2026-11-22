@@ -2098,6 +2098,8 @@
     max: mathMax,
     number: Number,
     numberToString,
+    numberValueOf: uncurry(Number.prototype.valueOf),
+    bigintValueOf: uncurry(BigInt.prototype.valueOf),
     string: String,
     boolean: Boolean,
     numberIsFinite: Number.isFinite,

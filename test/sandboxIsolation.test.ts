@@ -77,6 +77,29 @@ describe("tampering with built-ins", () => {
     `)).toBe("-1|\u0130|\u0131|1,234.5");
   });
 
+  test("number and BigInt formatting read their own value after valueOf and call are replaced", async () => {
+    expect(await value(`
+      Number.prototype.valueOf = function () { return 42; };
+      BigInt.prototype.valueOf = function () { return 42n; };
+      Function.prototype.call = () => "hijacked";
+      return [(1).toLocaleString(), (1234.5).toLocaleString("en-US", { style: "currency", currency: "USD" }), (1n).toLocaleString(), (1234.5).toLocaleString("de-DE")].join("|");
+    `)).toBe("1|$1,234.50|1|1234.5");
+  });
+
+  test("case and date formats keep working after Function.prototype.call and getTime are replaced", async () => {
+    expect(await value(`
+      Function.prototype.call = () => "hijacked";
+      Date.prototype.getTime = () => 0;
+      return [
+        "ı".toLocaleUpperCase("tr"),
+        "I".toLocaleLowerCase("tr"),
+        "abc".toLocaleUpperCase(),
+        new Date(0).toLocaleString("en-US", { timeZone: "Asia/Tokyo" }),
+        String(new Date(0)).includes("GMT"),
+      ].join("|");
+    `)).toBe("I|ı|ABC|1/1/1970, 9:00:00 AM|true");
+  });
+
   test("date formatting keeps working after its prototypes are replaced", async () => {
     expect(await value(`
       String.prototype.indexOf = () => -1;

@@ -67,17 +67,17 @@
   // The engine's own case mapping, which ignores the locale, is applied after the
   // Turkish letters are settled, so the rest of the text is mapped as it is elsewhere.
   function mapTurkish(text) {
-    if (upper) return original.call(builtins.replace(text, /i/g, "İ"));
+    if (upper) return builtins.apply(original, builtins.replace(text, /i/g, "İ"), []);
     // The first replace takes an I with a dot above (I + U+0307), the second the capital dotted I (U+0130).
-    return original.call(builtins.replace(builtins.replace(builtins.replace(text, /İ/g, "i"), /İ/g, "i"), /I/g, "ı"));
+    return builtins.apply(original, builtins.replace(builtins.replace(builtins.replace(text, /İ/g, "i"), /İ/g, "i"), /I/g, "ı"), []);
   }
 
   return {
     [original.name](locales) {
       if (this == null) throw new TypeError(`String.prototype.${original.name} called on null or undefined`);
-      if (locales === undefined) return original.call(this);
+      if (locales === undefined) return builtins.apply(original, this, []);
       const language = languageOf(locales);
-      if (language !== "tr" && language !== "az") return original.call(this);
+      if (language !== "tr" && language !== "az") return builtins.apply(original, this, []);
       return mapTurkish(`${this}`);
     },
   };

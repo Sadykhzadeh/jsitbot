@@ -6,22 +6,20 @@
 (function (original, owner, zoneInfo, builtins) {
   "use strict";
 
-  const getTime = Date.prototype.getTime;
-
   function named(date, text) {
     if (text === "Invalid Date") return text;
 
-    const info = zoneInfo("", getTime.call(date), "long");
+    const info = zoneInfo("", builtins.getTime(date), "long");
     const bar = builtins.indexOf(info, "|");
     return bar === -1 ? text : text + " (" + builtins.slice(info, bar + 1) + ")";
   }
 
   const methods = {
     toString() {
-      return named(this, original.call(this));
+      return named(this, builtins.apply(original, this, []));
     },
     toTimeString() {
-      return named(this, original.call(this));
+      return named(this, builtins.apply(original, this, []));
     },
   };
 

@@ -526,19 +526,19 @@
   }
 
   function numberToLocaleString(locales, options) {
-    const value = Number.prototype.valueOf.call(this);
+    const value = builtins.numberValueOf(this);
     checkLocales(locales);
     checkOptions(options, "Number.prototype.toLocaleString");
-    if (!handled(locales, options)) return original.call(value, locales, options);
+    if (!handled(locales, options)) return builtins.apply(original, value, [locales, options]);
 
     return format(value < 0 || builtins.is(value, -0), builtins.abs(value), options || {});
   }
 
   function bigintToLocaleString(locales, options) {
-    const value = BigInt.prototype.valueOf.call(this);
+    const value = builtins.bigintValueOf(this);
     checkLocales(locales);
     checkOptions(options, "BigInt.prototype.toLocaleString");
-    if (!handled(locales, options)) return original.call(value, locales, options);
+    if (!handled(locales, options)) return builtins.apply(original, value, [locales, options]);
 
     return format(value < 0n, value < 0n ? -value : value, options || {});
   }

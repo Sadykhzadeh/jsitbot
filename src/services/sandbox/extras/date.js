@@ -285,7 +285,7 @@
     const tag = builtins.isArray(locales) ? locales[0] : locales;
     if (tag !== undefined && !builtins.test(ENGLISH, builtins.string(tag))) return undefined;
 
-    const time = Date.prototype.getTime.call(date);
+    const time = builtins.getTime(date);
     const asked = METHODS[method];
     const resolved = resolve(options, asked.required, asked.defaults, asked.owner);
     if (resolved === null) return undefined;
@@ -302,7 +302,7 @@
       if (info === "" || (f.timeZoneName !== undefined && bar === -1)) return undefined;
       if (zone !== undefined) {
         moved = new Date(time + builtins.number(bar === -1 ? info : builtins.slice(info, 0, bar)));
-        if (Date.prototype.getTime.call(moved) !== Date.prototype.getTime.call(moved)) return undefined;
+        if (builtins.getTime(moved) !== builtins.getTime(moved)) return undefined;
       }
       if (bar !== -1) zoneText = builtins.slice(info, bar + 1);
     }
@@ -334,7 +334,7 @@
 
   function format(date, method, locales, options) {
     const parts = layout(date, method, locales, options);
-    return parts === undefined ? engine[method].call(date, locales, options) : builtins.join(builtins.map(parts, (part) => part.value), "");
+    return parts === undefined ? builtins.apply(engine[method], date, [locales, options]) : builtins.join(builtins.map(parts, (part) => part.value), "");
   }
 
   const methods = {
@@ -356,7 +356,7 @@
     // The parts Intl.DateTimeFormat writes with, for the method its options pick.
     partsOf(date, method, locales, options) {
       const parts = layout(date, method, locales, options);
-      return parts === undefined ? [{ type: "literal", value: engine[method].call(date, locales, options) }] : parts;
+      return parts === undefined ? [{ type: "literal", value: builtins.apply(engine[method], date, [locales, options]) }] : parts;
     },
     // The name of a zone as Intl spells it, which resolvedOptions reports.
     timeZoneId(zone) {
