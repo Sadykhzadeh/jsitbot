@@ -10,7 +10,7 @@
 // named zone is looked up with `zoneInfo`, which the host answers from its own
 // time zone data: how far the zone is from UTC at a moment, and what it is
 // called then. Anything else, another language, an era, a day period, a
-// calendar or a numbering system, or a year outside 1 to 9999, is left to the
+// calendar or a numbering system is left to the
 // engine's own method, which is the `original` it is given.
 (function (engine, zoneInfo, builtins) {
   "use strict";
@@ -323,7 +323,6 @@
         };
     // A year before 1 is written as the year of its era, which Node writes without the era: year 0 is 1.
     if (c.year < 1) c.year = 1 - c.year;
-    if (c.year > 9999) return undefined;
 
     const dateParts = has(f, DATE_FIELDS) ? datePart(f, c) : [];
     const timeParts = has(f, ["hour", "minute", "second", "fractionalSecondDigits"])

@@ -488,3 +488,20 @@ describe("Intl.DateTimeFormat", () => {
     expect(await value(`new Intl.DateTimeFormat("en-US", { month: "bad" })`)).toMatch(/^error: RangeError/);
   });
 });
+
+describe("years above 9999", () => {
+  test("are written in full by every method, as Node writes them", async () => {
+    expect(
+      await value(`
+        const d = new Date(253402300800000);
+        return [
+          d.toLocaleString("en-US", { timeZone: "UTC" }),
+          d.toLocaleDateString("en-US", { timeZone: "UTC" }),
+          d.toLocaleDateString("en-US", { timeZone: "UTC", year: "2-digit" }),
+          d.toLocaleDateString("en-US", { timeZone: "UTC", dateStyle: "full" }),
+          new Date(1e15).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", year: "numeric" }),
+        ].join("|");
+      `),
+    ).toBe("1/1/10000, 12:00:00 AM|1/1/10000|00|Saturday, January 1, 10000|Sep 33658");
+  });
+});
