@@ -395,6 +395,12 @@ describe("Date toLocaleString, toLocaleDateString and toLocaleTimeString", () =>
     expect(await value(`new Date(0).toLocaleString("en-US", { dateStyle: "full", timeZoneName: "short" })`)).toBe(
       "error: TypeError: Invalid option : option",
     );
+    expect(await value(`new Date(0).toLocaleString("en-US", { dateStyle: "full", era: "short" })`)).toBe(
+      "error: TypeError: Invalid option : option",
+    );
+    expect(await value(`new Date(0).toLocaleTimeString("en-US", { timeStyle: "short", dayPeriod: "short" })`)).toBe(
+      "error: TypeError: Invalid option : option",
+    );
   });
 
   test("leave what they cannot do to the engine, as before", async () => {

@@ -112,6 +112,9 @@
         zone = given;
       }
     }
+    if ((dateStyle !== undefined || timeStyle !== undefined) && (options.era !== undefined || options.dayPeriod !== undefined)) {
+      throw new TypeError("Invalid option : option");
+    }
     if (options.era !== undefined || options.dayPeriod !== undefined || options.calendar !== undefined || options.numberingSystem !== undefined) {
       return null;
     }
