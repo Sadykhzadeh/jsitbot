@@ -262,7 +262,7 @@
       });
       define(this, "resolvedOptions", () => {
         const zone = given.timeZone === undefined ? hostTimeZone : builtins.string(given.timeZone);
-        const out = { locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: builtins.indexOfIn(UTC_ZONES, builtins.toLowerCase(zone)) === -1 ? zone : "UTC" };
+        const out = { locale: "en-US", calendar: "gregory", numberingSystem: "latn", timeZone: builtins.indexOfIn(UTC_ZONES, builtins.toLowerCase(zone)) === -1 ? host.extra("date").timeZoneId(zone) : "UTC" };
         if (given.hour !== undefined || given.timeStyle !== undefined) {
           const cycle = given.hourCycle !== undefined ? given.hourCycle : given.hour12 === undefined ? "h12" : given.hour12 ? "h12" : "h23";
           out.hourCycle = cycle;

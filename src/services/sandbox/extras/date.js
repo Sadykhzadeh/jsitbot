@@ -358,5 +358,9 @@
       const parts = layout(date, method, locales, options);
       return parts === undefined ? [{ type: "literal", value: engine[method].call(date, locales, options) }] : parts;
     },
+    // The name of a zone as Intl spells it, which resolvedOptions reports.
+    timeZoneId(zone) {
+      return zoneInfo(zone, 0, "id");
+    },
   };
 })

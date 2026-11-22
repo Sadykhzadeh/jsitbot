@@ -31,10 +31,15 @@ function formatterFor(zone: string, style: string): Intl.DateTimeFormat {
  * An empty zone is the zone of this process. An empty string says the zone is
  * not one that exists, or the moment is out of range. A zero offset is named
  * GMT+0 or GMT+00:00 in the offset styles, and in the generic styles for UTC,
- * as Node names it, whatever the host's data says.
+ * as Node names it, whatever the host's data says. The style "id" gives the
+ * name the zone has in Intl, such as "Europe/Berlin" for "europe/berlin".
  */
 export function zoneInfo(zone: string, ms: number, style: string): string {
   try {
+    if (style === "id") {
+      return formatterFor(zone, "").resolvedOptions().timeZone;
+    }
+
     const parts = formatterFor(zone, "").formatToParts(ms);
     const field = (type: string) => Number(parts.find((part) => part.type === type)?.value);
 

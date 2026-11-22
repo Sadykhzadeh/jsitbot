@@ -69,6 +69,12 @@ describe("resolvedOptions", () => {
     expect(await value(`return new Intl.DateTimeFormat("en-US", { timeZone: "UTC" }).resolvedOptions().timeZone`)).toBe("UTC");
   });
 
+  test("of a date format names a zone the way Intl spells it", async () => {
+    expect(await value(`return new Intl.DateTimeFormat("en-US", { timeZone: "europe/berlin" }).resolvedOptions().timeZone`)).toBe("Europe/Berlin");
+    expect(await value(`return new Intl.DateTimeFormat("en-US", { timeZone: "etc/gmt+5" }).resolvedOptions().timeZone`)).toBe("Etc/GMT+5");
+    expect(await value(`return new Intl.DateTimeFormat("en-US", { timeZone: "+05:00" }).resolvedOptions().timeZone`)).toBe("+05:00");
+  });
+
   test("of a date format has the locale, the calendar and what was asked for", async () => {
     expect(
       await value(`return JSON.stringify(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long", hour: "numeric" }).resolvedOptions())`),
