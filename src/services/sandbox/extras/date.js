@@ -175,7 +175,7 @@
     // What the engine's formats have no sensible form for
     if (f.second !== undefined && f.hour !== undefined && f.minute === undefined) return null;
     if (f.day !== undefined && f.month === undefined && f.year !== undefined) return null;
-    if (f.month === "narrow" && (f.weekday !== undefined || f.day !== undefined || f.year !== undefined)) return null;
+    if (f.month === "narrow" && f.weekday !== undefined) return null;
 
     return { f, utc, zone, cycle, glue };
   }
