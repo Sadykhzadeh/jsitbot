@@ -73,7 +73,7 @@ const cases: AbuseCase[] = [
     outcome: timeLimit,
   },
   { name: "async loop that awaits forever", code: `for (;;) await 0`, outcome: timeLimit },
-  { name: "flood of promises", code: `for (let i = 0; i < 1e6; i++) Promise.resolve(i); 1`, outcome: eitherLimit },
+  { name: "flood of promises", code: `for (let i = 0; i < 1e7; i++) Promise.resolve(i); 1`, outcome: eitherLimit },
   {
     name: "setTimeout chain of a million",
     code: `let n = 0; function t() { if (++n < 1e6) setTimeout(t, 0); } t(); await new Promise(() => {})`,
