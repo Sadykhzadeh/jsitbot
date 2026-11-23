@@ -1,0 +1,7 @@
+const t = (s) => { try { JSON.parse(s) } catch (e) { console.log(e.name + ": " + e.message) } }; ["", " ", "{", "[", "{\"a\"", "{\"a\":", "{\"a\":1", "{\"a\":1,", "[1,", "[1 2]", "{'a':1}", "{a:1}", "[1,]", "{\"a\":1,}", "tru", "nul", "01", "1.", "-", "1e", "\"abc", "\"a\nb\"", "\"\x\"", "\"\u12G4\"", "1 2", "{} x", "undefined", "NaN", "[object Object]", "'a'", "+1", ".5"].forEach(t)
+---8<---
+const t = (s) => { try { JSON.parse(s) } catch (e) { console.log(e.name + ": " + e.message) } }; [JSON.stringify({ alpha: [1, 2, 3], beta: "text" }).slice(0, -1), "[" + "1,".repeat(20) + "x]", "{\"key\": \"a long value that goes on\" \"next\": 1}", "\n\n  {\n  \"a\": 1,\n  \"b\": ?\n}"].forEach(t)
+---8<---
+const t = (v) => { try { JSON.parse(v) } catch (e) { console.log(e.name + ": " + e.message) } }; [undefined, null, {}, [], 1n === 1n, 12, true].forEach(t)
+---8<---
+try { JSON.parse("[1,2", (k, v) => v) } catch (e) { console.log(e.message) } try { JSON.parse("[1]", () => { throw new SyntaxError("from reviver") }) } catch (e) { console.log(e.message) }

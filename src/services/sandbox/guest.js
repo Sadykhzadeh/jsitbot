@@ -2514,6 +2514,7 @@
   lazyMethod("ranges", Number.prototype, "toPrecision");
   lazyMethod("ranges", Number.prototype, "toExponential");
   lazyMethod("ranges", Number.prototype, "toString");
+  lazyMethod("jsonparse", JSON, "parse");
   lazyMethod("arrays", Array.prototype, "join");
   lazyMethod("arrays", Array.prototype, "toLocaleString");
   lazyMethod("arrays", Object.getPrototypeOf(Uint8Array.prototype), "toLocaleString");

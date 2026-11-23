@@ -45,7 +45,7 @@ export function guestRuntimeSource(): string {
  * globals the runtime asks for the source and evaluates it then, so a program
  * that does not use them does not pay for parsing them.
  */
-const EXTRA_NAMES = ["clone", "encoding", "url", "crypto", "collate", "date", "datestring", "number", "intl", "events", "proxy", "digest", "width", "bytes", "weakref", "buffer", "disposable", "blob", "arrays", "casing", "wording", "ranges", "bigint"];
+const EXTRA_NAMES = ["clone", "encoding", "url", "crypto", "collate", "date", "datestring", "number", "intl", "events", "proxy", "digest", "width", "bytes", "weakref", "buffer", "disposable", "blob", "arrays", "casing", "wording", "ranges", "bigint", "jsonparse"];
 const extraSources = new Map<string, string>();
 
 /** Source of the part called `name`, or undefined for a name that is not one. */
