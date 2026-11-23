@@ -38,7 +38,7 @@ Telegram bot for running JavaScript in an isolated sandbox.
 - Runs code in group chats when it is asked to: `/run 1 + 1`, `@your_bot_name 1 + 1`, `/run` or `@your_bot_name` as the caption of a `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` or `.cts` file, or `/run` as a reply to a message that has the code or to such a file. It ignores everything else that is said there
 - Prints results and `console` output the way Node does: `Map(2) { 'a' => 1 }`, class instances, errors (a subclass of `Error` by its class: `ValidationError: bad input`), cycles, and a proxy as `Proxy(` its target `)` without running its traps. The items of a Map or Set iterator are not shown (`[Map Iterator] { <items unknown> }`), because reading them would use them up
 - Besides `console.log` and friends it has `console.table`, `assert`, `count`, `group` and `time`
-- Reports the line an error came from, and for a syntax error shows that line with a caret under the column (a line longer than 80 characters is cut around the column). When an error is printed, reading or writing a property of `undefined` or `null`, a name that is not defined, an assignment to a const, a call of a name or a chain of names that is not a function (`obj.run is not a function`, or `f(...).go` for a call of a result), a variable used before its `let`, a name that is not iterable in a for-of loop, an array spread or an array pattern, a symbol turned into a string or number, `reduce` of an empty array and an invalid array length, an invalid date, a malformed URI and `Object.keys` and the like given null or undefined are worded as Node words them (`Cannot read properties of undefined (reading 'x')`); `error.message` itself keeps the engine's wording, as do the other errors
+- Reports the line an error came from, and for a syntax error shows that line with a caret under the column (a line longer than 80 characters is cut around the column). When an error is printed, reading or writing a property of `undefined` or `null`, a name that is not defined, an assignment to a const, a call of a name or a chain of names that is not a function (`obj.run is not a function`, or `f(...).go` for a call of a result), a variable used before its `let`, a name that is not iterable in a for-of loop, an array spread or an array pattern, a symbol turned into a string or number, `reduce` of an empty array and an invalid array length, an invalid date, a malformed URI and `Object.keys` and the like given null or undefined are worded as Node words them (`Cannot read properties of undefined (reading 'x')`); `error.message` itself keeps the engine's wording for these, except for the errors of `JSON.parse`, `String.prototype.repeat`, the digits and radix of the number methods, `BigInt` and the URI functions, which have Node's message in `error.message` as well, as do the errors of code that stops too early
 
 ## TypeScript
 
@@ -63,7 +63,7 @@ Not supported, and refused with one line:
 
 ## How Output Compares With Node
 
-Measured with `bun run compat` against Node 26.13.0: 397 snippets in `scripts/node-diff/corpus`, run once by Node with `console.log` and once by the sandbox, both at a depth of 3 (what the sandbox shows; Node's own default is 2). 390 match exactly (98.2%). The corpus covers the inspect and console test inputs, hand-picked containers, errors and iterators, generated runs of line width, grouping, nesting and numbers, template literals, JSON, dates, null-prototype objects, generators, classes, proxies, reflection, weak references, namespaces, functions and the console forms. To reproduce it, see [Running the comparison](#running-the-comparison).
+Measured with `bun run compat` against Node 26.13.0: 807 snippets in `scripts/node-diff/corpus`, run once by Node with `console.log` and once by the sandbox, both at a depth of 3 (what the sandbox shows; Node's own default is 2). 800 match exactly (99.1%). The corpus covers the inspect and console test inputs, hand-picked containers, errors and iterators, generated runs of line width, grouping, nesting and numbers, template literals, JSON, dates, null-prototype objects, generators, classes, proxies, reflection, weak references, namespaces, functions and the console forms. To reproduce it, see [Running the comparison](#running-the-comparison).
 
 | Group (corpus file) | Snippets | Exact |
 | --- | ---: | ---: |
@@ -72,7 +72,15 @@ Measured with `bun run compat` against Node 26.13.0: 397 snippets in `scripts/no
 | Options of console.dir: depth and showHidden (`console-options.txt`) | 26 | 26 |
 | Edge cases: prototypes, tagged objects, console table, dir, count (`edge.txt`) | 101 | 99 |
 | Targeted at single formatting rules (`targeted.txt`) | 89 | 87 |
-| Total | 397 | 390 |
+| Accessors and descriptors, frozen and sealed objects, key order and quoting (`accessors.txt`) | 65 | 65 |
+| Errors nested in containers: causes, aggregates, extra fields, classes (`errors-containers.txt`) | 41 | 41 |
+| Collections, iteration, sparse and long arrays, typed arrays, buffers (`collections.txt`) | 51 | 51 |
+| Primitives, quoting, numbers, boxed values, symbols, dates (`primitives.txt`) | 44 | 44 |
+| Console methods: format specifiers, groups, tables, counts, asserts (`console-methods.txt`) | 65 | 65 |
+| Custom inspect methods under `Symbol.for('nodejs.util.inspect.custom')` (`custom-inspect.txt`) | 17 | 17 |
+| Values in nested positions, binary data, functions, classes, globals (`values.txt`) | 123 | 123 |
+| Messages of the errors JSON.parse throws (`errors-json.txt`) | 4 | 4 |
+| Total | 807 | 800 |
 
 Deliberate differences, with the reason:
 

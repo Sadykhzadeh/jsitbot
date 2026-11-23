@@ -1,0 +1,245 @@
+console.log({ m: new Map([[1, { a: { b: { c: 1 } } }]]) })
+---8<---
+console.log({ s: new Set([[1, [2, [3, [4]]]]]) })
+---8<---
+console.log(new Map([[{ a: 1 }, { b: { c: { d: 1 } } }]]))
+---8<---
+console.log([new Map([[1, new Map([[2, new Map([[3, 4]])]])]])])
+---8<---
+console.log(new Set([new Map([["x", new Set([new Set([1])])]])]))
+---8<---
+console.log(new Uint8Array(101).fill(3))
+---8<---
+console.log(new Float32Array(3).fill(0.5), new Int8Array([-1, 127, -128]))
+---8<---
+console.log(Object.assign(new Float64Array(2), { note: "x" }))
+---8<---
+console.log(new Uint8Array(new ArrayBuffer(8), 2, 3))
+---8<---
+console.log(new Uint16Array([1, 2, 3]).buffer)
+---8<---
+console.log(new Float64Array([NaN, -0, Infinity]))
+---8<---
+console.log(new BigUint64Array([18446744073709551615n]))
+---8<---
+console.log(new DataView(new ArrayBuffer(8), 2, 4).byteLength, new DataView(new ArrayBuffer(0)))
+---8<---
+console.log(new ArrayBuffer(3, { maxByteLength: 9 }).resizable)
+---8<---
+console.log([new ArrayBuffer(0), new ArrayBuffer(1)])
+---8<---
+console.log({ buf: new Uint8Array([9, 8]).buffer, view: new DataView(new Uint8Array([1]).buffer) })
+---8<---
+console.log(Array.from({ length: 200 }, (_, i) => i).length, Array.from({ length: 150 }, () => "w"))
+---8<---
+console.log(Array.from({ length: 3 }, (_, i) => Array.from({ length: 3 }, (_, j) => i * 3 + j)))
+---8<---
+console.log(Array.from({ length: 2 }, () => ({ name: "n".repeat(20), value: 12345678 })))
+---8<---
+console.log(Array.from({ length: 9 }, (_, i) => "item-" + "x".repeat(i)))
+---8<---
+console.log(Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + (i % 26))))
+---8<---
+console.log([1.5, 22.25, 333.125, 4444.0625, 55555.03125, 666666.015625, 7777777.0078125])
+---8<---
+console.log([true, false, true, false, true, false, true, false, true, false, true])
+---8<---
+console.log([null, null, null, null, null, null, null, null, null])
+---8<---
+console.log(Array.from({ length: 8 }, (_, i) => ({ i })))
+---8<---
+console.log(Array.from({ length: 7 }, (_, i) => [i, i * 2]))
+---8<---
+console.log(Array.from({ length: 30 }, (_, i) => i % 2 === 0 ? i : "odd" + i))
+---8<---
+console.log(Array(3), Array(3).fill(), new Array(2, 3), new Array("2"))
+---8<---
+console.log([,], [, ,], [undefined], [, undefined])
+---8<---
+console.log(Object.assign([], { 1: "one-indexed", length: 3 }))
+---8<---
+console.log(Object.assign([1, 2, 3], { length: 1 }), Object.assign([], { length: 2 }))
+---8<---
+console.log(function () { return arguments }(1, 2, 3, "four"))
+---8<---
+console.log((function (a, b) { return [arguments.length, arguments[0]] })("x"))
+---8<---
+console.log(function bound() {}.bind({}), (function named() {}).bind(null).name)
+---8<---
+console.log(Object.defineProperty(function f() {}, "name", { value: "" }))
+---8<---
+console.log(Object.defineProperty(function f() {}, "name", { value: 42 }))
+---8<---
+console.log(class Named { static named = 1 }, class {}.name, (class {}).name === "")
+---8<---
+console.log(class { static x = [1, 2] }, class A { static [Symbol.iterator]() {} })
+---8<---
+console.log(Object.create(class Base {}.prototype), Object.create(Object.create(class Q {}.prototype)))
+---8<---
+console.log(Object.create({ toString() { return "not used" } }))
+---8<---
+console.log(new Date(Date.UTC(-1, 0, 1)).toISOString(), new Date(Date.UTC(-271821, 3, 20)).toISOString())
+---8<---
+console.log(new Date(Date.UTC(10000, 0, 1)), new Date(Date.UTC(275760, 8, 13)))
+---8<---
+console.log([new Date(Date.UTC(1900, 1, 28, 12, 30, 15, 250))], { old: new Date(-2208988800000) })
+---8<---
+console.log(new Date(Date.UTC(2024, 1, 29)).toISOString(), new Date(-1).getUTCFullYear())
+---8<---
+console.log(Date.UTC(1970, 0, 1), Date.UTC(2000, 0), new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 1)).toISOString())
+---8<---
+console.log("it's \"both\"", ["it's \"both\""], ["\\n"], ["tab\tin"])
+---8<---
+console.log({ "quote'key": 1, 'double"key': 2, "both'\"": 3, "new\nkey": 4 })
+---8<---
+console.log(["ascii only"], ["é"], ["😀"], ["\u{1F600}".length])
+---8<---
+console.log(["x".repeat(16), "y".repeat(17)], ["z".repeat(74)])
+---8<---
+console.log({ longStringValueOverSeventyFiveCharactersWhenCombinedWithTheKey: "value text here" })
+---8<---
+console.log(["row with a long string that goes past the usual line width of eighty chars"])
+---8<---
+console.log(Object.keys({ 1: 1, a: 2, [Symbol.iterator]: 3 }), Object.entries([7, 8]))
+---8<---
+console.log(-1e21, 1e21 - 1, 1.7976931348623157e308 * 10, -1e-21)
+---8<---
+console.log(0.1 * 0.1, 3 * 1.1, 100 * 1.15, 1 - 0.9)
+---8<---
+console.log(2 ** 53 + 2, 1e16 + 1, 123e-20, 0.000001 * 0.001)
+---8<---
+console.log([10 ** 21, 10 ** -7, 2 ** -1074, 2 ** 1023 * 2 - 2 ** 970])
+---8<---
+console.log(BigInt(Number.MAX_SAFE_INTEGER) * 3n, -(2n ** 64n), [0n, -0n])
+---8<---
+console.log(Number(12345678901234567890n), parseInt("9007199254740993"), Math.round(-0.4))
+---8<---
+console.log(Object.assign(new Array(3), { 1: "mid" }))
+---8<---
+console.log(Object.assign(new Set([1]), { size2: 2 }), new Set([]).has(undefined))
+---8<---
+console.log(new Map([[undefined, null]]), new Set([NaN, NaN, 0, -0]))
+---8<---
+console.log(new WeakRef({ x: 1 }) instanceof WeakRef, Object.prototype.toString.call(new WeakRef({})))
+---8<---
+console.log({ fin: new FinalizationRegistry(() => {}) })
+---8<---
+console.log(Object(Symbol()), Object(Symbol.iterator), [Object(10n)])
+---8<---
+console.log(new Boolean(false), [new Boolean(true)], new Number(0), new String(""))
+---8<---
+console.log(Object.assign(new Boolean(true), { flag: 1 }), Object.assign(new Number(9), { [Symbol("x")]: 1 }))
+---8<---
+console.log(new Number(1e21), new Number(-0), new Number(1.5), new String("multi\nline"))
+---8<---
+console.log(new String("ab")[0], Object("abc").length, Object.keys(new String("ab")))
+---8<---
+console.log(Symbol(), Symbol("a".repeat(30)), Symbol("\n"))
+---8<---
+console.log(Symbol.prototype.description, Symbol("x").description, Symbol().description)
+---8<---
+console.log({ [Symbol.unscopables]: 1, [Symbol.match]: 2, [Symbol.species]: 3 })
+---8<---
+console.log(Symbol.asyncIterator.toString(), String(Symbol.for("a b")))
+---8<---
+console.log(typeof Symbol.dispose, Symbol.toStringTag.description)
+---8<---
+class Temp { #c = 1; get celsius() { return this.#c } set celsius(v) { this.#c = v } } console.log(new Temp(), Object.getOwnPropertyDescriptor(Temp.prototype, "celsius").set.name)
+---8<---
+class Pt { constructor() { this.x = 1 } get len() { return 2 } } console.log(new Pt(), Object.keys(new Pt()))
+---8<---
+console.log(Object.freeze(new (class Fz { constructor() { this.v = [1] } })()))
+---8<---
+console.log(Object.seal([1, 2]), Object.isSealed(Object.seal([1])))
+---8<---
+console.log(Object.freeze(Object.assign([1], { extra: { deep: true } })))
+---8<---
+console.log({ a: Object.freeze({}), b: Object.freeze([]), c: Object.freeze(new Map()) })
+---8<---
+console.log(Object.getOwnPropertyDescriptor(Object.freeze([1]), 0))
+---8<---
+console.log(Reflect.getOwnPropertyDescriptor({ get x() { return 1 } }, "x").get.name)
+---8<---
+console.log(Object.entries(Object.getOwnPropertyDescriptors([1])).length)
+---8<---
+console.log({ x: 1, get y() { return 2 }, [Symbol.for("s")]: 3, "z-z": 4, 5: 5 })
+---8<---
+console.log(JSON.parse('{"a":[{"b":null}],"c":{"d":{"e":{"f":true}}}}'))
+---8<---
+console.log(JSON.parse("[1,\"2\",{\"3\":[4]}]"), JSON.parse('"text"'), JSON.parse("null"))
+---8<---
+console.log(Object.fromEntries([["__proto__", 1], ["ok", 2]]))
+---8<---
+console.log(Array.from(new Set([3, 1, 3])), Array.from("hé🙂"))
+---8<---
+console.log(new Set("hello"), new Map(Object.entries({ k: "v" })))
+---8<---
+console.log([..."ab"].entries().next().value, Object.entries("xy"))
+---8<---
+console.log(Object.getOwnPropertyDescriptor(Array.prototype, "length").writable)
+---8<---
+console.log(Object.getOwnPropertyDescriptor(Math, "PI"))
+---8<---
+console.log(Object.getOwnPropertyDescriptor(Symbol, "iterator"))
+---8<---
+console.log(Object.getOwnPropertyDescriptor(new Map(), "size"))
+---8<---
+console.log(Object.keys(Object.getOwnPropertyDescriptor(class { static m() {} }, "m")))
+---8<---
+function* counter() { yield 1; yield 2 } console.log([...counter()], counter().next(), counter().return(5))
+---8<---
+async function* agen() { yield 1 } console.log(agen().next() instanceof Promise, Object.prototype.toString.call(agen()))
+---8<---
+const genObj = (function* () {})(); console.log(genObj[Symbol.toStringTag], String(genObj))
+---8<---
+console.log(Object.getPrototypeOf(function* () {}).constructor.name)
+---8<---
+console.log(Array.from(Array(3).keys()), [...Array(2)].map((_, i) => i))
+---8<---
+console.log([1, [2, [3, [4, [5]]]]].flat(Infinity), [[1], [2]].flatMap((x) => x))
+---8<---
+console.log(Array.prototype.slice.call({ 0: "a", 1: "b", length: 2 }))
+---8<---
+console.log({ length: 2, 0: "x", 1: "y" }, Array.from({ length: 2, 0: "p" }))
+---8<---
+console.log(Object.assign(Object.create([1, 2]), { own: true }))
+---8<---
+console.log(new Proxy([], {}), new Proxy({ a: 1 }, { get() { return 99 } }).a)
+---8<---
+console.log(Object.keys(new Proxy({ k: 1 }, {})), Object.getPrototypeOf(new Proxy([], {})) === Array.prototype)
+---8<---
+console.log(String(new Proxy({}, { get: () => "tr" }).x))
+---8<---
+console.log(Reflect.apply(Math.max, null, [1, 9, 3]), Reflect.has({ a: 1 }, "a"))
+---8<---
+console.log(Object.getOwnPropertyNames(class { static a() {} }).sort())
+---8<---
+console.log(Object.getOwnPropertyNames(function g(p, q) {}).sort())
+---8<---
+console.log(typeof globalThis, Object.keys(globalThis).length >= 0, typeof global)
+---8<---
+console.log([0, 1, 2].map(String), ["1", "2", "3"].map(Number), [1, 0, ""].filter(Boolean))
+---8<---
+console.log("abc".split(""), "a,b,,c".split(","), "  pad ".trim().padStart(6, "*"))
+---8<---
+console.log("%s has %d items", "cart", 3, "extra")
+---8<---
+console.log(`${1 + 1} ${"tpl"} ${[1, 2]} ${{}}`, `line
+---8<---
+break`)
+---8<---
+console.log(String.raw`\u{41}\n`, `\u{41}`, "\x41")
+---8<---
+console.log(null ?? "d", 0 ?? "d", undefined?.x, ({ a: { b: 1 } }).a?.b)
+---8<---
+console.log(1_000_000.5, 0b1010_1010, 0o7_7, 1e0_1)
+---8<---
+console.log(void 0, typeof void 0, [void 0])
+---8<---
+label2: for (const x of [1, 2]) { for (const y of [1, 2]) { if (y === 2) continue label2; console.log("pair", x, y) } }
+---8<---
+try { throw "string thrown" } catch { console.log("caught without binding") }
+---8<---
+console.log([1, 2, 3].at(-1), "abc".at(-2), [1, 2].findLast((x) => x < 3))
+---8<---
+console.log(Object.hasOwn({ q: 1 }, "q"), [1, 2].includes(NaN), [NaN].includes(NaN))

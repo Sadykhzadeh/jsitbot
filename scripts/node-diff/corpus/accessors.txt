@@ -1,0 +1,129 @@
+console.log({ get a() { return 1 } })
+---8<---
+console.log({ set a(v) {} })
+---8<---
+console.log({ get a() { return 1 }, set a(v) {} })
+---8<---
+console.log({ get a() { throw new Error("x") } })
+---8<---
+console.log(Object.defineProperty({}, "g", { get() { return 1 }, enumerable: true }))
+---8<---
+console.log(Object.defineProperty({}, "s", { set(v) {}, enumerable: true }))
+---8<---
+console.log(Object.defineProperty({}, "hidden", { get() { return 1 } }))
+---8<---
+console.log(Object.defineProperty({ v: 1 }, "hidden", { value: 2, enumerable: false }))
+---8<---
+console.log(Object.defineProperty({}, Symbol("sym"), { get() { return 1 }, enumerable: true }))
+---8<---
+console.log({ [Symbol("k")]: { get v() { return 2 } } })
+---8<---
+console.log(Object.freeze({ a: 1, b: [2] }))
+---8<---
+console.log(Object.seal({ a: 1 }))
+---8<---
+console.log(Object.preventExtensions({ a: 1 }))
+---8<---
+console.log(Object.freeze([1, 2]))
+---8<---
+console.log(Object.isFrozen(Object.freeze({})), Object.isSealed(Object.seal({})))
+---8<---
+console.log({ 10: "ten", 2: "two", b: 1, 1: "one", a: 2, "-1": "neg", "01": "lead", 1.5: "frac" })
+---8<---
+console.log({ "a b": 1, "a-b": 2, "a.b": 3, "a_b": 4, "$x": 5, "ünï": 6, "9lives": 7, "": 8 })
+---8<---
+console.log({ "it's": 1, 'say "hi"': 2, "back`tick": 3, "new\nline": 4 })
+---8<---
+console.log(JSON.parse('{"__proto__": {"x": 1}, "y": 2}'))
+---8<---
+console.log(Object.keys(JSON.parse('{"__proto__": 1}')), Object.getPrototypeOf(JSON.parse('{"__proto__": 1}')) === Object.prototype)
+---8<---
+console.log(Object.getOwnPropertyDescriptor({ get a() { return 1 } }, "a"))
+---8<---
+console.log(Object.getOwnPropertyDescriptor([1], "length"))
+---8<---
+console.log(Object.getOwnPropertyDescriptor(function f(a) {}, "name"))
+---8<---
+console.log(Object.getOwnPropertyDescriptors({ a: 1, get b() { return 2 } }))
+---8<---
+console.log(Object.defineProperties({}, { x: { value: 1, enumerable: true }, y: { value: 2 } }))
+---8<---
+console.log(Reflect.ownKeys({ [Symbol.iterator]: 1, z: 1, 0: 0, [Symbol("t")]: 2 }))
+---8<---
+console.log(Object.entries({ get g() { return "lazy" }, v: 2 }))
+---8<---
+console.log(Object.assign({}, { get g() { return "copied" } }))
+---8<---
+console.log({ ...{ get g() { return "spread" } } })
+---8<---
+console.log(Object.create({}, { own: { value: 1, enumerable: true }, hidden: { value: 2 } }))
+---8<---
+console.log(Object.defineProperty([1, 2], 0, { get() { return 9 }, enumerable: true }))
+---8<---
+console.log(Object.defineProperty(() => {}, "tag", { value: "x", enumerable: true }))
+---8<---
+console.log(Object.defineProperty(new Map(), "k", { get() { return 1 }, enumerable: true }))
+---8<---
+console.log({ a: { get b() { return { c: 1 } } } })
+---8<---
+console.log([{ get x() { return 1 }, set x(v) {} }])
+---8<---
+console.log(Object.freeze(new Map([[1, 2]])))
+---8<---
+console.log(Object.defineProperty({}, "a", { value: undefined, enumerable: true }))
+---8<---
+console.log(Object.defineProperty({}, "n", { value: null, enumerable: true, writable: true }))
+---8<---
+console.log(Object.getOwnPropertyNames("ab"), Object.getOwnPropertyNames([1, 2]))
+---8<---
+console.log(Object.getOwnPropertyDescriptor(Object.freeze({ a: 1 }), "a"))
+---8<---
+console.log(Object.defineProperty({}, "a", { get: undefined, set: undefined, enumerable: true }))
+---8<---
+console.log({ get [Symbol.toStringTag]() { return "Tagged" }, a: 1 })
+---8<---
+console.log({ get "quoted key"() { return 1 } })
+---8<---
+console.log({ get 1() { return "one" }, set 2(v) {} })
+---8<---
+console.log(Object.defineProperty({}, "x", { get: function named() { return 1 }, enumerable: true }))
+---8<---
+console.log(Object.defineProperty({}, "x", { set: function named(v) {}, enumerable: true }))
+---8<---
+console.log(Object.defineProperty({}, Symbol.iterator, { get() { return 1 }, enumerable: true }))
+---8<---
+console.log({ __proto__: null, a: 1 })
+---8<---
+console.log(Object.keys({ __proto__: { x: 1 } }))
+---8<---
+console.log(Object.setPrototypeOf({}, null), Object.create(null))
+---8<---
+console.log({ a: 1, [Symbol.for("reg")]: 2, [Symbol()]: 3 })
+---8<---
+console.log(Object.defineProperty(Object.create(null), "h", { value: 1 }))
+---8<---
+console.log(Object.defineProperty({}, "frozen", { value: 1, writable: false, enumerable: true, configurable: false }))
+---8<---
+console.log(Object.getOwnPropertyDescriptor(globalThis, "undefined"))
+---8<---
+console.log({ a: [Object.freeze({ b: 1 })] })
+---8<---
+console.log({ n1: 1, n2: 2, n3: 3, n4: 4, n5: 5, n6: 6, n7: 7, n8: 8, n9: 9, n10: 10, n11: 11, n12: 12 })
+---8<---
+console.log({ get a() { return 1 }, get b() { return 2 }, get c() { return 3 } })
+---8<---
+console.log({ set a(v) {}, set b(v) {} })
+---8<---
+console.log(Object.defineProperty({ visible: 1 }, "gone", { value: 2 }))
+---8<---
+console.log(Object.defineProperty({}, "dup", { value: 1, enumerable: true }), Object.keys(Object.defineProperty({}, "dup", { value: 1 })))
+---8<---
+console.log(Object.getOwnPropertySymbols({ [Symbol.for("s")]: 1 }))
+---8<---
+console.log(Object.getOwnPropertyDescriptor(Symbol.prototype, "description").get.name)
+---8<---
+console.log({ "0": "zero", length: 1, "1e3": 2, "0x10": 3, "1_000": 4 })
+---8<---
+console.log({ 4294967295: "max", 4294967294: "below", 9007199254740993: "big" })
+---8<---
+console.log(Object.defineProperty({}, "x", { get() { return this } , enumerable: true }).x === undefined)

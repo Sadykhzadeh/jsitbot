@@ -1,0 +1,33 @@
+const sym = Symbol.for("nodejs.util.inspect.custom"); console.log({ [sym]() { return "custom text" } })
+---8<---
+const sym2 = Symbol.for("nodejs.util.inspect.custom"); console.log([{ [sym2]() { return { replaced: true } } }])
+---8<---
+class Money { constructor(v) { this.v = v } [Symbol.for("nodejs.util.inspect.custom")]() { return `Money(${this.v})` } } console.log(new Money(5), [new Money(6)], { m: new Money(7) })
+---8<---
+class Quiet { [Symbol.for("nodejs.util.inspect.custom")](depth, options, inspect) { return typeof inspect } } console.log(new Quiet())
+---8<---
+class DepthSeen { [Symbol.for("nodejs.util.inspect.custom")](depth) { return "depth " + depth } } console.log({ a: { b: { c: new DepthSeen() } } })
+---8<---
+class Opts { [Symbol.for("nodejs.util.inspect.custom")](depth, options) { return typeof options.stylize } } console.log(new Opts())
+---8<---
+const withSym = { [Symbol.for("nodejs.util.inspect.custom")]: () => "arrow custom", other: 1 }; console.log(withSym)
+---8<---
+console.log({ [Symbol.for("nodejs.util.inspect.custom")]: 5, x: 1 })
+---8<---
+console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return undefined }, x: 1 })
+---8<---
+console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return 42 } })
+---8<---
+console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return ["list", 1] } })
+---8<---
+console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { throw new Error("bad inspector") } })
+---8<---
+console.log({ [Symbol.for("nodejs.util.inspect.custom")]() { return this } })
+---8<---
+console.log(Symbol.for("nodejs.util.inspect.custom").description)
+---8<---
+console.log({ [Symbol("nodejs.util.inspect.custom")]() { return "not registered" } })
+---8<---
+class Multi { [Symbol.for("nodejs.util.inspect.custom")]() { return "line one\nline two" } } console.log({ inner: { m: new Multi() } })
+---8<---
+class Ret { [Symbol.for("nodejs.util.inspect.custom")]() { return { nested: [1, 2] } } } console.log([new Ret()])

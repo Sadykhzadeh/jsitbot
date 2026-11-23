@@ -1,0 +1,101 @@
+console.log({ a: { b: { c: new Map([[1, new Map([[2, 3]])]]) } } })
+---8<---
+console.log({ a: { b: { c: new Set([new Set([1])]) } } })
+---8<---
+console.log(new Map([[{ k: 1 }, "obj key"], [[1, 2], "arr key"], [null, "null key"]]))
+---8<---
+console.log(new Set([{ a: 1 }, [2], "s", 3n, Symbol("q")]))
+---8<---
+console.log(new WeakMap([[{}, 1]]), new WeakSet([{}]))
+---8<---
+console.log({ wm: new WeakMap(), ws: new WeakSet() })
+---8<---
+const holes = [1, , 3]; holes.extra = "x"; holes[10] = "far"; console.log(holes)
+---8<---
+const negatives = [1, 2]; negatives[-1] = "neg"; negatives["1.5"] = "frac"; negatives.name = "str"; console.log(negatives)
+---8<---
+console.log(Object.assign([, , "only"], { 2.5: "f", k: "v" }))
+---8<---
+console.log(Array(3), Array(1), [undefined, , null])
+---8<---
+console.log(new Array(5).fill(0).map((_, i) => i * i))
+---8<---
+console.log(Array.from({ length: 6 }, (_, i) => i * 1000))
+---8<---
+console.log(Array.from({ length: 7 }, (_, i) => i * 1000))
+---8<---
+console.log(Array.from({ length: 12 }, (_, i) => "item" + i))
+---8<---
+console.log(Array.from({ length: 28 }, (_, i) => i % 2 ? "x" : i))
+---8<---
+console.log([1, "two", [3], { four: 4 }, null, undefined, true, 8n, Symbol("nine"), 10, 11, 12, 13, 14, 15])
+---8<---
+console.log(Array.from({ length: 30 }, (_, i) => -i * 1.5))
+---8<---
+console.log(Array.from({ length: 16 }, (_, i) => i % 3 === 0 ? "s" : i))
+---8<---
+console.log(Array.from({ length: 101 }, (_, i) => "v" + (i % 10)).slice(95))
+---8<---
+console.log(new Uint8Array(120).fill(7).length, new Float64Array(8).map((_, i) => i / 2))
+---8<---
+console.log(new Int32Array(10).map((_, i) => i * -3))
+---8<---
+console.log(new BigInt64Array([1n, -2n]), new Uint16Array(0), new Uint8Array(3).subarray(1))
+---8<---
+console.log(new DataView(new ArrayBuffer(3), 1))
+---8<---
+console.log(new ArrayBuffer(4), new Uint8Array(new ArrayBuffer(2)).buffer.byteLength)
+---8<---
+function* gen() { yield 1 } console.log(gen(), { g: gen() })
+---8<---
+console.log((function () { return arguments })(1, "two"), (function () { return arguments })())
+---8<---
+console.log(function f() {}.bind(null), (() => {}).bind(null), function named(a, b) {}.bind(null, 1))
+---8<---
+class Stat { static x = 1; static { this.y = 2 } static m() {} }
+---8<---
+console.log(Stat, [Stat], { Stat })
+---8<---
+class Foo {} console.log(Object.create(Foo.prototype), Object.create(Object.create(Foo.prototype)))
+---8<---
+const proto = { greet() {} }; console.log(Object.create(proto), Object.create(proto, { own: { value: 1, enumerable: true } }))
+---8<---
+console.log(Object.create({ constructor: 1 }), Object.create(Array.prototype).length)
+---8<---
+console.log(Object.create(Map.prototype), Object.create(Date.prototype) instanceof Date)
+---8<---
+const ns = Object.freeze({ __proto__: null, b: 2, a: 1 }); console.log(ns)
+---8<---
+console.log(Object.assign(Object.create(null), { [Symbol.toStringTag]: "Module" }))
+---8<---
+console.log(new Map([[1, 2]]).entries().next(), new Set().size)
+---8<---
+console.log(new Map([[1, { a: [1, 2, { b: 3 }] }]]))
+---8<---
+console.log(new Set(Array.from({ length: 4 }, (_, i) => ({ id: i }))))
+---8<---
+console.log(new Map(Array.from({ length: 3 }, (_, i) => [i, "v" + i])))
+---8<---
+console.log(new Map([["a", new Set([1, 2])], ["b", new Map()]]))
+---8<---
+console.log([new Map(), new Set(), new WeakMap(), []])
+---8<---
+console.log(new Array(101).fill("z").length, [[]].length, [[[]]])
+---8<---
+console.log(Array.from({ length: 4 }, () => new Array(3)))
+---8<---
+console.log([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+---8<---
+console.log({ matrix: [[1, 0], [0, 1]], empty: [] })
+---8<---
+console.log(Object.assign(new Map([[1, 1]]), { [Symbol("s")]: "symbol prop" }))
+---8<---
+console.log(new Map([[NaN, "nan"], [-0, "zero"], [0, "same zero"]]))
+---8<---
+console.log([new Map([[1, 2]]), new Map([[3, 4]])].length)
+---8<---
+console.log(Array.prototype.concat.call([1], [2], 3, [[4]]))
+---8<---
+console.log([1, 2, 3].entries().toArray(), Array.from(new Map([[1, 2]]).keys()))
+---8<---
+console.log(Object.fromEntries(new Map([["x", 1], ["y", [2]]])))

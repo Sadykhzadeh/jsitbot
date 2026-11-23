@@ -1,0 +1,129 @@
+console.log("%o", { a: [1, { b: 2 }] })
+---8<---
+console.log("%O", { a: [1, { b: 2 }] })
+---8<---
+console.log("%o", "str", 5)
+---8<---
+console.log("%d", "42abc", "extra")
+---8<---
+console.log("%d", {}, "%d", null)
+---8<---
+console.log("%d %d", 1.5, -0)
+---8<---
+console.log("%i", "3.9", "%i", 2.5)
+---8<---
+console.log("%i %i", 12345678901234567890n, Symbol("q"))
+---8<---
+console.log("%f", "1.5e3", "%f", "abc")
+---8<---
+console.log("%f %f", Symbol("x"), null)
+---8<---
+console.log("%j", undefined, "%j", [1, "a"])
+---8<---
+console.log("%j", 1n === 1n ? "x" : "y")
+---8<---
+console.log("%c", "color: red", "after")
+---8<---
+console.log("%c%c", "a", "b", "tail")
+---8<---
+console.log("100%%", "%%", "%%s", "x")
+---8<---
+console.log("%s", undefined, null, "%s")
+---8<---
+console.log("missing %s and %d and %i")
+---8<---
+console.log("%s:%s", "only one")
+---8<---
+console.log("%", "%s", "%z", "%")
+---8<---
+console.log("%s", Symbol("sym"), 5n, -0)
+---8<---
+console.log("%s", new Date(0), [undefined])
+---8<---
+console.log("%s", { nested: { deep: { x: 1 } } })
+---8<---
+console.log("%s", [[1, [2]]], { toString() { return "own" } })
+---8<---
+console.log(Object.create(null), "%s", Object.create(null))
+---8<---
+console.log()
+---8<---
+console.log("")
+---8<---
+console.log("", "")
+---8<---
+console.log(undefined, null)
+---8<---
+console.log(0, false, "", [])
+---8<---
+console.group("outer"); console.log({ a: 1, b: [1, 2] }); console.log("two\nlines"); console.group("inner"); console.log(["x", "y"]); console.groupEnd(); console.groupEnd(); console.log("done")
+---8<---
+console.group("multi\nline label"); console.log("body"); console.groupEnd()
+---8<---
+console.group(); console.log("unlabeled"); console.groupEnd()
+---8<---
+console.groupEnd(); console.log("extra end is harmless")
+---8<---
+console.group("g"); console.table([{ a: 1 }]); console.groupEnd()
+---8<---
+console.table([[1, 2], [3, 4]])
+---8<---
+console.table([[1], [2, 3]])
+---8<---
+console.table({ r1: { a: 1, b: 2 }, r2: { a: 3, c: 4 } })
+---8<---
+console.table([{ a: 1, b: 2 }, { a: 3, b: 4 }], ["b"])
+---8<---
+console.table([{ a: 1, b: 2 }], ["missing"])
+---8<---
+console.table(["x", "y"])
+---8<---
+console.table([1, "two", true])
+---8<---
+console.table(5)
+---8<---
+console.table("str")
+---8<---
+console.table([])
+---8<---
+console.table({})
+---8<---
+console.table(new Map([["k", 1], ["j", { v: 2 }]]))
+---8<---
+console.table(new Set(["a", "b"]))
+---8<---
+console.table([{ n: null, u: undefined, s: Symbol("t") }])
+---8<---
+console.table([{ nested: [1, 2] }, { nested: { deep: true } }])
+---8<---
+console.table([{ "long header name": 1 }])
+---8<---
+console.table([{ a: 1 }, 2, [3]])
+---8<---
+console.count(); console.count(); console.count("label"); console.count(); console.countReset(); console.count()
+---8<---
+console.count(undefined); console.count(null); console.count(1); console.count("1")
+---8<---
+console.countReset("never"); console.count("never")
+---8<---
+console.assert(true, "not printed"); console.assert(false)
+---8<---
+console.assert(false, "value %d of %s", 3, "many"); console.assert(false, { obj: true }, "tail")
+---8<---
+console.assert(0, "zero is falsy"); console.assert(null, "null")
+---8<---
+console.assert(false, "%o", [1]); console.assert(false, "%%", "x")
+---8<---
+console.dirxml({ a: 1 }, [2], "text")
+---8<---
+console.dirxml()
+---8<---
+console.dir("plain string"); console.dir(["arr"]); console.dir()
+---8<---
+console.info("info", { i: 1 }); console.debug([1]); console.warn("warn text")
+---8<---
+console.log("line", "two", 3, [4], { five: 5 }, null, undefined, 6n, Symbol("seven"))
+---8<---
+console.log(Object.assign(() => {}, { x: 1 }), Object.assign(function f() {}, { y: 2 }))
+---8<---
+console.log([() => {}], { fn() {} })

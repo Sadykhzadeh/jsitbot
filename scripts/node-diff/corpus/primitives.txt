@@ -1,0 +1,87 @@
+console.log(-0, [-0], { z: -0 }, 0 * -1, Object.is(-0, 0))
+---8<---
+console.log(NaN, [NaN], -NaN, Number("x"), { n: NaN })
+---8<---
+console.log(1e21, [1e21, 1e-7], 1e-6, 123456789e15, 2 ** 70)
+---8<---
+console.log(0.1, 1 / 3, 100, 1e100, 5e-324, Number.MAX_VALUE, Number.MIN_VALUE)
+---8<---
+console.log(-1e-7, [-123.456], 1.0, 1.50, 0.000001234)
+---8<---
+console.log(9007199254740993n, -9007199254740993n, 0n, [10n ** 30n])
+---8<---
+console.log({ big: 123456789012345678901234567890n }, [1n, 2n])
+---8<---
+console.log("it's", ["it's"], 'say "hi"', ['say "hi"'], ["both ' and \""], ["back`tick"])
+---8<---
+console.log(["a'b\"c`d"], ["plain"], ["tab\there"], ["cr\r"], ["nul\0x"])
+---8<---
+console.log(["new\nline"], "new\nline", ["\\backslash"], ["\u001b[0m"], ["\u007f"])
+---8<---
+console.log(["\u0080", "\u009f", " ", "​", "﻿"])
+---8<---
+console.log(["\ud800"], ["\udfff"], ["a\ud800b"], ["😀"], "😀")
+---8<---
+console.log(Symbol(""), Symbol(), Symbol(undefined), Symbol(null), [Symbol("")])
+---8<---
+console.log(Symbol.iterator, Symbol.asyncIterator, Symbol.hasInstance, Symbol.toPrimitive)
+---8<---
+console.log(Symbol.for("app"), Symbol.keyFor(Symbol.for("app")), Symbol("with space"))
+---8<---
+console.log(Object(Symbol("boxed")), Object(1n), Object("str"), Object(3), Object(false))
+---8<---
+console.log([new Number(3), new String("x"), new Boolean(true), Object(Symbol("a")), Object(7n)])
+---8<---
+console.log(new Number(-0), new Number(NaN), new String(""), new String("it's"))
+---8<---
+console.log(Object.assign(new String("ab"), { extra: true }), Object.assign(new Number(1), { k: "v" }))
+---8<---
+console.log(new Date(-1), new Date(-62135596800000), new Date(253402300799999))
+---8<---
+console.log(new Date(Date.UTC(10000, 0, 1)), new Date(-8.64e15), new Date(8.64e15))
+---8<---
+console.log({ d: new Date(NaN) }, [new Date(NaN)], { when: new Date(NaN), n: 1 })
+---8<---
+console.log(Object.assign(new Date(NaN), { tag: 1 }))
+---8<---
+console.log(new Date(0).toISOString(), new Date(Date.UTC(1969, 11, 31, 23, 59, 59, 999)).toISOString())
+---8<---
+console.log(JSON.stringify([new Date(NaN)]), typeof new Date(NaN).getTime())
+---8<---
+console.log([1, 2].toString(), String([null, undefined]), `${[1, [2, 3]]}`)
+---8<---
+console.log(String(Symbol("s")), typeof Symbol(), typeof 1n, typeof null)
+---8<---
+console.log(Number.parseFloat("1.5e3"), (255).toString(16), (0.5).toString(2), (-7.25).toFixed(1))
+---8<---
+console.log((1234.5).toExponential(2), (0).toPrecision(3), (123).toPrecision(2), (1e21).toFixed(2))
+---8<---
+console.log(Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.EPSILON > 0)
+---8<---
+console.log(-(2 ** 31), 2 ** 32, 0xffffffff, 1e15 + 0.3)
+---8<---
+console.log([0.1 + 0.2, 1.1 * 3, 4.35 * 100, 2 / 3])
+---8<---
+console.log(123456789.123456789, 0.000000000001, 1e-300 * 1e-300)
+---8<---
+console.log(Infinity, -Infinity, [Infinity, -Infinity], { inf: 1 / 0 })
+---8<---
+console.log(true, [false], null, undefined, [null, undefined])
+---8<---
+console.log("", [""], [" "], ["   padded   "], "")
+---8<---
+console.log(["x".repeat(3), "y".repeat(0)], "end")
+---8<---
+console.log([`template`], [String.raw`raw\n`], ["\u{10FFFF}"])
+---8<---
+console.log({ "A": "A", "\x42": "B" }, ["\x41"])
+---8<---
+console.log(["\t", "\v", "\f", "\b", "\x1f", "\x7f"])
+---8<---
+console.log(["ascii", "ünïcode", "日本語", "emoji 🎉", "combining é"])
+---8<---
+console.log(["'", "\"", "'\"", "'\"`", "`"])
+---8<---
+console.log(JSON.stringify("a b"), ["a b"], [" "])
+---8<---
+console.log(new Symbol === undefined ? 1 : 2)

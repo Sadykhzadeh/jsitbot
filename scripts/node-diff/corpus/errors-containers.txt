@@ -1,0 +1,81 @@
+console.log([new Error("a", { cause: new Error("b") })].length, new Error("c", { cause: "text" }).cause)
+---8<---
+console.log({ e: new Error("outer", { cause: "inner" }) })
+---8<---
+console.log({ e: new Error("outer", { cause: { code: 1 } }) })
+---8<---
+console.log({ e: new Error("o", { cause: new TypeError("t") }) })
+---8<---
+console.log({ e: new AggregateError([new AggregateError([1], "nested")], "top") })
+---8<---
+console.log({ e: new AggregateError([], "empty") })
+---8<---
+console.log({ e: Object.assign(new Error("extra"), { code: "E1", status: 404 }) })
+---8<---
+console.log({ e: Object.assign(new RangeError("r"), { details: [1, 2] }) })
+---8<---
+console.log([Object.assign(new Error("in array"), { n: 1 })])
+---8<---
+console.log(new Map([["k", new Error("in map")]]))
+---8<---
+console.log(new Set([new TypeError("in set")]))
+---8<---
+class HttpError extends Error { constructor(m) { super(m); this.name = "HttpError"; this.status = 500 } }
+---8<---
+console.log({ e: new HttpError("boom") })
+---8<---
+class NoName extends Error {}
+---8<---
+console.log({ e: new NoName("plain") })
+---8<---
+class Named extends Error { get name() { return "Overridden" } }
+---8<---
+console.log({ e: new Named("getter") })
+---8<---
+class Msg extends Error { constructor() { super("x"); this.message = "changed" } }
+---8<---
+console.log({ e: new Msg() })
+---8<---
+class Str extends Error { toString() { return "custom string" } }
+---8<---
+console.log({ e: new Str("m") }, String(new Str("m")))
+---8<---
+const noStack = new Error("gone"); delete noStack.stack; console.log({ e: noStack })
+---8<---
+const plain = Object.create(Error.prototype); console.log({ e: plain })
+---8<---
+console.log({ e: Object.assign(Object.create(Error.prototype), { name: "Fake", message: "fake msg" }) })
+---8<---
+const emptyMsg = new Error(); console.log({ e: emptyMsg })
+---8<---
+console.log({ e: new Error("multi\nline message") })
+---8<---
+console.log({ e: new TypeError("with 'quotes' and \"double\"") })
+---8<---
+console.log({ e: new EvalError("ev") }, { e: new URIError("uri") }, { e: new SyntaxError("syn") })
+---8<---
+console.log([new Error("a")].map((e) => e.message))
+---8<---
+console.log(String(new Error("s")), new Error("t").toString(), Error.prototype.toString.call({ name: "N", message: "M" }))
+---8<---
+console.log(Object.prototype.toString.call(new Error("tag")), Object.prototype.toString.call(Error.prototype))
+---8<---
+console.log(new Error("x") instanceof Error, Object.getPrototypeOf(new TypeError()) === TypeError.prototype)
+---8<---
+console.log(Object.keys(new Error("hidden")), JSON.stringify(new Error("json")))
+---8<---
+console.log({ e: Object.defineProperty(new Error("nonenum"), "shown", { value: 1, enumerable: true }) })
+---8<---
+console.log({ e: Object.assign(new Error("sym"), { [Symbol("s")]: 1 }) })
+---8<---
+console.log({ e: Object.assign(new Error("nested err"), { inner: new Error("deep") }) })
+---8<---
+console.log({ e: new AggregateError([new Error("one"), "two", 3]) })
+---8<---
+console.log({ errors: [new Error("a"), new RangeError("b")] })
+---8<---
+console.log({ deep: { deeper: { e: new Error("cut") } } })
+---8<---
+console.log({ deep: { deeper: { e: new Error("cut", { cause: new Error("inner") }) } } })
+---8<---
+console.log(new Error("with cause", { cause: 0 }).cause, new Error("no cause", {}).hasOwnProperty("cause"))
