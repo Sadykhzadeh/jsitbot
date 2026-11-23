@@ -2334,6 +2334,7 @@
         exported = indirectEval(loadExtra(module))(registerInspector, [seed0, seed1, seed2, seed3], hostFunctions, captured);
         for (let i = 0; i < entries.length; i++) {
           const [owner, name] = entries[i];
+          markBuiltIn(exported[name], false);
           defineProperty(owner, name, { value: exported[name], writable: true, configurable: true, enumerable: false });
         }
       }
@@ -2349,6 +2350,7 @@
         },
       }[name];
       defineProperty(stub, "length", { value: length, configurable: true });
+      markBuiltIn(stub, false);
       defineProperty(owner, name, { value: stub, writable: true, configurable: true, enumerable: false });
     }
   }
@@ -2365,6 +2367,7 @@
       },
     }[name];
     defineProperty(stub, "length", { value: original.length, configurable: true });
+    markBuiltIn(stub, false);
 
     defineProperty(owner, name, { value: stub, writable: true, configurable: true, enumerable: false });
   }

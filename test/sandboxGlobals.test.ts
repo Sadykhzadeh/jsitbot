@@ -527,7 +527,7 @@ describe("the source of a function, checked against Node 26.13", () => {
     const result = await sandbox.execute(`
       const out = [
         Math.max, Array.prototype.map, Symbol, JSON.parse, (function () {}).bind(null), (() => 1).bind(null),
-        Object.prototype.toString, Promise, Map.prototype.get, Math.min,
+        Object.prototype.toString, Promise, Map.prototype.get, Math.min, String.prototype.localeCompare, Number.prototype.toFixed, Uint8Array.fromHex,
       ];
       out.push(function named(a, b) { return a + b }, (x) => x * 2, class K { m() {} });
       return out.map(String).join("\\n");
@@ -544,6 +544,9 @@ describe("the source of a function, checked against Node 26.13", () => {
       "function Promise() { [native code] }",
       "function get() { [native code] }",
       "function min() { [native code] }",
+      "function localeCompare() { [native code] }",
+      "function toFixed() { [native code] }",
+      "function fromHex() { [native code] }",
       "function named(a, b) { return a + b }",
       "(x) => x * 2",
       "class K { m() {} }",
