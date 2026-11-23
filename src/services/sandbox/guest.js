@@ -449,9 +449,10 @@
       }
     } else if (name === "RangeError") {
       if (message === "invalid array length") return "Invalid array length";
+      if (message === "invalid string length") return "Invalid string length";
       if (message === "Date value is NaN") return "Invalid time value";
     } else if (name === "URIError") {
-      if (message === "expecting hex digit" || message === "expecting %" || message === "malformed UTF-8") return "URI malformed";
+      if (message === "expecting hex digit" || message === "expecting %" || message === "malformed UTF-8" || message === "expecting surrogate pair") return "URI malformed";
     } else if (name === "ReferenceError") {
       if (startsWith(message, "'") && endsWith(message, "' is not defined")) {
         return stringSlice(message, 1, message.length - "' is not defined".length) + " is not defined";
@@ -2234,6 +2235,7 @@
     dataViewGetBigUint64: uncurry(DataView.prototype.getBigUint64),
     dataViewSetBigInt64: uncurry(DataView.prototype.setBigInt64),
     dataViewSetBigUint64: uncurry(DataView.prototype.setBigUint64),
+    BigInt,
     Map,
     Set,
     Date,
@@ -2507,6 +2509,11 @@
   lazyMethod("datestring", Date.prototype, "toTimeString");
   lazyMethod("number", Number.prototype, "toLocaleString");
   lazyMethod("number", BigInt.prototype, "toLocaleString");
+  lazyMethod("ranges", String.prototype, "repeat");
+  lazyMethod("ranges", Number.prototype, "toFixed");
+  lazyMethod("ranges", Number.prototype, "toPrecision");
+  lazyMethod("ranges", Number.prototype, "toExponential");
+  lazyMethod("ranges", Number.prototype, "toString");
   lazyMethod("arrays", Array.prototype, "join");
   lazyMethod("arrays", Array.prototype, "toLocaleString");
   lazyMethod("arrays", Object.getPrototypeOf(Uint8Array.prototype), "toLocaleString");
@@ -2527,6 +2534,7 @@
   lazyGlobals("intl", ["Intl"]);
   lazyGlobals("events", ["DOMException", "Event", "CustomEvent", "EventTarget", "AbortController", "AbortSignal"]);
   lazyGlobals("weakref", ["WeakRef"]);
+  lazyGlobals("bigint", ["BigInt"]);
   lazyGlobals("buffer", ["Buffer"], true);
   lazyGlobals("disposable", ["DisposableStack", "AsyncDisposableStack", "SuppressedError"]);
   lazyGlobals("blob", ["Blob", "File"]);
